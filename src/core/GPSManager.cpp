@@ -3,11 +3,11 @@
 
 void GPSManager::begin() {
 #if defined(PIN_GPS_RX) && defined(PIN_GPS_TX)
-  // Use Serial2 for GPS
+  // Gunakan Serial2 untuk GPS
   _gpsSerial = &Serial2;
   _gpsSerial->begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
 #else
-  // GPS Disabled due to pin conflicts
+  // GPS Dinonaktifkan karena konflik pin
   _gpsSerial = NULL;
 #endif
 }
@@ -63,7 +63,7 @@ double GPSManager::getHDOP() {
   if (_gps.hdop.isValid()) {
     return _gps.hdop.hdop();
   }
-  return 99.9; // No fix/bad
+  return 99.9; // Tidak ada perbaikan/buruk
 }
 
 double GPSManager::distanceBetween(double lat1, double long1, double lat2,

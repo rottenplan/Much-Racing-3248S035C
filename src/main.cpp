@@ -6,51 +6,51 @@
 #include "ui/UIManager.h"
 #include <Arduino.h>
 
-// Hardware Objects
+// Objek Perangkat Keras
 TFT_eSPI tft = TFT_eSPI();
 TAMC_GT911 touch(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH,
                  TOUCH_HEIGHT);
 // TouchLib touch(
 //     Wire,
-//     0x00); // Placeholder, waiting for list_dir results to know constructor
+//     0x00); // Placeholder, menunggu hasil list_dir untuk tahu konstruktor
 UIManager uiManager(&tft);
 GPSManager gpsManager;
 SessionManager sessionManager;
 
-// SPIClass touchSpi = SPIClass(HSPI); // Not needed for I2C
+// SPIClass touchSpi = SPIClass(HSPI); // Tidak diperlukan untuk I2C
 
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting RaceBox Clone...");
 
-  // Init Pins
+  // Inisialisasi Pin
 
-  // Init UI (TFT)
+  // Inisialisasi UI (TFT)
   tft.init();
-  tft.setRotation(1); // 0=Portrait, 1=Landscape. Check your mounting!
+  tft.setRotation(1); // 0=Potret, 1=Lanskap. Periksa pemasangan Anda!
   tft.fillScreen(COLOR_BG);
 
-  // Init Touch
-  // Initialize the specific SPI instance for Touch
-  // Pins from Schematic: CLK=14, MISO=12, MOSI=13, CS=33
+  // Inisialisasi Sentuh
+  // Inisialisasi instance SPI khusus untuk Sentuh
+  // Pin dari Skematik: CLK=14, MISO=12, MOSI=13, CS=33
   touch.begin();
-  // touch.setRotation(1); // Try 1 (Left/Landscape) to match TFT Rotation 1.
-  // touch.setRotation(ROTATION_RIGHT); // Match TFT rotation (1)
-  // if (!touch.begin()) { // XPT begin returns void usually, or we assume it
-  // works
-  //   Serial.println("Touch initialization failed!");
+  // touch.setRotation(1); // Coba 1 (Kiri/Lanskap) untuk mencocokkan Rotasi TFT 1.
+  // touch.setRotation(ROTATION_RIGHT); // Cocokkan rotasi TFT (1)
+  // if (!touch.begin()) { // XPT begin biasanya mengembalikan void, atau kita asumsikan itu
+  // bekerja
+  //   Serial.println("Inisialisasi sentuh gagal!");
   // }
 
-  // Init Backlight PWM
-  ledcSetup(0, 5000, 8); // Channel 0, 5kHz, 8-bit
+  // Inisialisasi PWM Lampu Latar
+  ledcSetup(0, 5000, 8); // Saluran 0, 5kHz, 8-bit
   ledcAttachPin(PIN_TFT_BL, 0);
-  ledcWrite(0, 255); // Default Full Brightness
+  ledcWrite(0, 255); // Default Kecerahan Penuh
 
-  // Init Core
+  // Inisialisasi Inti
   gpsManager.begin();
   sessionManager.begin();
 
-  uiManager.setTouch(&touch); // Pass touch object to UI
+  uiManager.setTouch(&touch); // Teruskan objek sentuh ke UI
   uiManager.begin();
 
   Serial.println("System Ready");
@@ -60,6 +60,6 @@ void loop() {
   gpsManager.update();
 
   uiManager.update();
-  // sessionManager autosaves on buffer flush if needed, but we write direct for
-  // now
+  // sessionManager menyimpan otomatis saat buffer flush jika diperlukan, tetapi kita tulis langsung untuk
+  // saat ini
 }

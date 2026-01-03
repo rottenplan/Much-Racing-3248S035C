@@ -73,7 +73,7 @@
 #define FONT_SIZE_STATUS_BAR 1
 #define FONT_SIZE_SPLASH_TEXT 1 // "ENGINE STARTING"
 #define FONT_SIZE_MENU_TITLE 2
-#define FONT_SIZE_MENU_ITEM 2
+#define FONT_SIZE_MENU_ITEM 3
 #define FONT_SIZE_LAP_SPEED 6 // Main Racing Speed
 #define FONT_SIZE_LAP_TIME 2  // Current Lap Time
 #define FONT_SIZE_LAP_LIST 2  // History List Text

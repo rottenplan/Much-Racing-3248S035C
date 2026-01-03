@@ -2,7 +2,6 @@
 #include "../../config.h"
 #include "../../core/SessionManager.h"
 #include "../fonts/Picopixel.h"
-#include "SettingsScreen.h"
 
 extern SessionManager sessionManager;
 
@@ -11,8 +10,7 @@ void SettingsScreen::onShow() {
   loadSettings();
 
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
-  _ui->drawStatusBar(); // Draw Status Bar
+  _ui->drawStatusBar(); // Gambar Bilah Status
   drawList(0);
 }
 
@@ -20,31 +18,31 @@ void SettingsScreen::loadSettings() {
   _settings.clear();
   _prefs.begin("laptimer", false); // Namespace "laptimer"
 
-  // 1. Brightness (Value: Low, Med, High)
+  // 1. Kecerahan (Nilai: Rendah, Sedap, Tinggi)
   SettingItem br;
   br.name = "Brightness";
   br.type = TYPE_VALUE;
   br.key = "bright";
   br.options = {"25%", "50%", "75%", "100%"};
-  br.currentOptionIdx = _prefs.getInt("bright", 3); // Default 100% (Index 3)
+  br.currentOptionIdx = _prefs.getInt("bright", 3); // Default 100% (Indeks 3)
   _settings.push_back(br);
 
-  // 2. Units (Value: Metric, Imperial)
+  // 2. Unit (Nilai: Metrik, Imperial)
   SettingItem unit;
   unit.name = "Units";
   unit.type = TYPE_VALUE;
   unit.key = "units";
   unit.options = {"Metric", "Imperial"};
-  unit.currentOptionIdx = _prefs.getInt("units", 0); // Default Metric
+  unit.currentOptionIdx = _prefs.getInt("units", 0); // Default Metrik
   _settings.push_back(unit);
 
-  // 3. SD Card Test (Action) - Moved up for visibility
+  // 3. Tes Kartu SD (Tindakan) - Dipindahkan ke atas untuk visibilitas
   SettingItem sdTest;
   sdTest.name = "SD Card Test";
   sdTest.type = TYPE_ACTION;
   _settings.push_back(sdTest);
 
-  // 4. Time Zone (Value)
+  // 4. Zona Waktu (Nilai)
   SettingItem tz;
   tz.name = "Time Zone";
   tz.type = TYPE_VALUE;
@@ -59,7 +57,7 @@ void SettingsScreen::loadSettings() {
   tz.currentOptionIdx = _prefs.getInt("timezone", 19); // Default UTC+7
   _settings.push_back(tz);
 
-  // 5. Factory Reset (Action)
+  // 5. Reset Pabrik (Tindakan)
   SettingItem reset;
   reset.name = "Factory Reset";
   reset.type = TYPE_ACTION;
@@ -82,7 +80,7 @@ void SettingsScreen::saveSetting(int idx) {
   if (item.type == TYPE_VALUE) {
     _prefs.putInt(item.key.c_str(), item.currentOptionIdx);
 
-    // Apply immediate effects
+    // Terapkan efek langsung
     if (item.name == "Brightness") {
       int duty = 255;
       switch (item.currentOptionIdx) {
@@ -99,9 +97,9 @@ void SettingsScreen::saveSetting(int idx) {
         duty = 255;
         break; // 100%
       }
-      ledcWrite(0, duty); // Channel 0
+      ledcWrite(0, duty); // Saluran 0
     }
-    // For now just storing.
+    // Untuk saat ini hanya menyimpan.
   } else if (item.type == TYPE_TOGGLE) {
     _prefs.putBool(item.key.c_str(), item.checkState);
   }
@@ -113,15 +111,15 @@ void SettingsScreen::update() {
   if (p.x == -1)
     return;
 
-  // Back Button (Header Area 20-60)
+  // Tombol Kembali (Area Header 20-60)
   if (p.x < 60 && p.y < 60) {
     _ui->switchScreen(SCREEN_MENU);
     return;
   }
 
-  // List Touch
-  int listY = 60; // Should match visual startY
-  int itemH = 35; // Reduced to fit 5 items (5 * 35 = 175 + 60 = 235 < 240)
+  // Daftar Sentuh
+  int listY = 60; // Dipindahkan ke atas (sebelumnya 60)
+  int itemH = 35; // Dikurangi agar muat 5 item (5 * 35 = 175 + 60 = 235 < 240)
 
     // Debounce Check
     static unsigned long lastSettingTouch = 0;
@@ -134,7 +132,7 @@ void SettingsScreen::update() {
         drawList(_scrollOffset);
     }
 
-  // Update Status Bar
+  // Perbarui Bilah Status
   static unsigned long lastStatusUpdate = 0;
   if (millis() - lastStatusUpdate > 1000) {
     _ui->drawStatusBar();
@@ -199,13 +197,13 @@ void SettingsScreen::handleTouch(int idx) {
       tft->setTextColor(COLOR_SECONDARY, COLOR_BG);
       tft->drawString("Touch to Return", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30);
 
-      // Blocking wait for touch
+      // Pemblokiran tunggu sentuhan
       delay(500); // Debounce
       while (_ui->getTouchPoint().x == -1) {
         delay(50);
       }
 
-      // Redraw list after return
+      // Gambar ulang daftar setelah kembali
       tft->fillScreen(COLOR_BG);
       drawList(_scrollOffset);
     }
@@ -216,22 +214,18 @@ void SettingsScreen::drawList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
 
   // Header
-  // Header (Below Status Bar)
-  // Status Bar is 0-20. Header 20-60 (Height 40).
-  tft->fillRect(0, 20, SCREEN_WIDTH, 40, COLOR_SECONDARY);
-  tft->setTextColor(COLOR_TEXT, COLOR_SECONDARY);
-  tft->setTextDatum(MC_DATUM); // Ensure Centering
-  tft->setTextSize(1);         // Standard Font Size
-  tft->drawString("SETTINGS", SCREEN_WIDTH / 2,
-                  40); // Y centered in 20-60 (which is 40)
-  tft->drawString("<", 15, 40);
-  tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY); // Header Separator
+  // Header (Di Bawah Bilah Status)
+  // Panah Kembali
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextSize(2);
+  tft->drawString("<", 10, 35);
 
-  // List
-  int startY = 60; // Starts below header (20+40)
-  int itemH = 35;  // 5 items * 35 = 175. + 60 header = 235 (Fits in 240)
+  // Daftar
+  int startY = 60; // Dimulai lebih tinggi (sebelumnya 60)
+  int itemH = 35;  // 5 item * 35 = 175. + 60 header = 235 (Muat dalam 240)
 
-  for (int i = 0; i < 5; i++) { // Show 5 items
+  for (int i = 0; i < 5; i++) { // Tampilkan 5 item
     int sIdx = scrollOffset + i;
     if (sIdx >= _settings.size())
       break;
@@ -239,28 +233,28 @@ void SettingsScreen::drawList(int scrollOffset) {
     SettingItem &item = _settings[sIdx];
     int y = startY + (i * itemH);
 
-    // Separator
+    // Pemisah
     tft->drawFastHLine(0, y + itemH - 1, SCREEN_WIDTH, COLOR_SECONDARY);
 
-    // Name
+    // Nama
     tft->setTextColor(COLOR_TEXT, COLOR_BG);
 
-    // ... inside drawList ...
+    // ... di dalam drawList ...
     tft->setTextDatum(TL_DATUM);
-    tft->setTextFont(2); // Standard Font
+    tft->setTextFont(2); // Font Standar
     tft->setTextSize(1);
     tft->drawString(item.name, 10, y + 12);
 
-    // Value/Element
+    // Nilai/Elemen
     tft->setTextDatum(TR_DATUM);
     tft->setTextColor(COLOR_ACCENT, COLOR_BG);
 
     if (item.type == TYPE_VALUE) {
       String val = item.options[item.currentOptionIdx];
       tft->drawString(val, SCREEN_WIDTH - 20, y + 12);
-      tft->drawString(">", SCREEN_WIDTH - 10, y + 12); // Arrow
+      tft->drawString(">", SCREEN_WIDTH - 10, y + 12); // Panah
     } else if (item.type == TYPE_TOGGLE) {
-      // Draw Toggle Switch
+      // Gambar Sakelar Toggle
       int swX = SCREEN_WIDTH - 40;
       int swY = y + 12;
       int swW = 30;
@@ -268,7 +262,7 @@ void SettingsScreen::drawList(int scrollOffset) {
 
       uint16_t color = item.checkState ? TFT_GREEN : TFT_RED;
       tft->fillRoundRect(swX, swY, swW, swH, 7, color);
-      // Knob
+      // Tombol
       int knobX = item.checkState ? (swX + swW - 14) : (swX + 2);
       tft->fillCircle(knobX + 6, swY + 7, 5, TFT_WHITE);
     } else if (item.type == TYPE_ACTION) {

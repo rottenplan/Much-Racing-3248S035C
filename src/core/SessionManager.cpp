@@ -7,15 +7,15 @@ void SessionManager::begin() {
   Serial.printf("SD Init: SCK=%d, MISO=%d, MOSI=%d, CS=%d\n", PIN_SD_SCLK,
                 PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
 
-  // Use a dedicated SPI instance for SD Card (VSPI)
-  // This avoids conflicts with the Display/Touch (usually on HSPI)
+  // Gunakan instans SPI khusus untuk Kartu SD (VSPI)
+  // Ini menghindari konflik dengan Tampilan/Sentuh (biasanya pada HSPI)
   SPIClass *sdSpi = new SPIClass(VSPI);
   sdSpi->begin(PIN_SD_SCLK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
 
-  delay(10); // Wait for SPI to stabilize
+  delay(10); // Tunggu SPI stabil
 
-  // Pass the custom SPI to SD.begin
-  if (!SD.begin(PIN_SD_CS, *sdSpi, 4000000)) { // 4MHz safe speed
+  // Teruskan SPI khusus ke SD.begin
+  if (!SD.begin(PIN_SD_CS, *sdSpi, 4000000)) { // Kecepatan aman 4MHz
     Serial.println("SD Card Init Failed!");
   } else {
     Serial.println("SD Card Ready");
@@ -73,7 +73,7 @@ void SessionManager::appendToHistoryIndex(String filename, String date,
   }
 
   if (indexFile) {
-    // Format: Filename,Date,Laps,BestLap
+    // Format: NamaFile,Tanggal,Lap,LapTerbaik
     String line =
         filename + "," + date + "," + String(laps) + "," + String(bestLap);
     indexFile.println(line);
@@ -103,7 +103,7 @@ String SessionManager::loadHistoryIndex() {
 
 bool SessionManager::getSDStatus(uint64_t &total, uint64_t &used) {
   if (!SD.totalBytes())
-    return false; // Check if mounted/valid
+    return false; // Periksa apakah terpasang/valid
   total = SD.totalBytes();
   used = SD.usedBytes();
   return true;

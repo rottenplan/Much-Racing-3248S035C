@@ -5,32 +5,32 @@
 void SplashScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
   tft->setRotation(1);
-  tft->fillScreen(0x0000); // Black
+  tft->fillScreen(0x0000); // Hitam
 
-  // Draw Bitmap (320x240)
-  tft->drawBitmap(0, 0, image_BOLONG_bits, 320, 240, 0xFFFF); // White
+  // Gambar Bitmap (320x240)
+  tft->drawBitmap(0, 0, image_BOLONG_bits, 320, 240, 0xFFFF); // Putih
 
-  // Draw Text "ENGINE STARTING" using Org_01
+  // Gambar Teks "ENGINE STARTING" menggunakan Org_01
   tft->setTextColor(0xFFFF);
   tft->setTextSize(FONT_SIZE_SPLASH_TEXT);
   tft->setFreeFont(&Org_01);
   tft->drawString("ENGINE STARTING", 115, 214);
 
-  // Initialize Progress
+  // Inisialisasi Kemajuan
   _progress = 0;
-  // Draw initial empty bar or just start at 0
+  // Gambar batang kosong awal atau hanya mulai dari 0
   tft->fillRect(38, 198, _progress, 11, 0xFFFF);
 
   _lastUpdate = millis();
 }
 
 void SplashScreen::update() {
-  // Animation Logic
-  // Target width is ~246 based on user code
+  // Logika Animasi
+  // Lebar target adalah ~246 berdasarkan kode pengguna
   if (_progress < 246) {
-    // Non-blocking update every 10ms (faster than 100ms for smoothness)
+    // Pembaruan non-pemblokiran setiap 10ms (lebih cepat dari 100ms untuk kelancaran)
     if (millis() - _lastUpdate > 10) {
-      _progress += 2; // Increment faster
+      _progress += 2; // Penambahan lebih cepat
 
       TFT_eSPI *tft = _ui->getTft();
       tft->fillRect(38, 198, _progress, 11, 0xFFFF);
@@ -38,7 +38,7 @@ void SplashScreen::update() {
       _lastUpdate = millis();
     }
   } else {
-    // Animation complete, wait a moment then switch
+    // Animasi selesai, tunggu sebentar lalu beralih
     if (millis() - _lastUpdate > 1000) {
       _ui->switchScreen(SCREEN_MENU);
     }

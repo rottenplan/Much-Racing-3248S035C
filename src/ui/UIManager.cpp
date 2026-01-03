@@ -1,7 +1,7 @@
 #include "UIManager.h"
 #include "../../config.h"
 
-// Include screens (created in next steps)
+// Sertakan layar (dibuat di langkah berikutnya)
 #include "screens/DragMeterScreen.h"
 #include "screens/HistoryScreen.h"
 #include "screens/LapTimerScreen.h"
@@ -11,10 +11,18 @@
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _currentScreen = nullptr;
+  
+  // Initialize State Trackers
+  _lastTimeStr = "";
+  _lastHdop = -1.0;
+  _lastFix = false;
+  _lastSignalStrength = -1;
+  _lastBat = -1;
+  _lastLogging = false;
 }
 
 void UIManager::begin() {
-  // Instantiate Screens
+  // Instansiasi Layar
   _splashScreen = new SplashScreen();
   _menuScreen = new MenuScreen();
   _lapTimerScreen = new LapTimerScreen();
@@ -22,7 +30,7 @@ void UIManager::begin() {
   _historyScreen = new HistoryScreen();
   _settingsScreen = new SettingsScreen();
 
-  // Begin Screens
+  // Mulai Layar
   _splashScreen->begin(this);
   _menuScreen->begin(this);
   _lapTimerScreen->begin(this);
@@ -30,19 +38,19 @@ void UIManager::begin() {
   _historyScreen->begin(this);
   _settingsScreen->begin(this);
 
-  // Start with Splash
+  // Mulai dengan Splash
   switchScreen(SCREEN_SPLASH);
 }
 
 void UIManager::update() {
-  // Update current screen logic
+  // Perbarui logika layar saat ini
   if (_currentScreen) {
     _currentScreen->update();
   }
 
-  // --- TOUCH HANDLING ---
-  // (Optional) We can handle specific global touches here, but for now
-  // letting screens handle it provides more context control.
+  // --- PENANGANAN SENTUH ---
+  // (Opsional) Kita dapat menangani sentuhan global tertentu di sini, tetapi untuk saat ini
+  // membiarkan layar menanganinya memberikan kontrol konteks yang lebih banyak.
 }
 
 UIManager::TouchPoint UIManager::getTouchPoint() {
@@ -55,28 +63,28 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     int rawX = _touch->points[0].x;
     int rawY = _touch->points[0].y;
 
-    // Calibration for 320x240 Screen
-    // Raw Y typically comes in 0-320 but screen is 0-240.
-    // Raw X is usually 0-320 matching screen width.
-    // Standard 1:1 Mapping (GT911 usually auto-scales)
-    // If inaccurate, check Serial Monitor for "Touch: Raw..." output
-    // Manual Calibration / Mapping from config.h
+    // Kalibrasi untuk Layar 320x240
+    // Y Mentah biasanya masuk 0-320 tetapi layar adalah 0-240.
+    // X Mentah biasanya 0-320 sesuai lebar layar.
+    // Pemetaan Standar 1:1 (GT911 biasanya skala otomatis)
+    // Jika tidak akurat, periksa Monitor Serial untuk output "Touch: Raw..."
+    // Kalibrasi Manual / Pemetaan dari config.h
     int pX = rawX;
     int pY = rawY;
 
-    // 1. Swap XY
+    // 1. Tukar XY
     if (TOUCH_SWAP_XY) {
       int temp = pX;
-      pX = pY; // pX now holds RawY (0-320 approx)
-      pY = temp; // pY now holds RawX (0-240 approx)
+      pX = pY; // pX sekarang menampung RawY (0-320 kira-kira)
+      pY = temp; // pY sekarang menampung RawX (0-240 kira-kira)
     }
 
-    // 2. Invert X (Screen Coordinates)
+    // 2. Balik X (Koordinat Layar)
     if (TOUCH_INVERT_X) {
       pX = SCREEN_WIDTH - 1 - pX;
     }
 
-    // 3. Invert Y (Screen Coordinates)
+    // 3. Balik Y (Koordinat Layar)
     if (TOUCH_INVERT_Y) {
       pY = SCREEN_HEIGHT - 1 - pY;
     }
@@ -84,7 +92,7 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     p.x = pX;
     p.y = pY;
 
-    // Constrain
+    // Batasi
     if (p.x < 0)
       p.x = 0;
     if (p.x > 320)
@@ -94,7 +102,7 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     if (p.y > 240)
       p.y = 240;
 
-    // Debug: Trace touch coordinates
+    // Debug: Lacak koordinat sentuh
     Serial.printf("Touch: Raw[%d,%d] -> Screen[%d,%d]\n", rawX, rawY, p.x, p.y);
   }
   return p;
@@ -107,8 +115,8 @@ extern GPSManager gpsManager;
 extern SessionManager sessionManager;
 
 void UIManager::switchScreen(ScreenType type) {
-  // Add 1-second delay for smooth transition (except from Splash)
-  // No delay for instant switching
+  // Tambahkan penundaan 1 detik untuk transisi yang mulus (kecuali dari Splash)
+  // Tidak ada penundaan untuk peralihan instan
 
   _currentType = type;
 
@@ -121,7 +129,7 @@ void UIManager::switchScreen(ScreenType type) {
     break;
   case SCREEN_MENU:
     _currentScreen = _menuScreen;
-    _screenTitle = ""; // Empty = Show Time
+    _screenTitle = ""; // Kosong = Tampilkan Waktu
     break;
   case SCREEN_LAP_TIMER:
     _currentScreen = _lapTimerScreen;
@@ -141,9 +149,9 @@ void UIManager::switchScreen(ScreenType type) {
     break;
   }
 
-  // Draw Status Bar immediately on switch (background already cleared)
+  // Gambar Bilah Status segera saat beralih (latar belakang sudah dihapus)
   if (_currentType != SCREEN_SPLASH) {
-    drawStatusBar();
+    drawStatusBar(true); // Force redraw on switch
   }
 
   if (_currentScreen) {
@@ -151,30 +159,24 @@ void UIManager::switchScreen(ScreenType type) {
   }
 }
 
-// Variables to track last state for conditional redrawing
-static String _lastTimeStr = "";
-static double _lastHdop = -1.0;
-static bool _lastFix = false;
-static int _lastSignalStrength = -1;
-static int _lastBat = -1;
-static bool _lastLogging = false;
-
-void UIManager::drawStatusBar() {
-  // 1. Static Elements (Only draw once or if forced? For now, we assume background is cleared only on screen switch)
-  // If we want to avoid flickering, we must NOT clear the whole bar every frame.
-  // We rely on text background colors to overwrite old text.
+void UIManager::drawStatusBar(bool force) {
+  // 1. Elemen Statis (Hanya gambar sekali atau jika dipaksa? Untuk saat ini, kita asumsikan latar belakang dihapus hanya pada peralihan layar)
+  // Jika kita ingin menghindari kedipan, kita TIDAK boleh menghapus seluruh bilah setiap bingkai.
+  // Kita mengandalkan warna latar belakang teks untuk menimpa teks lama.
   
-  // Draw separator line (safe to redraw, fast)
-  _tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Gambar garis pemisah (aman untuk digambar ulang, cepat)
+  if (force) {
+      _tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+  }
 
   _tft->setTextSize(FONT_SIZE_STATUS_BAR);
   _tft->setTextColor(COLOR_TEXT, COLOR_BG);
 
-  // --- GPS Section ---
+  // --- Bagian GPS ---
   double hdop = gpsManager.getHDOP();
   bool fix = gpsManager.isFixed();
   
-  // Logic to calculate strength
+  // Logika untuk menghitung kekuatan
   int signalStrength = 0;
   if (fix) {
     if (hdop <= 0.8) signalStrength = 4;
@@ -183,12 +185,12 @@ void UIManager::drawStatusBar() {
     else signalStrength = 1;
   }
 
-  // Redraw GPS Icon only if state changed (Fix status or Strength)
-  if (fix != _lastFix || signalStrength != _lastSignalStrength) {
-      // Clear GPS Area
+  // Gambar ulang Ikon GPS hanya jika status berubah (Status perbaikan atau Kekuatan)
+  if (force || fix != _lastFix || signalStrength != _lastSignalStrength) {
+      // Hapus Area GPS
       _tft->fillRect(0, 0, 80, 20, COLOR_BG);
       
-      // Draw "GPS" Label
+      // Gambar Label "GPS"
       _tft->setTextDatum(ML_DATUM);
       _tft->setTextColor(COLOR_TEXT, COLOR_BG);
       _tft->setTextSize(1);
@@ -215,35 +217,35 @@ void UIManager::drawStatusBar() {
       _lastSignalStrength = signalStrength;
   }
 
-  // --- Time / Title Section ---
-  // If _screenTitle is set, show it. Otherwise show Time.
+  // --- Bagian Waktu / Judul ---
+  // Jika _screenTitle diatur, tampilkan. Jika tidak tampilkan Waktu.
   String centerText;
   if (_screenTitle.length() > 0) {
       centerText = _screenTitle;
   } else {
-      centerText = gpsManager.getTimeString();
+      centerText = ""; // Jangan tampilkan waktu
   }
 
-  if (centerText != _lastTimeStr) { // Reusing _lastTimeStr for center text cache
-      // Clear Time/Title Area (Center)
-      // Assuming max width 160px (leaving 80px on each side)
+  if (force || centerText != _lastTimeStr) { // Menggunakan kembali _lastTimeStr untuk cache teks tengah
+      // Hapus Area Waktu / Judul (Tengah)
+      // Diasumsikan lebar maksimal 160px (menyisakan 80px di setiap sisi)
       int areaW = 160;
       
       _tft->setTextPadding(areaW);
       _tft->setTextDatum(TC_DATUM);
       _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-      _tft->drawString(centerText, SCREEN_WIDTH / 2, 5); // Adjusted Y to 5
+      _tft->drawString(centerText, SCREEN_WIDTH / 2, 5); // Y disesuaikan ke 5
       _tft->setTextPadding(0);
       
       _lastTimeStr = centerText;
   }
 
-  // --- Battery Section (Mock) ---
-  // Just redraw simple battery every time? Or check change?
-  // Mocking change check
+  // --- Bagian Baterai (Tiruan) ---
+  // Cukup gambar ulang baterai sederhana setiap saat? Atau periksa perubahan?
+  // Memeriksa mock perubahan
   int rawBat = 4095; // Mock
-  if (rawBat != _lastBat) {
-      // Clear Bat Area
+  if (force || rawBat != _lastBat) {
+      // Hapus Area Bar
       _tft->fillRect(SCREEN_WIDTH - 30, 0, 30, 20, COLOR_BG);
       
       int batX = SCREEN_WIDTH - 25;
@@ -254,16 +256,16 @@ void UIManager::drawStatusBar() {
       _tft->drawRect(batX, batY, batW, batH, COLOR_TEXT);
       _tft->fillRect(batX + batW, batY + 2, 2, 6, COLOR_TEXT);
       
-      // Mock Level
+      // Level Mock
       _tft->fillRect(batX + 2, batY + 2, batW - 4, batH - 4, TFT_GREEN);
       
       _lastBat = rawBat;
   }
 
-  // --- Recording Indicator ---
+  // --- Indikator Perekaman ---
   bool isLogging = sessionManager.isLogging();
-  if (isLogging != _lastLogging) {
-       // Clear Dot Area
+  if (force || isLogging != _lastLogging) {
+       // Hapus Area Titik
        int dotX = (SCREEN_WIDTH / 2) + 40;
        _tft->fillRect(dotX - 5, 0, 10, 20, COLOR_BG);
        

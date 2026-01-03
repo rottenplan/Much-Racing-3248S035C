@@ -35,7 +35,7 @@ public:
   void begin();
   void update();
   void switchScreen(ScreenType type);
-  void drawStatusBar();
+  void drawStatusBar(bool force = false); // Added force parameter
 
   // Touch Handling
   void setTouch(TAMC_GT911 *touch) { _touch = touch; }
@@ -65,6 +65,14 @@ private:
   UserScreen *_settingsScreen;
   
   String _screenTitle; // Added title
+  
+  // Status Bar State Trackers
+  String _lastTimeStr;
+  double _lastHdop;
+  bool _lastFix;
+  int _lastSignalStrength;
+  int _lastBat;
+  bool _lastLogging;
 };
 
 #endif

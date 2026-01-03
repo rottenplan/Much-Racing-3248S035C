@@ -2,33 +2,31 @@
 #include "../../core/GPSManager.h"
 #include "../../core/SessionManager.h"
 #include "../fonts/Org_01.h"
-#include <algorithm> // For min_element
+#include <algorithm> // Untuk min_element
 
 extern GPSManager gpsManager;
 extern SessionManager sessionManager;
 
-// Constants for UI Layout
+// Konstanta untuk Tata Letak UI
 #define STATUS_BAR_HEIGHT 20
-#define HEADER_HEIGHT 40
 #define LIST_ITEM_HEIGHT 30
-#define BUTTON_HEIGHT 40
 
-// Define Button Area
-#define STOP_BTN_Y 200 // Moved DOWN for better spacing
+// Tentukan Area Tombol
+#define STOP_BTN_Y 200 // Dipindahkan KE BAWAH untuk jarak yang lebih baik
 #define STOP_BTN_H 35
 
 void LapTimerScreen::onShow() {
   _lastUpdate = 0;
-  _isRecording = false; // Start not recording
+  _isRecording = false; // Mulai tidak merekam
   _finishSet = false;
   _lapCount = 0;
-  _state = STATE_SUMMARY; // Start in Summary/Menu View
+  _state = STATE_SUMMARY; // Mulai dalam Tampilan Ringkasan/Menu
   _bestLapTime = 0;
   _lapTimes.clear();
   _listScroll = 0;
 
   TFT_eSPI *tft = _ui->getTft();
-  // tft->fillScreen(COLOR_BG); // Already cleared by UIManager
+  // tft->fillScreen(COLOR_BG); // Sudah dibersihkan oleh UIManager
   drawSummary();
 }
 
@@ -39,33 +37,33 @@ void LapTimerScreen::update() {
 
 
   if (_state == STATE_SUMMARY) {
-    // --- SUMMARY STATE LOGIC ---
+    // --- LOGIKA STATUS RINGKASAN ---
     if (touched) {
-      // 1. START BUTTON (Bottom)
+      // 1. TOMBOL MULAI (Bawah)
       // Rect: y > 200
       if (p.y > 200) {
-        // Start Racing
+        // Mulai Balapan
         _state = STATE_RACING;
         _ui->getTft()->fillScreen(COLOR_BG);
-        drawRacingStatic(); // Draw static elements once
-        drawRacing(); // Initial draw of dynamic elements
+        drawRacingStatic(); // Gambar elemen statis sekali
+        drawRacing(); // Gambar awal elemen dinamis
         return;
       }
 
-      // 2. BACK/MENU (Top Left)
-      // Back Button (Header Area 20-60)
-      if (p.x < 70 && p.y < 70) { // Standardized to 70x70
+      // 2. KEMBALI/MENU (Kiri Atas)
+      // Tombol Kembali (Area Header 20-60)
+      if (p.x < 70 && p.y < 70) { // Distandarisasi ke 70x70
         _ui->switchScreen(SCREEN_MENU);
         return;
       }
 
-      // 3. SCROLLING (Middle)
-      // List is at y=70 to ~190
+      // 3. PENGGULIRAN (Tengah)
+      // Daftar ada di y=70 hingga ~190
       if (p.y > 70 && p.y < 200) {
-        if (p.y < 135) { // Upper half
+        if (p.y < 135) { // Setengah atas
           if (_listScroll > 0)
             _listScroll--;
-        } else { // Lower half
+        } else { // Setengah bawah
           if (_listScroll < _lapTimes.size())
             _listScroll++;
         }
@@ -74,16 +72,16 @@ void LapTimerScreen::update() {
     }
 
   } else {
-    // --- RACING STATE LOGIC ---
-    // Touch: STOP/FINISH
+    // --- LOGIKA STATUS BALAPAN ---
+    // Sentuh: BERHENTI/SELESAI
     if (touched) {
-      // Stop Button (Bottom)
+      // Tombol Berhenti (Bawah)
       if (p.y > STOP_BTN_Y) {
         _state = STATE_SUMMARY;
 
-        // Save History
+        // Simpan Riwayat
         if (sessionManager.isLogging()) {
-          // Get Date/Time string?
+          // Dapatkan string Tanggal/Waktu?
           String dateStr =
               gpsManager.getDateString() + " " + gpsManager.getTimeString();
           sessionManager.appendToHistoryIndex("Track Session", dateStr,
@@ -97,7 +95,7 @@ void LapTimerScreen::update() {
         return;
       }
 
-      // Manual Finish Set (if not set)
+      // Set Selesai Manual (jika belum diset)
       if (!_finishSet && gpsManager.isFixed() && p.y < 200) {
         _finishLat = gpsManager.getLatitude();
         _finishLon = gpsManager.getLongitude();
@@ -110,7 +108,7 @@ void LapTimerScreen::update() {
     if (_finishSet)
       checkFinishLine();
 
-    // Logging (1Hz or 10Hz?)
+    // Pencatatan (1Hz atau 10Hz?)
     if (sessionManager.isLogging() && (millis() - _lastUpdate > 100)) {
       String data = String(millis()) + "," +
                     String(gpsManager.getLatitude(), 6) + "," +
@@ -129,28 +127,23 @@ void LapTimerScreen::update() {
   }
 }
 
-// --- DRAWING HELPERS ---
+// --- PEMBANTU PENGGAMBARAN ---
 
 void LapTimerScreen::drawSummary() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Header
-  // Header (Below Status Bar)
+  // Header (Di Bawah Bilah Status)
   int headerY = STATUS_BAR_HEIGHT; // 20
-  tft->fillRect(0, headerY, SCREEN_WIDTH, HEADER_HEIGHT, COLOR_SECONDARY);
 
-  tft->setTextColor(COLOR_TEXT, COLOR_SECONDARY);
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextFont(2);
-  tft->setTextSize(1);
-  tft->drawString("SESSION SUMMARY", SCREEN_WIDTH / 2,
-                  headerY + (HEADER_HEIGHT / 2));
+  // Panah Kembali (Minimal seperti DragMeter)
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextSize(2);
+  tft->drawString("<", 10, 35); 
 
-  // Back Button Icon
-  tft->drawString("<", 15, headerY + (HEADER_HEIGHT / 2));
-
-  // Best Lap Box (Top)
-  int bestLapY = headerY + HEADER_HEIGHT + 5; // 20+40+5 = 65
+  // Kotak Lap Terbaik (Atas)
+  int bestLapY = 60; // Dipindahkan ke atas (sebelumnya 65)
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
   tft->setTextDatum(TC_DATUM);
   tft->setTextFont(2);
@@ -167,18 +160,18 @@ void LapTimerScreen::drawSummary() {
     sprintf(buf, "--:--.--");
   }
 
-  tft->setTextFont(4); // Use Font 4 for big numbers (approx 26px high)
-  tft->setTextSize(1); // Standard size
+  tft->setTextFont(4); // Gunakan Font 4 untuk angka besar (tinggi sekitar 26px)
+  tft->setTextSize(1); // Ukuran standar
   tft->drawString(buf, SCREEN_WIDTH / 2,
-                  bestLapY + 25); // Adjusted Y for font 4
+                  bestLapY + 25); // Y disesuaikan untuk font 4
 
-  // List (Middle)
-  // Shift list up slightly
+  // Daftar (Tengah)
+  // Geser daftar sedikit ke atas
   drawLapList(_listScroll);
 
-  // Start Button (Bottom)
-  // Screen H=240. Status=20. Header=40. List=~150.
-  // Button needs to be at ~200.
+  // Tombol Mulai (Bawah)
+  // Layar H=240. Status=20. Header=40. Daftar=~150.
+  // Tombol harus berada di ~200.
   int btnY = 200;
   int btnH = 35;
 
@@ -188,15 +181,15 @@ void LapTimerScreen::drawSummary() {
   tft->setTextSize(2);
   tft->setTextDatum(MC_DATUM);
   tft->drawString("START", SCREEN_WIDTH / 2,
-                  btnY + (btnH / 2) + 2); // +2 centering
+                  btnY + (btnH / 2) + 2); // +2 pemusatan
 }
 
 void LapTimerScreen::drawLapList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
-  int startY = 90;     // Moved down to clear header (20+40+30)
-  int itemsToShow = 4; // Show fewer items to fit
+  int startY = 90;     // Dipindahkan ke atas (sebelumnya 90)
+  int itemsToShow = 4; // Tampilkan lebih sedikit item agar muat
 
-  // Clear List Area
+  // Hapus Area Daftar
   tft->fillRect(0, startY, SCREEN_WIDTH, itemsToShow * LIST_ITEM_HEIGHT,
                 COLOR_BG);
 
@@ -220,7 +213,7 @@ void LapTimerScreen::drawLapList(int scrollOffset) {
     int y = startY + (i * LIST_ITEM_HEIGHT);
     tft->drawString(buf, 20, y);
 
-    // Highlight Best Lap?
+    // Sorot Lap Terbaik?
     if (t == _bestLapTime && t > 0) {
       tft->drawRect(15, y - 2, SCREEN_WIDTH - 30, LIST_ITEM_HEIGHT - 2,
                     TFT_GOLD);
@@ -231,55 +224,55 @@ void LapTimerScreen::drawLapList(int scrollOffset) {
 void LapTimerScreen::drawRacingStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Draw Static Labels
+  // Gambar Label Statis
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
   
-  // 1. Speed Label (Top Left)
-  tft->setTextDatum(TL_DATUM); // Top Left
+  // 1. Label Kecepatan (Kiri Atas)
+  tft->setTextDatum(TL_DATUM); // Kiri Atas
   tft->setTextFont(2);
   tft->setTextSize(1);
-  tft->drawString("km/h", 10, 50); // Label at 50
+  tft->drawString("km/h", 10, 50); // Label di 50
 
-  // 2. Lap Label (Top Right)
-  tft->setTextDatum(TR_DATUM); // Top Right
+  // 2. Label Lap (Kanan Atas)
+  tft->setTextDatum(TR_DATUM); // Kanan Atas
   tft->setTextFont(2);
-  tft->drawString("LAP", SCREEN_WIDTH - 10, 50); // Label at 50
+  tft->drawString("LAP", SCREEN_WIDTH - 10, 50); // Label di 50
 
-  // 3. Best Lap Label (Bottom Center, above STOP)
+  // 3. Label Lap Terbaik (Tengah Bawah, di atas STOP)
   tft->setTextDatum(TC_DATUM);
-  tft->drawString("BEST LAP", SCREEN_WIDTH / 2, 165); // Moved UP to 165
+  tft->drawString("BEST LAP", SCREEN_WIDTH / 2, 165); // Dipindahkan ke ATAS ke 165
 
-  // Stop Button (Moved here, drawn ONCE)
+  // Tombol Berhenti (Dipindahkan ke sini, digambar SEKALI)
   tft->fillRoundRect(40, STOP_BTN_Y, SCREEN_WIDTH - 80, STOP_BTN_H, 5, TFT_RED);
   tft->setTextColor(TFT_WHITE, TFT_RED);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
   tft->setTextDatum(MC_DATUM);
   tft->drawString("STOP", SCREEN_WIDTH / 2,
-                  STOP_BTN_Y + (STOP_BTN_H / 2) + 2); // Match offset
+                  STOP_BTN_Y + (STOP_BTN_H / 2) + 2); // Cocokkan offset
 }
 
 void LapTimerScreen::drawRacing() {
   TFT_eSPI *tft = _ui->getTft();
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
 
-  // 1. Speed (Top Left)
+  // 1. Kecepatan (Kiri Atas)
   tft->setTextDatum(TL_DATUM);
-  tft->setTextFont(4); // Medium Font
+  tft->setTextFont(4); // Font Sedang
   tft->setTextSize(1);
   tft->setTextPadding(80); 
-  tft->drawFloat(gpsManager.getSpeedKmph(), 0, 10, 20); // Value at 20
+  tft->drawFloat(gpsManager.getSpeedKmph(), 0, 10, 20); // Nilai di 20
   tft->setTextPadding(0);
 
-  // 2. Lap Count (Top Right)
+  // 2. Hitungan Lap (Kanan Atas)
   tft->setTextDatum(TR_DATUM);
   tft->setTextFont(4); 
   tft->setTextSize(1);
   tft->setTextPadding(50);
-  tft->drawNumber(_lapCount, SCREEN_WIDTH - 10, 20); // Value at 20
+  tft->drawNumber(_lapCount, SCREEN_WIDTH - 10, 20); // Nilai di 20
   tft->setTextPadding(0);
 
-  // 3. Current Lap Time (CENTER - Main Focus)
+  // 3. Waktu Lap Saat Ini (TENGAH - Fokus Utama)
   unsigned long currentLap = 0;
   if (_isRecording)
     currentLap = millis() - _currentLapStart;
@@ -289,14 +282,14 @@ void LapTimerScreen::drawRacing() {
   char buf[32];
   sprintf(buf, "%02d:%02d.%01d", m, s, ms / 100); // Format MM:SS.d
 
-  tft->setTextDatum(MC_DATUM); // Center Screen
-  tft->setTextFont(6); // Large Font
+  tft->setTextDatum(MC_DATUM); // Layar Tengah
+  tft->setTextFont(6); // Font Besar
   tft->setTextSize(1);
-  tft->setTextPadding(SCREEN_WIDTH); // Full width clear
-  tft->drawString(buf, SCREEN_WIDTH / 2, 115); // Center at 115
+  tft->setTextPadding(SCREEN_WIDTH); // Hapus lebar penuh
+  tft->drawString(buf, SCREEN_WIDTH / 2, 115); // Tengah di 115
   tft->setTextPadding(0);
 
-  // 4. Best Lap Time (Bottom Center - Small)
+  // 4. Waktu Lap Terbaik (Tengah Bawah - Kecil)
   if (_bestLapTime > 0) {
       int bms = _bestLapTime % 1000;
       int bs = (_bestLapTime / 1000) % 60;
@@ -309,7 +302,7 @@ void LapTimerScreen::drawRacing() {
   tft->setTextFont(2);
   tft->setTextDatum(TC_DATUM);
   tft->setTextPadding(100);
-  tft->drawString(buf, SCREEN_WIDTH / 2, 185); // Value at 185 (Clear gap to 200)
+  tft->drawString(buf, SCREEN_WIDTH / 2, 185); // Nilai di 185 (Hapus celah ke 200)
   tft->setTextPadding(0);
 }
 
@@ -318,13 +311,13 @@ void LapTimerScreen::checkFinishLine() {
                                            gpsManager.getLongitude(),
                                            _finishLat, _finishLon);
 
-  // Start/Lap Detection Logic
+  // Logika Deteksi Mulai/Lap
   static bool inside = false;
   static unsigned long lastCross = 0;
 
-  if (dist < 20) {                                   // 20m radius
+  if (dist < 20) {                                   // Radius 20m
     if (!inside && (millis() - lastCross > 10000)) { // Debounce 10s
-      // New Lap / Start
+      // Lap Baru / Mulai
       if (!_isRecording) {
         _isRecording = true;
         sessionManager.startSession();
@@ -332,7 +325,7 @@ void LapTimerScreen::checkFinishLine() {
       } else {
         unsigned long lapTime = millis() - _currentLapStart;
         _lastLapTime = lapTime;
-        _lapTimes.push_back(lapTime); // Add to history
+        _lapTimes.push_back(lapTime); // Tambahkan ke riwayat
         if (_bestLapTime == 0 || lapTime < _bestLapTime)
           _bestLapTime = lapTime;
         _lapCount++;

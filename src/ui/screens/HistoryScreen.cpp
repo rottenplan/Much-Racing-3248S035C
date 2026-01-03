@@ -11,8 +11,7 @@ void HistoryScreen::onShow() {
   scanHistory();
 
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
-  _ui->drawStatusBar(); // Draw Status Bar
+  _ui->drawStatusBar(); // Gambar Bilah Status
   drawList(0);
 }
 
@@ -22,8 +21,8 @@ void HistoryScreen::update() {
     return;
 
   if (_showingDetails) {
-    // Back from Details (Header Area 0-40 usually, but let's check drawDetails)
-    // drawDetails header is 0-40. So <40 is correct there.
+    // Kembali dari Detail (Area Header 0-40 biasanya, tapi mari kita periksa drawDetails)
+    // drawDetails header adalah 0-40. Jadi <40 benar di sana.
     if (p.y < 40) {
       _showingDetails = false;
       _ui->getTft()->fillScreen(COLOR_BG);
@@ -31,21 +30,21 @@ void HistoryScreen::update() {
       return;
     }
   } else {
-    // List View (Header Area 20-60)
-    // Back Button
+    // Tampilan Daftar (Area Header 20-60)
+    // Tombol Kembali
     if (p.x < 60 && p.y < 60) {
       _ui->switchScreen(SCREEN_MENU);
       return;
     }
 
-    // Scroll/Select
-    // List area: Y=70 to 240
-    // Items are ~40px high.
+    // Gulir/Pilih
+    // Area daftar: Y=70 hingga 240
+    // Item setinggi ~40px.
     int listY = 70;
     int itemH = 40;
 
-    // Check scroll buttons (if we add them) or simple touch zones
-    // Simple Touch-to-Select for now
+    // Periksa tombol gulir (jika kita menambahkannya) atau zona sentuh sederhana
+    // Sentuh-untuk-Pilih Sederhana untuk saat ini
     if (p.y > listY) {
       int clickedIdx = _scrollOffset + ((p.y - listY) / itemH);
       if (clickedIdx < _historyList.size()) {
@@ -57,7 +56,7 @@ void HistoryScreen::update() {
     }
   }
 
-  // Update Status Bar
+  // Perbarui Bilah Status
   static unsigned long lastStatusUpdate = 0;
   if (millis() - lastStatusUpdate > 1000) {
     _ui->drawStatusBar();
@@ -69,7 +68,7 @@ void HistoryScreen::scanHistory() {
   _historyList.clear();
   String content = sessionManager.loadHistoryIndex();
 
-  // Parse CSV: filename,date,laps,bestLap
+  // Uraikan CSV: nama file,tanggal,lap,lap terbaik
   int start = 0;
   while (start < content.length()) {
     int end = content.indexOf('\n', start);
@@ -80,7 +79,7 @@ void HistoryScreen::scanHistory() {
     line.trim();
 
     if (line.length() > 0) {
-      // Split commas
+      // Pisahkan koma
       int c1 = line.indexOf(',');
       int c2 = line.indexOf(',', c1 + 1);
       int c3 = line.indexOf(',', c2 + 1);
@@ -90,9 +89,9 @@ void HistoryScreen::scanHistory() {
         item.filename = line.substring(0, c1);
         item.date = line.substring(c1 + 1, c2);
         item.laps = line.substring(c2 + 1, c3).toInt();
-        item.bestLap = line.substring(c3 + 1).toInt(); // Assuming millis
+        item.bestLap = line.substring(c3 + 1).toInt(); // Asumsi millis
         _historyList.insert(_historyList.begin(),
-                            item); // Prepend (Newest first)
+                            item); // Tambahkan di awal (Terbaru dulu)
       }
     }
     start = end + 1;
@@ -103,49 +102,49 @@ void HistoryScreen::drawList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
 
   // Header
-  // Status Bar 0-20, Header 20-60
-  tft->fillRect(0, 20, SCREEN_WIDTH, 40, COLOR_SECONDARY);
-  tft->setTextColor(COLOR_TEXT, COLOR_SECONDARY);
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextFont(2);
-  tft->setTextSize(1);
-  tft->drawString("HISTORY", SCREEN_WIDTH / 2, 40); // Centered at Y=40
-  tft->drawString("<", 15, 40);
-  tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY); // Header Separator
+  // Header
+  // Bilah Status 0-20. 
+  
+  // Panah Kembali
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextFont(1); // Atau standar
+  tft->setTextSize(2); // Besar untuk sentuhan mudah
+  tft->drawString("<", 10, 35);
 
-  // List
-  int startY = 70; // 60 (Header End) + 10 margin
+  // Daftar
+  int startY = 70; // Dipindahkan ke atas (sebelumnya 70)
   int itemH = 40;
   int count = 0;
 
   for (int i = scrollOffset; i < _historyList.size(); i++) {
     if (count >= 4)
-      break; // Show 4 items
+      break; // Tampilkan 4 item
 
     HistoryItem &item = _historyList[i];
     int y = startY + (count * itemH);
 
-    // Background for item (alternating?)
+    // Latar belakang untuk item (bergantian?)
     if (count % 2 == 0)
-      tft->fillRect(0, y, SCREEN_WIDTH, itemH, 0x10A2); // Dark Grey
+      tft->fillRect(0, y, SCREEN_WIDTH, itemH, 0x10A2); // Abu-abu Gelap
 
-    // Date (Top Left)
-    tft->setTextColor(COLOR_TEXT); // Transparent bg
+    // Tanggal (Kiri Atas)
+    tft->setTextColor(COLOR_TEXT); // Latar belakang transparan
     tft->setTextDatum(TL_DATUM);
     tft->setTextFont(2);
     tft->setTextSize(1);
     tft->drawString(item.date, 10, y + 2);
 
-    // Stats (Bottom Left/Right)
+    // Statistik (Kiri/Kanan Bawah)
     tft->setTextSize(1);
-    tft->setTextFont(2); // Keep font 2
+    tft->setTextFont(2); // Tetap font 2
     tft->setTextColor(COLOR_SECONDARY);
     String sub = "Laps: " + String(item.laps);
     tft->drawString(sub, 10, y + 22);
 
-    // Best Lap (Right)
+    // Lap Terbaik (Kanan)
     tft->setTextDatum(TR_DATUM);
-    tft->setTextColor(COLOR_ACCENT); // Green/Teal
+    tft->setTextColor(COLOR_ACCENT); // Hijau/Teal
     tft->setTextFont(2);
     tft->setTextSize(1);
 
@@ -175,16 +174,15 @@ void HistoryScreen::drawDetails(int idx) {
   TFT_eSPI *tft = _ui->getTft();
 
   // Header
-  tft->fillRect(0, 0, SCREEN_WIDTH, 40, COLOR_SECONDARY);
-  tft->setTextColor(COLOR_TEXT, COLOR_SECONDARY);
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextFont(2);
-  tft->setTextSize(1);
-  tft->drawString("SESSION DETAILS", SCREEN_WIDTH / 2, 20);
-  tft->drawString("<", 15, 20);
+  // Detail Header
+  // Panah Kembali
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextSize(2);
+  tft->drawString("<", 10, 35);
 
   // Info
-  int y = 60;
+  int y = 70;
   tft->setTextDatum(TL_DATUM);
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
 
@@ -193,7 +191,7 @@ void HistoryScreen::drawDetails(int idx) {
   tft->drawString("Total Laps: " + String(item.laps), 20, y);
   y += 30;
 
-  // Best Lap
+  // Lap Terbaik
   tft->drawString("Best Lap:", 20, y);
   tft->setTextColor(TFT_GREEN, COLOR_BG);
 
@@ -205,7 +203,7 @@ void HistoryScreen::drawDetails(int idx) {
   tft->setTextSize(3);
   tft->drawString(buf, 20, y + 25);
 
-  // Note: Parsing the actual CSV for full lap list is complex.
-  // For now, this summary view matches user request "like RaceBox" history
-  // list.
+  // Catatan: Mengurai CSV sebenarnya untuk daftar lap lengkap itu rumit.
+  // Untuk saat ini, tampilan ringkasan ini cocok dengan permintaan pengguna "seperti RaceBox" daftar
+  // riwayat.
 }
