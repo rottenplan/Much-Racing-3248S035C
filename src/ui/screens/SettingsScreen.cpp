@@ -123,16 +123,16 @@ void SettingsScreen::update() {
   int listY = 60; // Should match visual startY
   int itemH = 35; // Reduced to fit 5 items (5 * 35 = 175 + 60 = 235 < 240)
 
-  if (p.y > listY) {
-    int idx = _scrollOffset + ((p.y - listY) / itemH);
-    handleTouch(idx);
-
-    // Debounce simple
-    delay(200);
-
-    // Redraw
-    drawList(_scrollOffset);
-  }
+    // Debounce Check
+    static unsigned long lastSettingTouch = 0;
+    if (millis() - lastSettingTouch > 200) {
+        int idx = _scrollOffset + ((p.y - listY) / itemH);
+        handleTouch(idx);
+        lastSettingTouch = millis();
+        
+        // Redraw
+        drawList(_scrollOffset);
+    }
 
   // Update Status Bar
   static unsigned long lastStatusUpdate = 0;

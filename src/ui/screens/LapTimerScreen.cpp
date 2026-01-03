@@ -28,7 +28,7 @@ void LapTimerScreen::onShow() {
   _listScroll = 0;
 
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
+  // tft->fillScreen(COLOR_BG); // Already cleared by UIManager
   drawSummary();
 }
 

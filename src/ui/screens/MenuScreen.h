@@ -12,6 +12,7 @@ public:
 private:
   UIManager *_ui;
   int _selectedIndex;
+  unsigned long _lastTouchTime = 0;
   void drawMenu();
 };
 

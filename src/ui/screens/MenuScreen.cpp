@@ -9,6 +9,7 @@ const char *menuLabels[MENU_ITEMS] = {"LAP TIMER", "DRAG METER", "HISTORY",
 
 void MenuScreen::onShow() {
   _selectedIndex = 0;
+  _lastTouchTime = 0; // Reset debounce
   drawMenu();
 }
 
@@ -38,6 +39,13 @@ void MenuScreen::update() {
 
       // Check if touch is within the visual highlight box
       if (p.x >= 5 && p.x <= (SCREEN_WIDTH - 5) && p.y >= yTop && p.y <= yBot) {
+        
+        // Debounce Check
+        if (millis() - _lastTouchTime < 200) {
+            return; // Ignore rapid touches
+        }
+        _lastTouchTime = millis();
+        
         // Valid Tap on Item i
         if (_selectedIndex != i) {
           // First tap: Just Highlight
@@ -48,7 +56,7 @@ void MenuScreen::update() {
           // Second tap (on selected): Enter
           enter = true;
         }
-        delay(200); // Simple debounce
+        // delay(200); // Removed blocking delay
         break;
       }
     }

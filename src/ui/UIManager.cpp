@@ -108,9 +108,7 @@ extern SessionManager sessionManager;
 
 void UIManager::switchScreen(ScreenType type) {
   // Add 1-second delay for smooth transition (except from Splash)
-  if (_currentType != SCREEN_SPLASH) {
-    delay(500);
-  }
+  // No delay for instant switching
 
   _currentType = type;
 
@@ -119,21 +117,27 @@ void UIManager::switchScreen(ScreenType type) {
   switch (type) {
   case SCREEN_SPLASH:
     _currentScreen = _splashScreen;
+    _screenTitle = "";
     break;
   case SCREEN_MENU:
     _currentScreen = _menuScreen;
+    _screenTitle = ""; // Empty = Show Time
     break;
   case SCREEN_LAP_TIMER:
     _currentScreen = _lapTimerScreen;
+    _screenTitle = "LAP TIMER";
     break;
   case SCREEN_DRAG_METER:
     _currentScreen = _dragMeterScreen;
+    _screenTitle = "DRAG METER";
     break;
   case SCREEN_HISTORY:
     _currentScreen = _historyScreen;
+    _screenTitle = "HISTORY";
     break;
   case SCREEN_SETTINGS:
     _currentScreen = _settingsScreen;
+    _screenTitle = "SETTINGS";
     break;
   }
 
@@ -147,97 +151,125 @@ void UIManager::switchScreen(ScreenType type) {
   }
 }
 
-void UIManager::drawStatusBar() {
-  // Only draw every second or so to minimize flicker?
-  // Or just draw transparent text.
+// Variables to track last state for conditional redrawing
+static String _lastTimeStr = "";
+static double _lastHdop = -1.0;
+static bool _lastFix = false;
+static int _lastSignalStrength = -1;
+static int _lastBat = -1;
+static bool _lastLogging = false;
 
-  // Background Strip
-  _tft->fillRect(0, 0, SCREEN_WIDTH, 20, COLOR_BG);
+void UIManager::drawStatusBar() {
+  // 1. Static Elements (Only draw once or if forced? For now, we assume background is cleared only on screen switch)
+  // If we want to avoid flickering, we must NOT clear the whole bar every frame.
+  // We rely on text background colors to overwrite old text.
+  
+  // Draw separator line (safe to redraw, fast)
   _tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
 
   _tft->setTextSize(FONT_SIZE_STATUS_BAR);
   _tft->setTextColor(COLOR_TEXT, COLOR_BG);
 
-  // 1. GPS Signal Icon (Left)
+  // --- GPS Section ---
   double hdop = gpsManager.getHDOP();
   bool fix = gpsManager.isFixed();
-
-  // Draw "GPS" Label
-  _tft->setTextDatum(ML_DATUM);
-  _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  _tft->setTextSize(1); // Small
-  _tft->drawString(
-      "GPS", 5,
-      11); // Vertically centered (y=11 is approx visual middle for this font)
-
-  // Calculate signal strength (0-4 bars) based on HDOP/Accuracy
+  
+  // Logic to calculate strength
   int signalStrength = 0;
   if (fix) {
-    if (hdop <= 0.8)
-      signalStrength = 4; // Excellent
-    else if (hdop <= 1.0)
-      signalStrength = 3; // Good
-    else if (hdop <= 1.5)
-      signalStrength = 2; // Fair
-    else
-      signalStrength = 1; // Poor
+    if (hdop <= 0.8) signalStrength = 4;
+    else if (hdop <= 1.0) signalStrength = 3;
+    else if (hdop <= 1.5) signalStrength = 2;
+    else signalStrength = 1;
+  }
+
+  // Redraw GPS Icon only if state changed (Fix status or Strength)
+  if (fix != _lastFix || signalStrength != _lastSignalStrength) {
+      // Clear GPS Area
+      _tft->fillRect(0, 0, 80, 20, COLOR_BG);
+      
+      // Draw "GPS" Label
+      _tft->setTextDatum(ML_DATUM);
+      _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+      _tft->setTextSize(1);
+      _tft->drawString("GPS", 5, 11);
+
+      int barX = 30;
+      int barY = 16;
+      int barW = 3;
+      int barGap = 2;
+
+      for (int i = 0; i < 4; i++) {
+        int h = (i + 1) * 3;
+        int x = barX + (i * (barW + barGap));
+        int y = barY - h;
+
+        if (i < signalStrength) {
+          uint16_t color = fix ? TFT_GREEN : TFT_RED;
+          _tft->fillRect(x, y, barW, h, color);
+        } else {
+          _tft->drawRect(x, y, barW, h, COLOR_TEXT);
+        }
+      }
+      _lastFix = fix;
+      _lastSignalStrength = signalStrength;
+  }
+
+  // --- Time / Title Section ---
+  // If _screenTitle is set, show it. Otherwise show Time.
+  String centerText;
+  if (_screenTitle.length() > 0) {
+      centerText = _screenTitle;
   } else {
-    signalStrength = 0;
+      centerText = gpsManager.getTimeString();
   }
 
-  int barX = 30; // Shifted right to make room for "GPS" text
-  int barY = 16; // Bottom align
-  int barW = 3;
-  int barGap = 2;
-
-  for (int i = 0; i < 4; i++) {
-    int h = (i + 1) * 3; // Heights: 3, 6, 9, 12
-    int x = barX + (i * (barW + barGap));
-    int y = barY - h;
-
-    if (i < signalStrength) {
-      // Filled bar
-      uint16_t color = fix ? TFT_GREEN : TFT_RED;
-      _tft->fillRect(x, y, barW, h, color);
-    } else {
-      // Empty bar (outline or gray)
-      _tft->drawRect(x, y, barW, h, COLOR_TEXT); // Outline
-    }
+  if (centerText != _lastTimeStr) { // Reusing _lastTimeStr for center text cache
+      // Clear Time/Title Area (Center)
+      // Assuming max width 160px (leaving 80px on each side)
+      int areaW = 160;
+      
+      _tft->setTextPadding(areaW);
+      _tft->setTextDatum(TC_DATUM);
+      _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+      _tft->drawString(centerText, SCREEN_WIDTH / 2, 5); // Adjusted Y to 5
+      _tft->setTextPadding(0);
+      
+      _lastTimeStr = centerText;
   }
 
-  // Optional: Draw 'GPS' text small next to it if needed, or just rely on icon.
-  // Let's keep it clean with just the icon as requested.
+  // --- Battery Section (Mock) ---
+  // Just redraw simple battery every time? Or check change?
+  // Mocking change check
+  int rawBat = 4095; // Mock
+  if (rawBat != _lastBat) {
+      // Clear Bat Area
+      _tft->fillRect(SCREEN_WIDTH - 30, 0, 30, 20, COLOR_BG);
+      
+      int batX = SCREEN_WIDTH - 25;
+      int batY = 5;
+      int batW = 20;
+      int batH = 10;
+      
+      _tft->drawRect(batX, batY, batW, batH, COLOR_TEXT);
+      _tft->fillRect(batX + batW, batY + 2, 2, 6, COLOR_TEXT);
+      
+      // Mock Level
+      _tft->fillRect(batX + 2, batY + 2, batW - 4, batH - 4, TFT_GREEN);
+      
+      _lastBat = rawBat;
+  }
 
-  // 2. Time (Center)
-  _tft->setTextDatum(TC_DATUM);
-  _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  String timeStr = gpsManager.getTimeString();
-  _tft->drawString(timeStr, SCREEN_WIDTH / 2, 2);
-
-  // 3. Battery (Right)
-#ifdef PIN_BATTERY
-  int rawBat = analogRead(PIN_BATTERY);
-  // Estimate percentage (very rough) - just mocking for now
-  // Real implementation would map voltage
-#else
-  int rawBat = 4095; // Mock Full Battery
-#endif
-
-  int batX = SCREEN_WIDTH - 25;
-  int batY = 5;
-  int batW = 20;
-  int batH = 10;
-
-  // Battery Body
-  _tft->drawRect(batX, batY, batW, batH, COLOR_TEXT);
-  // Battery Nipple
-  _tft->fillRect(batX + batW, batY + 2, 2, 6, COLOR_TEXT);
-  // Battery Level (Green)
-  // Mock level 75%
-  _tft->fillRect(batX + 2, batY + 2, batW - 4, batH - 4, TFT_GREEN);
-
-  // Recording Indicator (Next to Time?)
-  if (sessionManager.isLogging()) {
-    _tft->fillCircle((SCREEN_WIDTH / 2) + 40, 10, 3, TFT_RED);
+  // --- Recording Indicator ---
+  bool isLogging = sessionManager.isLogging();
+  if (isLogging != _lastLogging) {
+       // Clear Dot Area
+       int dotX = (SCREEN_WIDTH / 2) + 40;
+       _tft->fillRect(dotX - 5, 0, 10, 20, COLOR_BG);
+       
+       if (isLogging) {
+         _tft->fillCircle(dotX, 10, 3, TFT_RED);
+       }
+       _lastLogging = isLogging;
   }
 }

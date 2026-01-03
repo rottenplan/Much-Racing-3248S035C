@@ -23,7 +23,7 @@ void DragMeterScreen::onShow() {
   // start logic needed? For now just 0-X
   _disciplines.push_back({"1/4 Mi", true, 402.34, 0, false, 0});
 
-  _ui->getTft()->fillScreen(COLOR_BG);
+  // _ui->getTft()->fillScreen(COLOR_BG); // Already cleared by UIManager
   drawDashboard();
 }
 

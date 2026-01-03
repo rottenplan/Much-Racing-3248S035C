@@ -63,6 +63,8 @@ private:
   UserScreen *_dragMeterScreen;
   UserScreen *_historyScreen;
   UserScreen *_settingsScreen;
+  
+  String _screenTitle; // Added title
 };
 
 #endif
