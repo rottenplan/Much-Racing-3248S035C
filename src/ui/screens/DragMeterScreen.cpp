@@ -30,10 +30,6 @@ void DragMeterScreen::onShow() {
 void DragMeterScreen::update() {
   // Handle Touch (Back Button)
   UIManager::TouchPoint p = _ui->getTouchPoint();
-  // DEBUG: Visual Touch Feedback
-  if (p.x != -1) {
-      _ui->getTft()->fillCircle(p.x, p.y, 3, TFT_YELLOW);
-  }
   if (p.x != -1) {
     if (p.x < 60 && p.y < 40) {
       _ui->switchScreen(SCREEN_MENU);
