@@ -1,5 +1,6 @@
 #include "UIManager.h"
 #include "../../config.h"
+#include "fonts/Org_01.h"
 
 // Sertakan layar (dibuat di langkah berikutnya)
 #include "screens/DragMeterScreen.h"
@@ -169,6 +170,7 @@ void UIManager::drawStatusBar(bool force) {
       _tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
   }
 
+  _tft->setFreeFont(&Org_01);
   _tft->setTextSize(FONT_SIZE_STATUS_BAR);
   _tft->setTextColor(COLOR_TEXT, COLOR_BG);
 

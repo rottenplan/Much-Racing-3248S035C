@@ -24,7 +24,7 @@ void DragMeterScreen::onShow() {
   _disciplines.push_back({"1/4 Mi", true, 402.34, 0, false, 0});
 
   // _ui->getTft()->fillScreen(COLOR_BG); // Sudah dibersihkan oleh UIManager
-  drawDashboard();
+  drawDashboardStatic();
 }
 
 void DragMeterScreen::update() {
@@ -60,7 +60,7 @@ void DragMeterScreen::update() {
   // Segarkan UI (10Hz)
   if (millis() - _lastUpdate > 100) {
     if (_state != STATE_SUMMARY) {
-      drawDashboard();
+      drawDashboardDynamic();
     }
     _ui->drawStatusBar();
     _lastUpdate = millis();
@@ -133,38 +133,54 @@ void DragMeterScreen::updateDisciplines() {
   }
 }
 
-void DragMeterScreen::drawDashboard() {
+void DragMeterScreen::drawDashboardStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Panah Kembali Header
+  // Panah Kembali Header (HANYA DIGAMBAR SEKALI)
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
   tft->setTextDatum(TL_DATUM);
   tft->setTextSize(2);
   tft->drawString("<", 10, 30); // Di bawah bilah status
 
-  // 1. Kecepatan Besar (Tengah Atas)
+  // Label Satuan (Statis)
   tft->setTextDatum(TC_DATUM);
-  tft->setTextFont(7); // Numerik seperti 7-segmen
-  tft->setTextSize(1);
-  tft->drawFloat(gpsManager.getSpeedKmph(), 0, SCREEN_WIDTH / 2, 40);
   tft->setTextFont(2);
   tft->setTextSize(1);
   tft->drawString("km/h", SCREEN_WIDTH / 2, 90);
 
-  // 2. Daftar Disiplin (Kiri)
+  // Daftar Disiplin (Nama Saja - Statis)
   int listY = 120;
   tft->setTextDatum(TL_DATUM);
+  
+  for (int i = 0; i < _disciplines.size(); i++) {
+    Discipline &d = _disciplines[i];
+    int y = listY + (i * 30);
+    tft->setTextColor(COLOR_SECONDARY, COLOR_BG);
+    tft->drawString(d.name, 20, y);
+  }
+}
+
+void DragMeterScreen::drawDashboardDynamic() {
+  TFT_eSPI *tft = _ui->getTft();
+  
+  // 1. Kecepatan Besar (Tengah Atas - Dinamis)
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextDatum(TC_DATUM);
+  tft->setTextFont(7); // Numerik seperti 7-segmen
+  tft->setTextSize(1);
+  tft->setTextPadding(SCREEN_WIDTH); // Hapus lebar penuh untuk angka besar
+  tft->drawFloat(gpsManager.getSpeedKmph(), 0, SCREEN_WIDTH / 2, 40);
+  tft->setTextPadding(0);
+
+  // 2. Status/Waktu (Kanan - Dinamis)
+  int listY = 120;
   tft->setTextFont(2);
   tft->setTextSize(1);
-
+  
   for (int i = 0; i < _disciplines.size(); i++) {
     Discipline &d = _disciplines[i];
     int y = listY + (i * 30);
 
-    tft->setTextColor(COLOR_SECONDARY, COLOR_BG);
-    tft->drawString(d.name, 20, y);
-
-    // 3. Status/Waktu (Kanan)
     tft->setTextDatum(TR_DATUM);
     if (d.completed) {
       tft->setTextColor(TFT_GREEN, COLOR_BG);
@@ -175,13 +191,12 @@ void DragMeterScreen::drawDashboard() {
       tft->setTextColor(COLOR_SECONDARY, COLOR_BG);
       tft->drawString("--.--", SCREEN_WIDTH - 20, y);
     }
-
-    tft->setTextDatum(TL_DATUM); // Reset
   }
 
   // Teks Status
   tft->setTextDatum(BC_DATUM);
   tft->setTextSize(1);
+  tft->setTextPadding(SCREEN_WIDTH);
   if (_state == STATE_READY) {
     tft->setTextColor(TFT_ORANGE, COLOR_BG);
     tft->drawString(gpsManager.isFixed() ? "READY" : "WAIT GPS",
@@ -190,6 +205,7 @@ void DragMeterScreen::drawDashboard() {
     tft->setTextColor(TFT_GREEN, COLOR_BG);
     tft->drawString("RUNNING", SCREEN_WIDTH / 2, 230);
   }
+  tft->setTextPadding(0);
 }
 
 void DragMeterScreen::drawResults() {

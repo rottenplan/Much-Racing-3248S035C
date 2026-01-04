@@ -37,7 +37,8 @@ private:
   void updateDisciplines();
 
   // Drawing
-  void drawDashboard(); // Ready/Running
+  void drawDashboardStatic();  // Dib panggil sekali di onShow
+  void drawDashboardDynamic(); // Dipanggil di loop update
   void drawResults();   // Summary
 };
 
