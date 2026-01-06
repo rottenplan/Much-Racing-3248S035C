@@ -34,6 +34,7 @@ bool SessionManager::startSession() {
 
   if (_logFile) {
     _logging = true;
+    _currentFilename = filename;
     _logFile.println("Time,Lat,Lon,Speed,Sats"); // Header
     Serial.println("Started logging to: " + filename);
     return true;
@@ -66,16 +67,16 @@ String SessionManager::createFilename() {
 }
 
 void SessionManager::appendToHistoryIndex(String filename, String date,
-                                          int laps, unsigned long bestLap) {
+                                          int laps, unsigned long bestLap, String type) {
   File indexFile = SD.open("/history.csv", FILE_APPEND);
   if (!indexFile) {
     indexFile = SD.open("/history.csv", FILE_WRITE);
   }
 
   if (indexFile) {
-    // Format: NamaFile,Tanggal,Lap,LapTerbaik
+    // Format: NamaFile,Tanggal,Lap,LapTerbaik,Tipe
     String line =
-        filename + "," + date + "," + String(laps) + "," + String(bestLap);
+        filename + "," + date + "," + String(laps) + "," + String(bestLap) + "," + type;
     indexFile.println(line);
     indexFile.close();
     Serial.println("Added to history index: " + line);
@@ -107,4 +108,96 @@ bool SessionManager::getSDStatus(uint64_t &total, uint64_t &used) {
   total = SD.totalBytes();
   used = SD.usedBytes();
   return true;
+}
+
+SessionManager::SDTestResult SessionManager::runFullTest(void (*progressCallback)(int, String)) {
+    SDTestResult res;
+    res.success = false;
+    res.readSpeedKBps = 0;
+    res.writeSpeedKBps = 0;
+
+    if (!SD.totalBytes()) {
+        res.cardType = "NO CARD";
+        return res;
+    }
+
+    uint64_t total = SD.totalBytes();
+    uint64_t used = SD.usedBytes();
+    
+    // Format Size Label
+    float totalGB = total / (1024.0 * 1024.0 * 1024.0);
+    res.sizeLabel = String(totalGB, 1) + " GB";
+    
+    float usedMB = used / (1024.0 * 1024.0);
+    res.usedLabel = String(usedMB, 0) + " MB";
+
+    sdcard_type_t t = SD.cardType();
+    if (t == CARD_MMC) res.cardType = "MMC";
+    else if (t == CARD_SD) res.cardType = "SDSC";
+    else if (t == CARD_SDHC) res.cardType = "SDHC";
+    else res.cardType = "UNKNOWN";
+
+    // Benchmark Write
+    if (progressCallback) progressCallback(0, "Writing...");
+    
+    uint8_t buf[512]; // Small buffer 
+    memset(buf, 0xAA, 512);
+    String testFile = "/test_bench.bin";
+    
+    unsigned long start = millis();
+    File f = SD.open(testFile, FILE_WRITE);
+    if (f) {
+        // Write 1MB (2048 * 512)
+        int chunks = 2048; 
+        for (int i=0; i<chunks; i++) {
+            f.write(buf, 512);
+            if (i % 200 == 0 && progressCallback) { // Update every ~10% of phase
+                int p = (i * 50) / chunks; // 0-50%
+                progressCallback(p, "Writing...");
+            }
+        }
+        f.close();
+        unsigned long duration = millis() - start;
+        if (duration > 0) {
+            res.writeSpeedKBps = 1024.0 / (duration / 1000.0);
+        }
+    } else {
+        return res; // Write failed
+    }
+
+    // Benchmark Read
+    if (progressCallback) progressCallback(50, "Reading...");
+    
+    start = millis();
+    f = SD.open(testFile, FILE_READ);
+    if (f) {
+        long len = f.size();
+        long pos = 0;
+        int chunks = 0;
+        
+        while (f.available()) {
+            f.read(buf, 512);
+            pos += 512;
+            chunks++;
+            
+            if (chunks % 200 == 0 && progressCallback) { 
+                 int p = 50 + (pos * 50) / len; // 50-100%
+                 progressCallback(p, "Reading...");
+            }
+        }
+        f.close();
+        unsigned long duration = millis() - start;
+        if (duration > 0) {
+            res.readSpeedKBps = 1024.0 / (duration / 1000.0);
+        }
+    } else {
+        return res; // Read failed
+    }
+    
+    // Cleanup
+    if (progressCallback) progressCallback(100, "Done!");
+    SD.remove(testFile);
+
+    res.success = true;
+    return res;
 }

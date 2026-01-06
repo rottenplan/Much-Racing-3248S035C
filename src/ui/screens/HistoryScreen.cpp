@@ -7,13 +7,13 @@ extern SessionManager sessionManager;
 
 void HistoryScreen::onShow() {
   _scrollOffset = 0;
-  _showingDetails = false;
+  _currentMode = MODE_MENU; // Start at Menu
   _selectedIdx = -1;
-  scanHistory();
+  scanHistory(); // Scan everything once
 
   TFT_eSPI *tft = _ui->getTft();
-  _ui->drawStatusBar(); // Gambar Bilah Status
-  drawList(0);
+  _ui->drawStatusBar();
+  drawMenu();
 }
 
 void HistoryScreen::update() {
@@ -21,60 +21,142 @@ void HistoryScreen::update() {
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x == -1)
     return;
+    
+  // Debounce global
+  if (millis() - lastHistoryTouch < 200) return;
 
-  if (_showingDetails) {
-    // Kembali dari Detail (Area Header 0-40 biasanya, tapi mari kita periksa drawDetails)
-    // drawDetails header adalah 0-40. Jadi <40 benar di sana.
-    if (p.y < 40) {
-      _showingDetails = false;
-      _ui->getTft()->fillScreen(COLOR_BG);
-      drawList(_scrollOffset);
-      return;
-    }
-  } else {
-  // Tampilan Daftar (Area Header 20-60)
-    // Tombol Kembali
-    if (p.x < 60 && p.y < 60) {
-      if (millis() - lastHistoryTouch < 200) return;
-      lastHistoryTouch = millis();
-
-      if (_selectedIdx == -2) {
-         _ui->switchScreen(SCREEN_MENU);
-      } else {
-         _selectedIdx = -2;
-         drawList(_scrollOffset);
+  // --- MENU MODE ---
+  if (_currentMode == MODE_MENU) {
+      if (p.x < 60 && p.y < 60) {
+          // Back to Main Menu
+          lastHistoryTouch = millis();
+          _ui->switchScreen(SCREEN_MENU);
+          return;
+      }
+      
+      // Menu Items (Simple Layout)
+      // Button Layout (Match LapTimer)
+      int startY = 80;
+      int btnHeight = 40;
+      int gap = 20;
+      int btnWidth = 240;
+      int x = (SCREEN_WIDTH - btnWidth) / 2;
+      
+      int touchedIdx = -1;
+      for(int i=0; i<2; i++) {
+          int y = startY + i * (btnHeight + gap);
+          if (p.x > x && p.x < x + btnWidth && p.y > y && p.y < y + btnHeight) {
+              touchedIdx = i;
+              break;
+          }
+      }
+      
+      if (touchedIdx != -1) {
+          // Debounce
+          if (millis() - lastHistoryTouch < 200) return;
+          lastHistoryTouch = millis();
+          
+          unsigned long now = millis();
+          if (_lastTapIdx == touchedIdx && (now - _lastTapTime < 500)) {
+              // Confirmed Double Tap
+              _lastTapIdx = -1;
+              
+              if (touchedIdx == 0) {
+                  _selectedType = "TRACK";
+              } else {
+                  _selectedType = "DRAG";
+              }
+              _currentMode = MODE_LIST;
+              _scrollOffset = 0;
+              _selectedIdx = -1; // Reset for list
+              _ui->getTft()->fillScreen(COLOR_BG);
+              _ui->drawStatusBar();
+              drawList(0);
+          } else {
+              // First Tap
+              _lastTapIdx = touchedIdx;
+              _lastTapTime = now;
+              
+              if (_selectedIdx != touchedIdx) {
+                  _selectedIdx = touchedIdx;
+                  drawMenu();
+              }
+          }
       }
       return;
-    }
-
-    // Gulir/Pilih
-    // Area daftar: Y=70 hingga 240
-    // Item setinggi ~40px.
-    int listY = 70;
-    int itemH = 40;
-
-    if (p.y > listY) {
-      // Debounce checks
-      if (millis() - lastHistoryTouch < 200) return;
-      lastHistoryTouch = millis();
-
-      int clickedIdx = _scrollOffset + ((p.y - listY) / itemH);
-      if (clickedIdx < _historyList.size()) {
-        if (_selectedIdx == clickedIdx) {
-            // Second Tap -> Open Details
-            _showingDetails = true;
-            _ui->getTft()->fillScreen(COLOR_BG);
-            drawDetails(_selectedIdx);
-        } else {
-            // First Tap -> Highlight
-            _selectedIdx = clickedIdx;
-            drawList(_scrollOffset);
-        }
+  }
+  
+  // --- LIST MODE ---
+  if (_currentMode == MODE_LIST) {
+      // Back Button
+      if (p.x < 60 && p.y < 60) {
+          _currentMode = MODE_MENU;
+          _ui->getTft()->fillScreen(COLOR_BG);
+          _ui->drawStatusBar();
+          drawMenu();
+          lastHistoryTouch = millis();
+          return;
       }
-    }
+      
+      // List Items (Y > 70)
+      int listY = 70;
+      int itemH = 40;
+      
+      if (p.y > listY) {
+          int visibleIdx = (p.y - listY) / itemH;
+          // We need to map visible index to actual index in filtered list
+          // This matches how we draw it
+          
+          int actualIdx = -1;
+          int count = 0;
+          for(int i = 0; i < _historyList.size(); i++) {
+              if (_historyList[i].type == _selectedType) {
+                  if (count == visibleIdx + _scrollOffset) {
+                      actualIdx = i;
+                      break;
+                  }
+                  count++;
+              }
+          }
+          
+          if (actualIdx != -1) {
+             unsigned long now = millis();
+             if (_lastTapIdx == actualIdx && (now - _lastTapTime < 500)) {
+                 // Confirmed Double Tap
+                 _lastTapIdx = -1;
+                 
+                  // Open Details
+                  _currentMode = MODE_DETAILS;
+                  _ui->getTft()->fillScreen(COLOR_BG);
+                  drawDetails(_selectedIdx);
+             } else {
+                 // First Tap
+                 _lastTapIdx = actualIdx;
+                 _lastTapTime = now;
+                 
+                 if (_selectedIdx != actualIdx) {
+                     _selectedIdx = actualIdx;
+                     drawList(_scrollOffset);
+                 }
+             }
+             lastHistoryTouch = now;
+          }
+      }
+      return;
   }
 
-  // Perbarui Bilah Status
+  // --- DETAILS MODE ---
+  if (_currentMode == MODE_DETAILS) {
+      if (p.y < 40) { // Back header
+          _currentMode = MODE_LIST;
+          _ui->getTft()->fillScreen(COLOR_BG);
+          drawList(_scrollOffset);
+          lastHistoryTouch = millis();
+          return;
+      }
+  }
+
+  // Status Bar Update loop (if needed)
   static unsigned long lastStatusUpdate = 0;
   if (millis() - lastStatusUpdate > 1000) {
     _ui->drawStatusBar();
@@ -86,7 +168,7 @@ void HistoryScreen::scanHistory() {
   _historyList.clear();
   String content = sessionManager.loadHistoryIndex();
 
-  // Uraikan CSV: nama file,tanggal,lap,lap terbaik
+  // Uraikan CSV: nama file,tanggal,lap,lap terbaik,TIPE(opt)
   int start = 0;
   while (start < content.length()) {
     int end = content.indexOf('\n', start);
@@ -101,13 +183,22 @@ void HistoryScreen::scanHistory() {
       int c1 = line.indexOf(',');
       int c2 = line.indexOf(',', c1 + 1);
       int c3 = line.indexOf(',', c2 + 1);
+      int c4 = line.indexOf(',', c3 + 1); // Type separator
 
       if (c1 > 0 && c2 > 0 && c3 > 0) {
         HistoryItem item;
         item.filename = line.substring(0, c1);
         item.date = line.substring(c1 + 1, c2);
         item.laps = line.substring(c2 + 1, c3).toInt();
-        item.bestLap = line.substring(c3 + 1).toInt(); // Asumsi millis
+        item.bestLap = line.substring(c3 + 1, (c4 > 0) ? c4 : line.length()).toInt(); 
+        
+        if (c4 > 0) {
+            item.type = line.substring(c4 + 1);
+            item.type.trim();
+        } else {
+            item.type = "TRACK"; // Default backward compatibility
+        }
+        
         _historyList.insert(_historyList.begin(),
                             item); // Tambahkan di awal (Terbaru dulu)
       }
@@ -116,70 +207,118 @@ void HistoryScreen::scanHistory() {
   }
 }
 
+void HistoryScreen::drawMenu() {
+    TFT_eSPI *tft = _ui->getTft();
+    
+    // Header
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(2);
+    tft->drawString("<", 10, 25);
+    
+    tft->setTextDatum(TC_DATUM);
+    tft->setFreeFont(&Org_01); // Match LapTimer (was numeric font 2)
+    tft->setTextSize(2);       // Match LapTimer
+    // tft->setTextFont(2);    // Removed
+    tft->drawString("HISTORY MENU", SCREEN_WIDTH/2, 40);
+    
+    tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY);
+    
+    // Buttons
+    int startY = 80;
+    int btnHeight = 40;
+    int gap = 20;
+    int btnWidth = 240;
+    int x = (SCREEN_WIDTH - btnWidth) / 2;
+    
+    const char* items[] = {"TRACK HISTORY", "DRAG HISTORY"};
+    
+    for (int i = 0; i < 2; i++) {
+        int y = startY + i * (btnHeight + gap);
+        
+        // Match LapTimer style: Red if selected, Dark Grey otherwise
+        uint16_t btnColor = (i == _selectedIdx) ? TFT_RED : TFT_DARKGREY;
+        
+        tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+        tft->setTextColor(TFT_WHITE, btnColor);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString(items[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
+    }
+}
+
 void HistoryScreen::drawList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
-
-  // Header
-  // Header
-  // Bilah Status 0-20. 
   
-  // Panah Kembali
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01); // Atau standar
-  tft->setTextSize(2); // Besar untuk sentuhan mudah
-  tft->drawString("<", 10, 25);
+  // Header
+  // tft->fillRect(0, 0, SCREEN_WIDTH, 20, TFT_BLACK); // Don't wipe it manually
+  _ui->drawStatusBar(); // Ensure it's drawn/redrawn
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, TFT_WHITE);
+  
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(1);
+  tft->drawString("Track History", SCREEN_WIDTH/2, 25);
+  
+  tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
 
   // Daftar
-  int startY = 70; // Dipindahkan ke atas (sebelumnya 70)
-  int itemH = 40;
+  int startY = 50;
+  int itemH = 30; // Compact height
   int count = 0;
+  
+  int skip = 0;
 
-  for (int i = scrollOffset; i < _historyList.size(); i++) {
-    if (count >= 4)
-      break; // Tampilkan 4 item
+  for (int i = 0; i < _historyList.size(); i++) {
+     if (count >= 5) break; // Fit 5 items
+     
+     if (_historyList[i].type != _selectedType) continue;
+     
+     if (skip < scrollOffset) {
+         skip++;
+         continue;
+     }
 
     HistoryItem &item = _historyList[i];
     int y = startY + (count * itemH);
 
-    // Latar belakang untuk item (bergantian?)
-    if (count % 2 == 0)
-      tft->fillRect(0, y, SCREEN_WIDTH, itemH, 0x10A2); // Abu-abu Gelap
+    // Style Match: Selected = White BG, Black Text. Unselected = Black BG, White Text
+    uint16_t bg = (i == _selectedIdx) ? TFT_WHITE : TFT_BLACK;
+    uint16_t fg = (i == _selectedIdx) ? TFT_BLACK : TFT_WHITE;
+    
+    tft->fillRect(0, y, SCREEN_WIDTH, itemH, bg);
+    tft->setTextColor(fg, bg);
 
-    // Tanggal (Kiri Atas)
-    tft->setTextColor(COLOR_TEXT); // Latar belakang transparan
+    // Left: Date/Filename - Laps
     tft->setTextDatum(TL_DATUM);
     tft->setTextFont(2);
     tft->setTextSize(1);
-    tft->drawString(item.date, 10, y + 2);
+    
+    // Parse Date for shorter display? "dd mmm yyyy"
+    // Using simple format "Date - X Laps"
+    String leftText = item.date.substring(0, 10) + " - " + String(item.laps) + " Laps";
+    // Or if filename is better? item.filename
+    
+    tft->drawString(leftText, 5, y + 8);
 
-    // Statistik (Kiri/Kanan Bawah)
-    tft->setTextSize(1);
-    tft->setTextFont(2); // Tetap font 2
-    tft->setTextColor(COLOR_SECONDARY);
-    String sub = "Laps: " + String(item.laps);
-    tft->drawString(sub, 10, y + 22);
-
-    // Lap Terbaik (Kanan)
+    // Right: Best Lap
     tft->setTextDatum(TR_DATUM);
-    tft->setTextColor(COLOR_ACCENT); // Hijau/Teal
-    tft->setTextFont(2);
-    tft->setTextSize(1);
 
     int ms = item.bestLap % 1000;
     int s = (item.bestLap / 1000) % 60;
     int m = (item.bestLap / 60000);
     char buf[16];
-    sprintf(buf, "%02d:%02d.%02d", m, s, ms / 10);
+    sprintf(buf, "%d:%02d.%02d", m, s, ms / 10);
 
-    tft->drawString(buf, SCREEN_WIDTH - 10, y + 8);
+    tft->drawString(buf, SCREEN_WIDTH - 5, y + 8);
 
     count++;
   }
 
-  if (_historyList.size() == 0) {
+  if (count == 0 && skip == 0) {
     tft->setTextDatum(MC_DATUM);
-    tft->setTextColor(COLOR_SECONDARY, COLOR_BG);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->drawString("No Sessions Found", SCREEN_WIDTH / 2, 120);
   }
 }
@@ -190,39 +329,65 @@ void HistoryScreen::drawDetails(int idx) {
   HistoryItem &item = _historyList[idx];
 
   TFT_eSPI *tft = _ui->getTft();
-
-  // Header
-  // Detail Header
-  // Panah Kembali
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->fillScreen(TFT_BLACK);
+  
+  // 1. Header Line (Track Name + Session ID)
+  // Use Filename as Track Name proxy for now
+  String trackName = item.filename;
+  if(trackName.length() == 0) trackName = "Track Session";
+  
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextDatum(TL_DATUM);
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
-
-  // Info
-  int y = 70;
+  tft->setTextSize(1); 
+  tft->drawString(trackName, 5, 25);
+  
+  tft->setTextDatum(TR_DATUM);
+  tft->drawString("Session " + String(idx + 1), SCREEN_WIDTH - 5, 25);
+  
+  // 2. Sub Header (Laps + Date)
   tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
-
-  tft->drawString("Date: " + item.date, 20, y);
-  y += 30;
-  tft->drawString("Total Laps: " + String(item.laps), 20, y);
-  y += 30;
-
-  // Lap Terbaik
-  tft->drawString("Best Lap:", 20, y);
-  tft->setTextColor(TFT_GREEN, COLOR_BG);
-
+  tft->drawString(String(item.laps) + " Laps", 5, 45);
+  
+  tft->setTextDatum(TR_DATUM);
+  tft->drawString(item.date, SCREEN_WIDTH - 5, 45);
+  
+  tft->drawFastHLine(0, 60, SCREEN_WIDTH, TFT_WHITE);
+  
+  // 3. Stats Grid
+  int y = 70;
+  int rowH = 30;
+  
+  // Helper to draw row
+  auto drawRow = [&](String label, String value, int yPos) {
+      tft->setTextDatum(TL_DATUM);
+      tft->setTextColor(TFT_WHITE, TFT_BLACK); // White for label? Image has white labels
+      tft->drawString(label, 5, yPos);
+      
+      tft->setTextDatum(TR_DATUM);
+      tft->setFreeFont(&Org_01); // Or bold if available
+      tft->drawString(value, SCREEN_WIDTH - 5, yPos);
+  };
+  
+  // Best Lap
   int ms = item.bestLap % 1000;
   int s = (item.bestLap / 1000) % 60;
   int m = (item.bestLap / 60000);
   char buf[16];
-  sprintf(buf, "%02d:%02d.%02d", m, s, ms / 10);
-  tft->setTextSize(3);
-  tft->drawString(buf, 20, y + 25);
-
-  // Catatan: Mengurai CSV sebenarnya untuk daftar lap lengkap itu rumit.
-  // Untuk saat ini, tampilan ringkasan ini cocok dengan permintaan pengguna "seperti RaceBox" daftar
-  // riwayat.
+  sprintf(buf, "%d:%02d.%02d", m, s, ms / 10);
+  drawRow("Best Lap", String(buf), y);
+  
+  // Max Speed (Placeholder)
+  y += rowH;
+  drawRow("Max Speed", "-- km/h", y); // Need full log parsing for this
+  
+  // Max G (Placeholder)
+  y += rowH;
+  drawRow("Max G-Force", "-- G", y);
+  
+  // Theoretical (Placeholder)
+  y += rowH;
+  drawRow("Theoretical", String(buf), y); // Mock as best for now
+  
+  _ui->drawStatusBar();
 }

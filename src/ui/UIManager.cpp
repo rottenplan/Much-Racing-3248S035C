@@ -11,7 +11,10 @@
 #include "screens/SettingsScreen.h"
 #include "screens/SplashScreen.h"
 #include "screens/TimeSettingScreen.h"
-#include "screens/AutoOffScreen.h"
+#include "screens/TimeSettingScreen.h"
+// #include "screens/AutoOffScreen.h"
+#include "screens/RpmSensorScreen.h"
+#include "screens/RpmSensorScreen.h"
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _currentScreen = nullptr;
@@ -34,7 +37,10 @@ void UIManager::begin() {
   _historyScreen = new HistoryScreen();
   _settingsScreen = new SettingsScreen();
   _timeSettingScreen = new TimeSettingScreen();
-  _autoOffScreen = new AutoOffScreen();
+  _timeSettingScreen = new TimeSettingScreen();
+  // _autoOffScreen = new AutoOffScreen();
+  _rpmSensorScreen = new RpmSensorScreen();
+  _rpmSensorScreen = new RpmSensorScreen();
 
   // Mulai Layar
   _splashScreen->begin(this);
@@ -44,18 +50,34 @@ void UIManager::begin() {
   _historyScreen->begin(this);
   _settingsScreen->begin(this);
   _timeSettingScreen->begin(this);
-  _autoOffScreen->begin(this);
+  _timeSettingScreen->begin(this);
+  // _autoOffScreen->begin(this);
+  _rpmSensorScreen->begin(this);
+  _rpmSensorScreen->begin(this);
 
-  // Initialize Sleep Logic
+  // Initialize Sleep Logic (New System)
   Preferences prefs;
   prefs.begin("laptimer", true);
-  int autoOffIdx = prefs.getInt("auto_off", 0);
+  bool autoOffEn = prefs.getBool("auto_off_en", false); // Default Off
+  int autoOffSec = prefs.getInt("auto_off_val", 30);    // Default 30s
   prefs.end();
-  setAutoOff(autoOffIdx);
+  
+  // Disable Auto Off Logic
+  /*
+  if (autoOffEn) {
+      setAutoOff(autoOffSec * 1000UL); 
+  } else {
+      setAutoOff(0);
+  }
+  */
+  setAutoOff(0); // Force Disable
 
   _lastInteractionTime = millis();
   _isScreenOff = false;
   _currentBrightness = 255; // Default max, should load from prefs if we had a stored brightness variable
+  
+  _lastTapTime = 0;
+  _wasTouched = false;
 
   // Mulai dengan Splash
   switchScreen(SCREEN_SPLASH);
@@ -66,6 +88,25 @@ void UIManager::update() {
   if (_currentScreen) {
     if (!_isScreenOff) {
         _currentScreen->update();
+    } else {
+        // Handle Wakeup from Off State (Double Tap)
+        if (_touch) {
+            _touch->read();
+            bool touched = _touch->isTouched;
+            
+            // Detect Rising Edge (Touch Start)
+            if (touched && !_wasTouched) {
+                unsigned long now = millis();
+                if (now - _lastTapTime < 500) {
+                    // Double Tap Detected!
+                    wakeUp();
+                    _lastTapTime = 0; // Reset
+                } else {
+                    _lastTapTime = now;
+                }
+            }
+            _wasTouched = touched;
+        }
     }
   }
 
@@ -176,9 +217,13 @@ void UIManager::switchScreen(ScreenType type) {
     _currentScreen = _timeSettingScreen;
     _screenTitle = "CLOCK";
     break;
-  case SCREEN_AUTO_OFF:
-    _currentScreen = _autoOffScreen;
-    _screenTitle = "AUTO OFF";
+  // case SCREEN_AUTO_OFF:
+  //   _currentScreen = _autoOffScreen;
+  //   _screenTitle = "AUTO OFF";
+  //   break;
+  case SCREEN_RPM_SENSOR:
+    _currentScreen = _rpmSensorScreen;
+    _screenTitle = "RPM SENSOR";
     break;
   }
 
@@ -350,24 +395,16 @@ void UIManager::drawStatusBar(bool force) {
 
 // --- Auto Off Logic ---
 
-void UIManager::setAutoOff(int index) {
-    // 0=Never, 1=15s, 2=30s, 3=1m, 4=3m, 5=5m
-    switch (index) {
-        case 1: _autoOffMs = 15000; break;
-        case 2: _autoOffMs = 30000; break;
-        case 3: _autoOffMs = 60000; break;
-        case 4: _autoOffMs = 180000; break;
-        case 5: _autoOffMs = 300000; break;
-        default: _autoOffMs = 0; break; // Never
-    }
+void UIManager::setAutoOff(unsigned long ms) {
+    _autoOffMs = ms;
     updateInteraction();
 }
 
 void UIManager::updateInteraction() {
     _lastInteractionTime = millis();
-    if (_isScreenOff) {
-        wakeUp();
-    }
+    // if (_isScreenOff) {
+    //     wakeUp();
+    // }
 }
 
 void UIManager::checkSleep() {

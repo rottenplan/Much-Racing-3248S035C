@@ -17,7 +17,7 @@ public:
   bool isLogging() { return _logging; }
 
   void appendToHistoryIndex(String filename, String date, int laps,
-                            unsigned long bestLap);
+                            unsigned long bestLap, String type = "TRACK");
   String loadHistoryIndex(); // Returns full content for processing
 
   bool getSDStatus(uint64_t &total, uint64_t &used);
@@ -31,12 +31,16 @@ public:
     float writeSpeedKBps;
   };
 
-  SDTestResult runFullTest();
+  SDTestResult runFullTest(void (*progressCallback)(int, String) = NULL);
 
 private:
   bool _logging;
   File _logFile;
   String createFilename();
+  String _currentFilename;
+
+public:
+  String getCurrentFilename() { return _currentFilename; } 
 };
 
 #endif

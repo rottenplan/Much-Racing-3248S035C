@@ -4,7 +4,7 @@
 
 void SplashScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->setRotation(1);
+  // tft->setRotation(1); // Already set in main.cpp
   tft->fillScreen(0x0000); // Hitam
 
   // Gambar Bitmap (320x240)

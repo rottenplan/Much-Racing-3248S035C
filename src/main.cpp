@@ -28,7 +28,7 @@ void setup() {
   // Inisialisasi UI (TFT)
   tft.init();
   tft.setRotation(1); // 0=Potret, 1=Lanskap. Periksa pemasangan Anda!
-  tft.fillScreen(COLOR_BG);
+  // tft.fillScreen(COLOR_BG); // Removed to prevent startup flash; SplashScreen will fill it.
 
   // Inisialisasi Sentuh
   // Inisialisasi instance SPI khusus untuk Sentuh
@@ -41,14 +41,20 @@ void setup() {
   //   Serial.println("Inisialisasi sentuh gagal!");
   // }
 
-  // Inisialisasi PWM Lampu Latar
+  // Inisialisasi PWM Lampu Latar (Start OFF)
   ledcSetup(0, 5000, 8); // Saluran 0, 5kHz, 8-bit
   ledcAttachPin(PIN_TFT_BL, 0);
-  ledcWrite(0, 255); // Default Kecerahan Penuh
+  ledcWrite(0, 0); // Matikan backlight dulu untuk mencegah glitch
 
   // Inisialisasi Inti
   gpsManager.begin();
   sessionManager.begin();
+
+  // Bersihkan layar sebelum menyalakan backlight
+  tft.fillScreen(TFT_BLACK);
+  
+  // Nyalakan Backlight
+  ledcWrite(0, 255);
 
   uiManager.setTouch(&touch); // Teruskan objek sentuh ke UI
   uiManager.begin();

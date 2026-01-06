@@ -321,7 +321,7 @@ void LapTimerScreen::update() {
                // Execute Stop Logic
                if (sessionManager.isLogging()) {
                    String dateStr = gpsManager.getDateString() + " " + gpsManager.getTimeString();
-                   sessionManager.appendToHistoryIndex("Track Session", dateStr, _lapCount, _bestLapTime);
+                   sessionManager.appendToHistoryIndex("Track Session", dateStr, _lapCount, _bestLapTime, "TRACK");
                }
                sessionManager.stopSession();
                _isRecording = false;
@@ -353,7 +353,7 @@ void LapTimerScreen::update() {
           String dateStr =
               gpsManager.getDateString() + " " + gpsManager.getTimeString();
           sessionManager.appendToHistoryIndex("Track Session", dateStr,
-                                              _lapCount, _bestLapTime);
+                                              _lapCount, _bestLapTime, "TRACK");
         }
 
         sessionManager.stopSession();

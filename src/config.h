@@ -42,6 +42,7 @@
 #define PIN_RGB_BLUE 17
 #define PIN_LIGHT_SENSOR 34
 #define PIN_SPEAKER 26
+#define PIN_RPM_INPUT 35  // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
 
 // Legacy / Conflicting Pins (Disabled)
 // #define PIN_GPS_RX 16 // CONFLICT with RGB Green

@@ -15,7 +15,8 @@ enum ScreenType {
   SCREEN_HISTORY,
   SCREEN_SETTINGS,
   SCREEN_TIME_SETTINGS,
-  SCREEN_AUTO_OFF
+  SCREEN_AUTO_OFF,
+  SCREEN_RPM_SENSOR
 };
 
 class UserScreen {
@@ -38,7 +39,7 @@ public:
   void update();
   void switchScreen(ScreenType type);
   void drawStatusBar(bool force = false); // Added force parameter
-  void setAutoOff(int index);
+  void setAutoOff(unsigned long ms);
   void wakeUp();
   void checkSleep();
   void updateInteraction();
@@ -70,7 +71,8 @@ private:
   UserScreen *_historyScreen;
   UserScreen *_settingsScreen;
   UserScreen *_timeSettingScreen;
-  UserScreen *_autoOffScreen;
+  // UserScreen *_autoOffScreen;
+  UserScreen *_rpmSensorScreen;
   
   String _screenTitle; // Added title
   
@@ -87,6 +89,10 @@ private:
   unsigned long _autoOffMs;
   bool _isScreenOff;
   int _currentBrightness; // To restore after sleep
+  
+  // Wakeup
+  unsigned long _lastTapTime;
+  bool _wasTouched;
 };
 
 #endif

@@ -19,18 +19,25 @@ private:
     String date;
     int laps;              // or runs for drag
     unsigned long bestLap; // ms
+    String type;           // "TRACK" or "DRAG"
   };
 
   std::vector<HistoryItem> _historyList;
   void scanHistory();
   void drawList(int scrollOffset);
+  
   int _scrollOffset = 0;
 
-  // Detail View State?
-  bool _showingDetails;
+  enum HistoryMode { MODE_MENU, MODE_LIST, MODE_DETAILS };
+  HistoryMode _currentMode;
+  
+  String _selectedType; // "TRACK" or "DRAG"
+
   int _selectedIdx;
+  
+  int _lastTapIdx;
+  unsigned long _lastTapTime;  void drawMenu();
   void drawDetails(int idx);
-  // void drawLapDetails(int idx); // Future expansion
 };
 
 #endif
