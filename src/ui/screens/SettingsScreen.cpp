@@ -90,9 +90,9 @@ void SettingsScreen::loadSettings() {
       
       // Pulses Per Revolution (PPR)
       SettingItem ppr = {"PULSE PER REV", TYPE_VALUE, "rpm_ppr"};
-      ppr.options = {"1.0 (Default)", "0.5 (1p/2r)", "2.0 (2p/1r)", "3.0 (3p/1r)", "4.0 (4p/1r)"};
-      ppr.currentOptionIdx = _prefs.getInt("rpm_ppr_idx", 0); 
-      if (ppr.currentOptionIdx < 0 || ppr.currentOptionIdx >= ppr.options.size()) ppr.currentOptionIdx = 0;
+      ppr.options = {"1.0", "0.5 (1p/2r)", "2.0 (Default)", "3.0 (3p/1r)", "4.0 (4p/1r)"};
+      ppr.currentOptionIdx = _prefs.getInt("rpm_ppr_idx", 2); 
+      if (ppr.currentOptionIdx < 0 || ppr.currentOptionIdx >= ppr.options.size()) ppr.currentOptionIdx = 2;
       
       _settings.push_back(ppr);
       
@@ -141,26 +141,23 @@ void SettingsScreen::update() {
     // Special handling for GPS/SD/WiFi Mode (Single tap back)
     if (_currentMode == MODE_GPS || _currentMode == MODE_SD_TEST || _currentMode == MODE_WIFI || _currentMode == MODE_WIFI_PASS) {
         if (p.x < 50 && p.y < 50) { // Back Button
-             if (millis() - lastSettingTouch < 200) return;
-             lastSettingTouch = millis();
-             
-             if (_currentMode == MODE_WIFI_PASS) {
-                 // Back to WiFi List
-                 _currentMode = MODE_WIFI;
-                 _ui->getTft()->fillScreen(COLOR_BG);
-                 _ui->drawStatusBar(true);
-                 drawWiFiScan();
-                 return;
-             }
-             
-             // Back to Main
-             _currentMode = MODE_MAIN;
-             loadSettings();
-             _ui->getTft()->fillScreen(COLOR_BG);
-             _ui->drawStatusBar(true);
-             drawList(0);
-             return;
-        }
+              if (_currentMode == MODE_WIFI_PASS) {
+                  // Back to WiFi List
+                  _currentMode = MODE_WIFI;
+                  _ui->getTft()->fillScreen(COLOR_BG);
+                  _ui->drawStatusBar(true);
+                  drawWiFiScan();
+                  return;
+              }
+              
+              // Back to Main for GPS, SD_TEST, WIFI
+              _currentMode = MODE_MAIN;
+              loadSettings();
+              _ui->getTft()->fillScreen(COLOR_BG);
+              _ui->drawStatusBar(true);
+              drawList(0);
+              return;
+         }
 
         // Mode Specific Touch
         if (millis() - lastSettingTouch > 200) {

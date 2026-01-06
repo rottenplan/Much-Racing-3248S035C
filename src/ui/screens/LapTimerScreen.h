@@ -6,6 +6,13 @@
 #include <vector>
 #include <Arduino.h>
 
+// GPS Point for track recording
+struct GPSPoint {
+  double lat;
+  double lon;
+  unsigned long timestamp;
+};
+
 struct TrackConfig {
   String name;
   // TODO: Add sectors/finish line coordinates here
@@ -19,8 +26,9 @@ struct Track {
 };
 
 
-enum LapTimerState { STATE_MENU, STATE_TRACK_SELECT, STATE_SUMMARY, STATE_RACING, STATE_CREATE_TRACK, STATE_NO_GPS };
+enum LapTimerState { STATE_MENU, STATE_TRACK_SELECT, STATE_SUMMARY, STATE_RACING, STATE_RECORD_TRACK, STATE_NO_GPS };
 enum RaceMode { MODE_BEST, MODE_LAST, MODE_PREDICTIVE };
+enum RecordingState { RECORD_IDLE, RECORD_ACTIVE, RECORD_COMPLETE };
 
 class LapTimerScreen : public UserScreen {
 public:
@@ -37,7 +45,15 @@ private:
   unsigned long _lastTouchTime = 0;
   bool _isRecording;
 
-  // Custom Track Creation
+  // GPS Track Recording
+  RecordingState _recordingState;
+  std::vector<GPSPoint> _recordedPoints;
+  double _recordStartLat, _recordStartLon;
+  unsigned long _recordingStartTime;
+  unsigned long _lastPointTime;
+  double _totalDistance;
+  
+  // Legacy (can be removed later)
   double _tempStartLat, _tempStartLon;
   int _tempSplitCount;
 
@@ -48,7 +64,7 @@ private:
   void drawLapList(int scrollOffset);
   void drawMenu(); // Sub-menu
   void drawTrackSelect();
-  void drawCreateTrack(); // Custom Track UI
+  void drawRecordTrack(); // GPS Track Recording UI
   void drawNoGPS();
 
 

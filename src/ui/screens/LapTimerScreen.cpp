@@ -28,6 +28,15 @@ void LapTimerScreen::onShow() {
   _listScroll = 0;
   _menuSelectionIdx = -1;
   
+  // Initialize GPS recording state
+  _recordingState = RECORD_IDLE;
+  _recordedPoints.clear();
+  _recordStartLat = 0;
+  _recordStartLon = 0;
+  _recordingStartTime = 0;
+  _lastPointTime = 0;
+  _totalDistance = 0;
+  
   loadTracks();
   
   // Start in Sub-Menu
@@ -124,13 +133,12 @@ void LapTimerScreen::update() {
                           _state = STATE_SUMMARY;
                           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
                           drawSummary();
-                      } else if (touchedIdx == 3) { // Create Custom Track
-                          _tempStartLat = 0;
-                          _tempStartLon = 0;
-                          _tempSplitCount = 0;
-                          _state = STATE_CREATE_TRACK;
+                      } else if (touchedIdx == 3) { // Record Track
+                          _recordingState = RECORD_IDLE;
+                          _recordedPoints.clear();
+                          _state = STATE_RECORD_TRACK;
                           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-                          drawCreateTrack();
+                          drawRecordTrack();
                       }
                   } else {
                       // First tap (or different button) -> Highlight Only
@@ -229,63 +237,128 @@ void LapTimerScreen::update() {
       }
     }
 
-  } else if (_state == STATE_CREATE_TRACK) {
+  } else if (_state == STATE_RECORD_TRACK) {
+      extern GPSManager gpsManager;
+      
       if (touched) {
-          // 4 Quadrants
-          bool left = (p.x < SCREEN_WIDTH/2);
-          bool top = (p.y < SCREEN_HEIGHT/2);
-          
-          if (top && left) {
-              // Set Start/Finish (Top Left)
-              if (gpsManager.isFixed()) {
-                  _tempStartLat = gpsManager.getLatitude();
-                  _tempStartLon = gpsManager.getLongitude();
-                  // Visual Feedback?
-                  _ui->getTft()->fillCircle(20, 20, 5, TFT_GREEN);
-              }
-          } else if (top && !left) {
-              // Cancel (Top Right)
-              // Back to Sub-Menu
+          // Back button (bottom left)
+          if (p.x < 80 && p.y > SCREEN_HEIGHT - 30) {
               _state = STATE_MENU;
               _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
               drawMenu();
               _ui->drawStatusBar();
               return;
-          } else if (!top && left) {
-              // Add Split (Bottom Left)
-              if (gpsManager.isFixed() && _tempSplitCount < 4) {
-                  _tempSplitCount++;
-                  // Simpan split di mana? Belum ada struct split di TrackConfig
-                  // Untuk sekarang hanya counter visual
-                  drawCreateTrack(); // Redraw counter
+          }
+          
+          if (_recordingState == RECORD_IDLE) {
+              // START button (bottom center)
+              if (p.x > SCREEN_WIDTH/2 - 50 && p.x < SCREEN_WIDTH/2 + 50 &&
+                  p.y > SCREEN_HEIGHT - 60 && p.y < SCREEN_HEIGHT - 20) {
+                  
+                  if (gpsManager.isFixed() && gpsManager.getSatellites() >= 6) {
+                      // Start recording
+                      _recordingState = RECORD_ACTIVE;
+                      _recordStartLat = gpsManager.getLatitude();
+                      _recordStartLon = gpsManager.getLongitude();
+                      _recordingStartTime = millis();
+                      _lastPointTime = millis();
+                      _recordedPoints.clear();
+                      
+                      // Add first point
+                      GPSPoint firstPoint;
+                      firstPoint.lat = _recordStartLat;
+                      firstPoint.lon = _recordStartLon;
+                      firstPoint.timestamp = millis();
+                      _recordedPoints.push_back(firstPoint);
+                      
+                      drawRecordTrack();
+                  }
               }
-          } else if (!top && !left) {
-              // Save Track (Bottom Right)
-              if (_tempStartLat != 0) {
-                   // Create Custom Track Entry
-                   _finishLat = _tempStartLat;
-                   _finishLon = _tempStartLon;
-                   _finishSet = true;
-                   
-                   _currentTrackName = "Custom Track";
-                   
-                   // Start Racing Immediately
-                   _state = STATE_RACING;
-                   _isRecording = true;
-                   sessionManager.startSession();
-                   _lapCount = 1;
-                   _currentLapStart = millis();
-                   _bestLapTime = 0;
-                   _lapTimes.clear();
-                   
-                   _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-                   drawRacingStatic();
-                   drawRacing();
-                   return;
+          } else if (_recordingState == RECORD_ACTIVE) {
+              // STOP button (bottom center)
+              if (p.x > SCREEN_WIDTH/2 - 50 && p.x < SCREEN_WIDTH/2 + 50 &&
+                  p.y > SCREEN_HEIGHT - 60 && p.y < SCREEN_HEIGHT - 20) {
+                  
+                  _recordingState = RECORD_COMPLETE;
+                  drawRecordTrack();
+              }
+          } else if (_recordingState == RECORD_COMPLETE) {
+              // SAVE button
+              if (p.x > SCREEN_WIDTH/2 - 50 && p.x < SCREEN_WIDTH/2 + 50 &&
+                  p.y > SCREEN_HEIGHT - 100 && p.y < SCREEN_HEIGHT - 60) {
+                  
+                  // TODO: Implement track save to SD card
+                  // For now, just use the track as finish line
+                  _finishLat = _recordStartLat;
+                  _finishLon = _recordStartLon;
+                  _finishSet = true;
+                  _currentTrackName = "Recorded Track";
+                  
+                  // Go to racing screen
+                  _state = STATE_RACING;
+                  _lapCount = 0;
+                  _bestLapTime = 0;
+                  _lapTimes.clear();
+                  _currentLapStart = millis();
+                  _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+                  drawRacingStatic();
+                  drawRacing();
+                  return;
+              }
+              
+              // DISCARD button
+              if (p.x > SCREEN_WIDTH/2 - 50 && p.x < SCREEN_WIDTH/2 + 50 &&
+                  p.y > SCREEN_HEIGHT - 50 && p.y < SCREEN_HEIGHT - 10) {
+                  
+                  _recordingState = RECORD_IDLE;
+                  _recordedPoints.clear();
+                  drawRecordTrack();
               }
           }
-           // Debounce touch?
-           delay(200);
+      }
+      
+      // GPS Recording Loop (when ACTIVE)
+      if (_recordingState == RECORD_ACTIVE) {
+          unsigned long now = millis();
+          
+          // Record point every 2 seconds OR every 10 meters
+          if (now - _lastPointTime > 2000) {
+              if (gpsManager.isFixed()) {
+                  double currentLat = gpsManager.getLatitude();
+                  double currentLon = gpsManager.getLongitude();
+                  
+                  // Check distance from last point
+                  if (_recordedPoints.size() > 0) {
+                      GPSPoint &lastPoint = _recordedPoints.back();
+                      double dist = gpsManager.distanceBetween(lastPoint.lat, lastPoint.lon, currentLat, currentLon);
+                      
+                      // Only record if moved at least 5 meters
+                      if (dist > 5) {
+                          GPSPoint newPoint;
+                          newPoint.lat = currentLat;
+                          newPoint.lon = currentLon;
+                          newPoint.timestamp = now;
+                          _recordedPoints.push_back(newPoint);
+                          
+                          // Check for finish line detection
+                          double distToStart = gpsManager.distanceBetween(_recordStartLat, _recordStartLon, currentLat, currentLon);
+                          
+                          // Auto-finish if back at start (< 15m) and recorded enough points (> 20)
+                          if (distToStart < 15 && _recordedPoints.size() > 20) {
+                              _recordingState = RECORD_COMPLETE;
+                          }
+                          
+                          _lastPointTime = now;
+                      }
+                  }
+              }
+              
+              // Redraw to update stats
+              if (now - _lastUpdate > 500) {
+                  drawRecordTrack();
+                  _lastUpdate = now;
+              }
+          }
       }
       
   } else if (_state == STATE_NO_GPS) {
@@ -439,7 +512,7 @@ void LapTimerScreen::drawMenu() {
         "SELECT TRACK",
         "RACE SCREEN",
         "SESSION SUMMARY",
-        "CREATE CUSTOM TRACK"
+        "RECORD TRACK"
     };
     
     for (int i = 0; i < 4; i++) {
@@ -511,47 +584,118 @@ void LapTimerScreen::drawTrackSelect() {
   // 4. Create Custom Track (Bottom) - REMOVED (Moved to Sub-Menu)
 }
 
-void LapTimerScreen::drawCreateTrack() {
+void LapTimerScreen::drawRecordTrack() {
     TFT_eSPI *tft = _ui->getTft();
+    extern GPSManager gpsManager;
+    
     // Background Black
     tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
     tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY); // Separator
     
-    int cx = SCREEN_WIDTH / 2;
-    int cy = SCREEN_HEIGHT / 2;
-    
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->setFreeFont(&Org_01);
-    tft->setTextSize(1); // Standard
+    tft->setTextSize(1);
     
-    // Top Left: Set Start/Finish
-    tft->setTextDatum(TL_DATUM);
-    tft->drawString("Set Start/Finish", 10, 30); // Adjusted to 30
-    tft->drawString("Line", 10, 50); // Adjusted to 50
-    if (_tempStartLat != 0) {
-        tft->setTextColor(TFT_GREEN, TFT_BLACK);
-        tft->drawString("SET", 10, 70); // Adjusted to 70
+    // Title
+    tft->setTextDatum(TC_DATUM);
+    tft->drawString("GPS TRACK RECORDING", SCREEN_WIDTH/2, 30);
+    
+    // GPS Status Check
+    if (!gpsManager.isFixed() || gpsManager.getSatellites() < 6) {
+        tft->setTextColor(TFT_RED, TFT_BLACK);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString("GPS SIGNAL WEAK", SCREEN_WIDTH/2, 100);
+        tft->drawString("Need 6+ Satellites", SCREEN_WIDTH/2, 120);
         tft->setTextColor(TFT_WHITE, TFT_BLACK);
+        tft->setTextDatum(BL_DATUM);
+        tft->drawString("< Back", 10, SCREEN_HEIGHT - 10);
+        _ui->drawStatusBar();
+        return;
     }
-
-    // Top Right: Cancel
-    tft->setTextDatum(TR_DATUM);
-    tft->drawString("Cancel", SCREEN_WIDTH - 10, 30); // Adjusted to 30
     
-    // Bottom Left: Add Split
+    // Recording State Display
+    tft->setTextDatum(TL_DATUM);
+    
+    if (_recordingState == RECORD_IDLE) {
+        // Instructions
+        tft->drawString("Ready to Record", 10, 60);
+        tft->drawString("Tap START to begin", 10, 80);
+        tft->drawString("at finish line", 10, 100);
+        
+        // GPS Info
+        tft->setTextColor(TFT_GREEN, TFT_BLACK);
+        tft->drawString("GPS: " + String(gpsManager.getSatellites()) + " Sats", 10, 130);
+        tft->drawString("HDOP: " + String(gpsManager.getHDOP(), 1), 10, 150);
+        
+        // START Button (Bottom Center)
+        tft->setTextColor(TFT_BLACK, TFT_GREEN);
+        tft->fillRect(SCREEN_WIDTH/2 - 50, SCREEN_HEIGHT - 60, 100, 40, TFT_GREEN);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString("START", SCREEN_WIDTH/2, SCREEN_HEIGHT - 40);
+        
+    } else if (_recordingState == RECORD_ACTIVE) {
+        // Recording in progress
+        tft->setTextColor(TFT_RED, TFT_BLACK);
+        tft->drawString("RECORDING...", 10, 60);
+        
+        // Stats
+        tft->setTextColor(TFT_WHITE, TFT_BLACK);
+        tft->drawString("Points: " + String(_recordedPoints.size()), 10, 90);
+        
+        unsigned long elapsed = (millis() - _recordingStartTime) / 1000;
+        tft->drawString("Time: " + String(elapsed) + "s", 10, 110);
+        
+        // Distance from start
+        double currentLat = gpsManager.getLatitude();
+        double currentLon = gpsManager.getLongitude();
+        double distToStart = gpsManager.distanceBetween(_recordStartLat, _recordStartLon, currentLat, currentLon);
+        
+        tft->drawString("Dist: " + String(distToStart, 0) + "m", 10, 130);
+        
+        // Finish detection hint
+        if (distToStart < 50 && _recordedPoints.size() > 10) {
+            tft->setTextColor(TFT_YELLOW, TFT_BLACK);
+            tft->drawString("Near Start!", 10, 160);
+            if (distToStart < 20) {
+                tft->setTextColor(TFT_GREEN, TFT_BLACK);
+                tft->drawString("FINISH DETECTED!", 10, 180);
+            }
+        }
+        
+        // STOP Button
+        tft->setTextColor(TFT_BLACK, TFT_RED);
+        tft->fillRect(SCREEN_WIDTH/2 - 50, SCREEN_HEIGHT - 60, 100, 40, TFT_RED);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString("STOP", SCREEN_WIDTH/2, SCREEN_HEIGHT - 40);
+        
+    } else if (_recordingState == RECORD_COMPLETE) {
+        // Recording complete
+        tft->setTextColor(TFT_GREEN, TFT_BLACK);
+        tft->drawString("RECORDING COMPLETE!", 10, 60);
+        
+        tft->setTextColor(TFT_WHITE, TFT_BLACK);
+        tft->drawString("Points: " + String(_recordedPoints.size()), 10, 90);
+        
+        unsigned long elapsed = (_recordedPoints.back().timestamp - _recordingStartTime) / 1000;
+        tft->drawString("Duration: " + String(elapsed) + "s", 10, 110);
+        
+        // SAVE Button
+        tft->setTextColor(TFT_BLACK, TFT_GREEN);
+        tft->fillRect(SCREEN_WIDTH/2 - 50, SCREEN_HEIGHT - 100, 100, 40, TFT_GREEN);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString("SAVE", SCREEN_WIDTH/2, SCREEN_HEIGHT - 80);
+        
+        // DISCARD Button
+        tft->setTextColor(TFT_BLACK, TFT_RED);
+        tft->fillRect(SCREEN_WIDTH/2 - 50, SCREEN_HEIGHT - 50, 100, 40, TFT_RED);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString("DISCARD", SCREEN_WIDTH/2, SCREEN_HEIGHT - 30);
+    }
+    
+    // Back button
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->setTextDatum(BL_DATUM);
-    tft->drawString("Add Split " + String(_tempSplitCount + 1), 10, SCREEN_HEIGHT - 40);
-    tft->drawString("of 4", 10, SCREEN_HEIGHT - 20);
-    
-    // Bottom Right: Save Track
-    tft->setTextDatum(BR_DATUM);
-    tft->drawString("Save Track", SCREEN_WIDTH - 10, SCREEN_HEIGHT - 20);
-    
-    // Separators (Optional, looks better without hard lines for this pure text look?)
-    // Reference image has no visible lines, just text quadrants.
-    // But we can add soft guide lines.
-    // tft->drawFastVLine(cx, 0, SCREEN_HEIGHT, TFT_DARKGREY);
-    // tft->drawFastHLine(0, cy, SCREEN_WIDTH, TFT_DARKGREY);
+    tft->drawString("< Back", 10, SCREEN_HEIGHT - 10);
     
     _ui->drawStatusBar();
 }

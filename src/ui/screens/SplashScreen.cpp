@@ -5,7 +5,7 @@
 void SplashScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
   // tft->setRotation(1); // Already set in main.cpp
-  tft->fillScreen(0x0000); // Hitam
+  // Screen already cleared in main.cpp before backlight turns on
 
   // Gambar Bitmap (320x240)
   tft->drawBitmap(0, 0, image_BOLONG_bits, 320, 240, 0xFFFF); // Putih
