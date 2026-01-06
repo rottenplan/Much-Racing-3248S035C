@@ -1,6 +1,7 @@
 #include "HistoryScreen.h"
 #include "../../config.h"
 #include "../../core/SessionManager.h"
+#include "../fonts/Org_01.h"
 
 extern SessionManager sessionManager;
 
@@ -16,6 +17,7 @@ void HistoryScreen::onShow() {
 }
 
 void HistoryScreen::update() {
+  static unsigned long lastHistoryTouch = 0;
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x == -1)
     return;
@@ -30,10 +32,18 @@ void HistoryScreen::update() {
       return;
     }
   } else {
-    // Tampilan Daftar (Area Header 20-60)
+  // Tampilan Daftar (Area Header 20-60)
     // Tombol Kembali
     if (p.x < 60 && p.y < 60) {
-      _ui->switchScreen(SCREEN_MENU);
+      if (millis() - lastHistoryTouch < 200) return;
+      lastHistoryTouch = millis();
+
+      if (_selectedIdx == -2) {
+         _ui->switchScreen(SCREEN_MENU);
+      } else {
+         _selectedIdx = -2;
+         drawList(_scrollOffset);
+      }
       return;
     }
 
@@ -43,15 +53,23 @@ void HistoryScreen::update() {
     int listY = 70;
     int itemH = 40;
 
-    // Periksa tombol gulir (jika kita menambahkannya) atau zona sentuh sederhana
-    // Sentuh-untuk-Pilih Sederhana untuk saat ini
     if (p.y > listY) {
+      // Debounce checks
+      if (millis() - lastHistoryTouch < 200) return;
+      lastHistoryTouch = millis();
+
       int clickedIdx = _scrollOffset + ((p.y - listY) / itemH);
       if (clickedIdx < _historyList.size()) {
-        _selectedIdx = clickedIdx;
-        _showingDetails = true;
-        _ui->getTft()->fillScreen(COLOR_BG);
-        drawDetails(_selectedIdx);
+        if (_selectedIdx == clickedIdx) {
+            // Second Tap -> Open Details
+            _showingDetails = true;
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawDetails(_selectedIdx);
+        } else {
+            // First Tap -> Highlight
+            _selectedIdx = clickedIdx;
+            drawList(_scrollOffset);
+        }
       }
     }
   }
@@ -108,9 +126,9 @@ void HistoryScreen::drawList(int scrollOffset) {
   // Panah Kembali
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
   tft->setTextDatum(TL_DATUM);
-  tft->setTextFont(1); // Atau standar
+  tft->setFreeFont(&Org_01); // Atau standar
   tft->setTextSize(2); // Besar untuk sentuhan mudah
-  tft->drawString("<", 10, 35);
+  tft->drawString("<", 10, 25);
 
   // Daftar
   int startY = 70; // Dipindahkan ke atas (sebelumnya 70)
@@ -178,8 +196,9 @@ void HistoryScreen::drawDetails(int idx) {
   // Panah Kembali
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
   tft->setTextDatum(TL_DATUM);
+  tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->drawString("<", 10, 35);
+  tft->drawString("<", 10, 25);
 
   // Info
   int y = 70;

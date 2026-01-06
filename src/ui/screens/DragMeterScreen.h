@@ -14,7 +14,7 @@ public:
 
 private:
   UIManager *_ui;
-  enum State { STATE_READY, STATE_RUNNING, STATE_SUMMARY };
+  enum State { STATE_MENU, STATE_DRAG_MODE_MENU, STATE_RUNNING, STATE_SUMMARY_VIEW };
   State _state;
 
   struct Discipline {
@@ -30,6 +30,18 @@ private:
 
   unsigned long _startTime;
   unsigned long _lastUpdate;
+  int _selectedBtn; // -1:None, 0:Back, 1:Reset
+  
+  // Menu
+  // Menu
+  std::vector<String> _menuItems;
+  std::vector<String> _dragModeItems;
+  int _selectedMenuIdx;
+  int _selectedDragModeIdx;
+  void drawMenu();
+  void drawDragModeMenu();
+  void handleMenuTouch(int idx);
+  void handleDragModeTouch(int idx);
 
   // Logic
   void checkStartCondition();

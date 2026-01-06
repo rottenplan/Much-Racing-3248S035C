@@ -8,7 +8,7 @@ const char *menuLabels[MENU_ITEMS] = {"LAP TIMER", "DRAG METER", "HISTORY",
                                       "SETTINGS"};
 
 void MenuScreen::onShow() {
-  _selectedIndex = 0;
+  _selectedIndex = -1;
   _lastTouchTime = 0; // Reset debounce
   drawMenu();
 }
@@ -31,7 +31,8 @@ void MenuScreen::update() {
     int itemHeight = 30;
 
     for (int i = 0; i < MENU_ITEMS; i++) {
-      int yTop = startY + (i * gap) - 5;
+        int yTop = startY + (i * gap) - 5;
+        // ...
       int yBot =
           yTop + 30; // Cocokkan tinggi visual dengan tepat (30px)
                      // sebelumnya menggunakan 'gap' (38px) yang menyebabkan tumpang tindih/tidak ada celah.

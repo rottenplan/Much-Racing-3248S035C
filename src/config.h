@@ -72,7 +72,7 @@
 // Font Sizes (1=Tiny, 2=Small, 3=Medium, 4=Large, 6=Huge)
 #define FONT_SIZE_STATUS_BAR 1
 #define FONT_SIZE_SPLASH_TEXT 1 // "ENGINE STARTING"
-#define FONT_SIZE_MENU_TITLE 2
+#define FONT_SIZE_MENU_TITLE 3
 #define FONT_SIZE_MENU_ITEM 3
 #define FONT_SIZE_LAP_SPEED 6 // Main Racing Speed
 #define FONT_SIZE_LAP_TIME 2  // Current Lap Time

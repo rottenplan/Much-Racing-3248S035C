@@ -34,6 +34,7 @@ private:
   RaceMode _raceMode;
   int _menuSelectionIdx = -1;
   unsigned long _lastUpdate;
+  unsigned long _lastTouchTime = 0;
   bool _isRecording;
 
   // Custom Track Creation

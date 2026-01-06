@@ -1,5 +1,6 @@
 #include "UIManager.h"
 #include "../../config.h"
+#include <Preferences.h>
 #include "fonts/Org_01.h"
 
 // Sertakan layar (dibuat di langkah berikutnya)
@@ -9,6 +10,8 @@
 #include "screens/MenuScreen.h"
 #include "screens/SettingsScreen.h"
 #include "screens/SplashScreen.h"
+#include "screens/TimeSettingScreen.h"
+#include "screens/AutoOffScreen.h"
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _currentScreen = nullptr;
@@ -30,6 +33,8 @@ void UIManager::begin() {
   _dragMeterScreen = new DragMeterScreen();
   _historyScreen = new HistoryScreen();
   _settingsScreen = new SettingsScreen();
+  _timeSettingScreen = new TimeSettingScreen();
+  _autoOffScreen = new AutoOffScreen();
 
   // Mulai Layar
   _splashScreen->begin(this);
@@ -38,6 +43,19 @@ void UIManager::begin() {
   _dragMeterScreen->begin(this);
   _historyScreen->begin(this);
   _settingsScreen->begin(this);
+  _timeSettingScreen->begin(this);
+  _autoOffScreen->begin(this);
+
+  // Initialize Sleep Logic
+  Preferences prefs;
+  prefs.begin("laptimer", true);
+  int autoOffIdx = prefs.getInt("auto_off", 0);
+  prefs.end();
+  setAutoOff(autoOffIdx);
+
+  _lastInteractionTime = millis();
+  _isScreenOff = false;
+  _currentBrightness = 255; // Default max, should load from prefs if we had a stored brightness variable
 
   // Mulai dengan Splash
   switchScreen(SCREEN_SPLASH);
@@ -46,8 +64,12 @@ void UIManager::begin() {
 void UIManager::update() {
   // Perbarui logika layar saat ini
   if (_currentScreen) {
-    _currentScreen->update();
+    if (!_isScreenOff) {
+        _currentScreen->update();
+    }
   }
+
+  checkSleep();
 
   // --- PENANGANAN SENTUH ---
   // (Opsional) Kita dapat menangani sentuhan global tertentu di sini, tetapi untuk saat ini
@@ -61,6 +83,8 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
 
   _touch->read();
   if (_touch->isTouched) {
+    updateInteraction(); // Reset timer on touch
+    
     int rawX = _touch->points[0].x;
     int rawY = _touch->points[0].y;
 
@@ -148,19 +172,41 @@ void UIManager::switchScreen(ScreenType type) {
     _currentScreen = _settingsScreen;
     _screenTitle = "SETTINGS";
     break;
-  }
-
-  // Gambar Bilah Status segera saat beralih (latar belakang sudah dihapus)
-  if (_currentType != SCREEN_SPLASH) {
-    drawStatusBar(true); // Force redraw on switch
+  case SCREEN_TIME_SETTINGS:
+    _currentScreen = _timeSettingScreen;
+    _screenTitle = "CLOCK";
+    break;
+  case SCREEN_AUTO_OFF:
+    _currentScreen = _autoOffScreen;
+    _screenTitle = "AUTO OFF";
+    break;
   }
 
   if (_currentScreen) {
     _currentScreen->onShow();
   }
+  
+  // Gambar Bilah Status setelah onShow agar tidak tertimpa oleh fillScreen di layar
+  if (_currentType != SCREEN_SPLASH) {
+    drawStatusBar(true); // Force redraw on switch
+  }
 }
 
 void UIManager::drawStatusBar(bool force) {
+  // 1. Time Update Logic (Manual Clock)
+  if (g_lastTimeUpdate == 0) g_lastTimeUpdate = millis();
+  
+  if (millis() - g_lastTimeUpdate >= 60000) {
+      g_manualMinute++;
+      if (g_manualMinute > 59) {
+          g_manualMinute = 0;
+          g_manualHour++;
+          if (g_manualHour > 23) g_manualHour = 0;
+      }
+      g_lastTimeUpdate = millis();
+      force = true; // Redraw to update time
+  }
+
   // 1. Elemen Statis (Hanya gambar sekali atau jika dipaksa? Untuk saat ini, kita asumsikan latar belakang dihapus hanya pada peralihan layar)
   // Jika kita ingin menghindari kedipan, kita TIDAK boleh menghapus seluruh bilah setiap bingkai.
   // Kita mengandalkan warna latar belakang teks untuk menimpa teks lama.
@@ -196,7 +242,7 @@ void UIManager::drawStatusBar(bool force) {
       _tft->setTextDatum(ML_DATUM);
       _tft->setTextColor(COLOR_TEXT, COLOR_BG);
       _tft->setTextSize(1);
-      _tft->drawString("GPS", 5, 11);
+      _tft->drawString("GPS", 5, 10); // Centered at 10
 
       int barX = 30;
       int barY = 16;
@@ -220,12 +266,15 @@ void UIManager::drawStatusBar(bool force) {
   }
 
   // --- Bagian Waktu / Judul ---
-  // Jika _screenTitle diatur, tampilkan. Jika tidak tampilkan Waktu.
+  // Jika _screenTitle diatur, tampilkan. Jika tidak tampilkan Waktu Manual.
   String centerText;
   if (_screenTitle.length() > 0) {
       centerText = _screenTitle;
   } else {
-      centerText = ""; // Jangan tampilkan waktu
+      // Manual Time Format HH:MM
+      char buf[16];
+      sprintf(buf, "%02d:%02d", g_manualHour, g_manualMinute);
+      centerText = String(buf);
   }
 
   if (force || centerText != _lastTimeStr) { // Menggunakan kembali _lastTimeStr untuk cache teks tengah
@@ -234,32 +283,53 @@ void UIManager::drawStatusBar(bool force) {
       int areaW = 160;
       
       _tft->setTextPadding(areaW);
-      _tft->setTextDatum(TC_DATUM);
+      _tft->setTextDatum(MC_DATUM); // Middle Center
       _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-      _tft->drawString(centerText, SCREEN_WIDTH / 2, 5); // Y disesuaikan ke 5
+      _tft->drawString(centerText, SCREEN_WIDTH / 2, 10); // Y=10 Centered
       _tft->setTextPadding(0);
       
       _lastTimeStr = centerText;
   }
 
-  // --- Bagian Baterai (Tiruan) ---
-  // Cukup gambar ulang baterai sederhana setiap saat? Atau periksa perubahan?
-  // Memeriksa mock perubahan
-  int rawBat = 4095; // Mock
+  // --- Bagian Baterai ---
+  // Mock value (ADC value 0-4095)
+  // Misal Voltage divider: 4.2V = 4095 (atau disesuaikan)
+  // Sederhana: 0-100% linear dari 3.0V(0%) - 4.2V(100%)?
+  // Mock: Selalu 100% untuk sekarang atau simulasi fluktuasi
+  int rawBat = 4095; 
+  
   if (force || rawBat != _lastBat) {
-      // Hapus Area Bar
-      _tft->fillRect(SCREEN_WIDTH - 30, 0, 30, 20, COLOR_BG);
+      // Hitung Persentase
+      // Anggap 4095 = 100%
+      int pct = (rawBat * 100) / 4096;
+      if (pct > 100) pct = 100;
+  
+      // Hapus Area Bar + Teks
+      // Area Kanan: 60px lebar?
+      _tft->fillRect(SCREEN_WIDTH - 60, 0, 60, 20, COLOR_BG);
       
-      int batX = SCREEN_WIDTH - 25;
-      int batY = 5;
+      // Gambar Teks Persentase
+      _tft->setTextDatum(MR_DATUM); // Rata Kanan Tengah
+      _tft->setTextSize(1);
+      _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+      String pctStr = String(pct) + "%";
+      _tft->drawString(pctStr, SCREEN_WIDTH - 32, 10); // Centered at 10
+
+      // Gambar Ikon Baterai
+      int batX = SCREEN_WIDTH - 28; // Geser sedikit ke kiri
+      int batY = 5; // Centered (5 to 15)
       int batW = 20;
       int batH = 10;
       
       _tft->drawRect(batX, batY, batW, batH, COLOR_TEXT);
       _tft->fillRect(batX + batW, batY + 2, 2, 6, COLOR_TEXT);
       
-      // Level Mock
-      _tft->fillRect(batX + 2, batY + 2, batW - 4, batH - 4, TFT_GREEN);
+      // Isi Level
+      int innerW = batW - 4;
+      int fillW = (innerW * pct) / 100;
+      
+      if (pct > 20) _tft->fillRect(batX + 2, batY + 2, fillW, batH - 4, TFT_GREEN);
+      else _tft->fillRect(batX + 2, batY + 2, fillW, batH - 4, TFT_RED);
       
       _lastBat = rawBat;
   }
@@ -276,4 +346,41 @@ void UIManager::drawStatusBar(bool force) {
        }
        _lastLogging = isLogging;
   }
+}
+
+// --- Auto Off Logic ---
+
+void UIManager::setAutoOff(int index) {
+    // 0=Never, 1=15s, 2=30s, 3=1m, 4=3m, 5=5m
+    switch (index) {
+        case 1: _autoOffMs = 15000; break;
+        case 2: _autoOffMs = 30000; break;
+        case 3: _autoOffMs = 60000; break;
+        case 4: _autoOffMs = 180000; break;
+        case 5: _autoOffMs = 300000; break;
+        default: _autoOffMs = 0; break; // Never
+    }
+    updateInteraction();
+}
+
+void UIManager::updateInteraction() {
+    _lastInteractionTime = millis();
+    if (_isScreenOff) {
+        wakeUp();
+    }
+}
+
+void UIManager::checkSleep() {
+    if (_autoOffMs > 0 && !_isScreenOff) {
+        if (millis() - _lastInteractionTime > _autoOffMs) {
+            _isScreenOff = true;
+            ledcWrite(0, 0);
+        }
+    }
+}
+
+void UIManager::wakeUp() {
+    _isScreenOff = false;
+    _lastInteractionTime = millis();
+    ledcWrite(0, _currentBrightness);
 }

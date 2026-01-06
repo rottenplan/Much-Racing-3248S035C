@@ -6,7 +6,6 @@
 #include <Preferences.h>
 #include <vector>
 
-
 class SettingsScreen : public UserScreen {
 public:
   void begin(UIManager *ui) override { _ui = ui; }
@@ -37,6 +36,7 @@ private:
 
   std::vector<SettingItem> _settings;
   int _scrollOffset;
+  int _selectedIdx;
 
   void loadSettings();
   void saveSetting(int idx);

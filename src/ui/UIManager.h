@@ -13,7 +13,9 @@ enum ScreenType {
   SCREEN_LAP_TIMER,
   SCREEN_DRAG_METER,
   SCREEN_HISTORY,
-  SCREEN_SETTINGS
+  SCREEN_SETTINGS,
+  SCREEN_TIME_SETTINGS,
+  SCREEN_AUTO_OFF
 };
 
 class UserScreen {
@@ -36,6 +38,10 @@ public:
   void update();
   void switchScreen(ScreenType type);
   void drawStatusBar(bool force = false); // Added force parameter
+  void setAutoOff(int index);
+  void wakeUp();
+  void checkSleep();
+  void updateInteraction();
 
   // Touch Handling
   void setTouch(TAMC_GT911 *touch) { _touch = touch; }
@@ -63,6 +69,8 @@ private:
   UserScreen *_dragMeterScreen;
   UserScreen *_historyScreen;
   UserScreen *_settingsScreen;
+  UserScreen *_timeSettingScreen;
+  UserScreen *_autoOffScreen;
   
   String _screenTitle; // Added title
   
@@ -73,6 +81,12 @@ private:
   int _lastSignalStrength;
   int _lastBat;
   bool _lastLogging;
+
+  // Sleep / Auto-Off
+  unsigned long _lastInteractionTime;
+  unsigned long _autoOffMs;
+  bool _isScreenOff;
+  int _currentBrightness; // To restore after sleep
 };
 
 #endif
