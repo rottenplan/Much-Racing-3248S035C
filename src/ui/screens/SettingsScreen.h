@@ -55,20 +55,28 @@ private:
   unsigned long _lastScanAnim = 0;
   int _scanAnimStep = 0;
 
+  int _lastSelectedIdx;
+  int _lastWiFiSelectedIdx;
+
   int _lastTapIdx = -1;
   unsigned long _lastTapTime;
   int _touchStartY = -1;
   unsigned long _lastWiFiTouch = 0;
   unsigned long _lastKeyboardTouch = 0;
-  int _lastSelectedIdx = -3;
-  int _lastWiFiSelectedIdx = -1;
   unsigned long _lastGPSUpdate = 0; // Rate limit GPS redraw
+
+  // GPS Data Trackers for incremental update
+  int _lastSats = -1;
+  double _lastHdopValue = -1.0;
+  double _lastLat = 0;
+  double _lastLon = 0;
+  bool _lastFixed = false;
 
   void loadSettings();
   void saveSetting(int idx);
-  void drawList(bool force = false);
+  void drawList(int scrollOffset, bool force = false);
   void drawHeader(String title, uint16_t backColor = COLOR_HIGHLIGHT);
-  void drawGPSStatus();
+  void drawGPSStatus(bool force = false);
   void drawSDTest();
 
   // WiFi Draw Functions

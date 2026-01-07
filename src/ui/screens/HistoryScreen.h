@@ -24,7 +24,7 @@ private:
 
   std::vector<HistoryItem> _historyList;
   void scanHistory();
-  void drawList(bool force = false);
+  void drawList(int scrollOffset);
   
   int _scrollOffset = 0;
 
@@ -32,14 +32,11 @@ private:
   HistoryMode _currentMode;
   
   String _selectedType; // "TRACK" or "DRAG"
+
   int _selectedIdx;
   
-  int _lastSelectedIdx = -3;
-  int _lastScrollOffset = -1;
-  int _lastTapIdx = -1;
-  unsigned long _lastTapTime;
-
-  void drawMenu(bool force = false);
+  int _lastTapIdx;
+  unsigned long _lastTapTime;  void drawMenu();
   void drawDetails(int idx);
 };
 

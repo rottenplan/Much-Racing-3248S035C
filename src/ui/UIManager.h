@@ -40,6 +40,7 @@ public:
   void switchScreen(ScreenType type);
   void drawStatusBar(bool force = false); // Added force parameter
   void setAutoOff(unsigned long ms);
+  void setBrightness(int level);
   void wakeUp();
   void checkSleep();
   void updateInteraction();

@@ -11,11 +11,12 @@ const char *menuLabels[MENU_ITEMS] = {"LAP TIMER", "DRAG METER", "RPM SENSOR",
 
 void MenuScreen::onShow() {
   _selectedIndex = -1;
-  _lastSelectedIndex = -2; // Force first redraw
+  _lastSelectedIndex = -1;
   _lastTouchTime = 0;
-  _currentPage = 0;
-  _lastPage = -1;
+  _currentPage = 0; // Start at Page 0
   _touchStartY = -1;
+  _lastTapIdx = -1;
+  _lastTapTime = 0;
   drawMenu(true);
 }
 
@@ -120,7 +121,6 @@ void MenuScreen::update() {
                            _lastTapIdx = actualIndex;
                            _lastTapTime = millis();
                            if (_selectedIndex != actualIndex) {
-                               _lastSelectedIndex = _selectedIndex;
                                _selectedIndex = actualIndex;
                                drawMenu(false);
                            }
@@ -157,8 +157,7 @@ void MenuScreen::update() {
 void MenuScreen::drawMenu(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // 1. Force Redraw or Page Change
-  if (force || _currentPage != _lastPage) {
+  if (force) {
     tft->fillRect(0, 21, SCREEN_WIDTH, SCREEN_HEIGHT - 21, COLOR_BG);
     tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
 
@@ -169,6 +168,8 @@ void MenuScreen::drawMenu(bool force) {
     tft->drawString("MAIN MENU", SCREEN_WIDTH / 2, 45); 
   }
 
+  tft->setTextSize(FONT_SIZE_MENU_ITEM);
+  
   int startY = 80;     
   int gap = 38;        
   int rectWidth = SCREEN_WIDTH - 10;
@@ -183,12 +184,13 @@ void MenuScreen::drawMenu(bool force) {
     int actualIndex = startIndex + i;
     int yPos = startY + (i * gap);
 
-    // Only update if forced, or selection changed for this item
-    if (force || _currentPage != _lastPage || actualIndex == _selectedIndex || actualIndex == _lastSelectedIndex) {
-      
+    // Only draw if forced OR if this item's selection state changed
+    bool stateChanged = (actualIndex == _selectedIndex || actualIndex == _lastSelectedIndex);
+    
+    if (force || stateChanged) {
       // Clear item area
       tft->fillRect(rectX, yPos - 5, rectWidth, 30, COLOR_BG);
-
+      
       if (actualIndex == _selectedIndex) {
         tft->setTextColor(COLOR_BG, COLOR_HIGHLIGHT);
         tft->fillRoundRect(rectX, yPos - 5, rectWidth, 30, 5,
@@ -204,24 +206,23 @@ void MenuScreen::drawMenu(bool force) {
     }
   }
   
-  // Page Indicators (Redraw only if page changed or forced)
-  if (force || _currentPage != _lastPage) {
-    tft->setTextDatum(BC_DATUM);
-    tft->setTextSize(1);
-    tft->setTextColor(COLOR_SECONDARY);
-    
-    int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
-    
-    if (maxPage > 0) {
-        if (_currentPage < maxPage) {
-            tft->fillTriangle(SCREEN_WIDTH/2 - 10, 230, SCREEN_WIDTH/2 + 10, 230, SCREEN_WIDTH/2, 238, COLOR_ACCENT);
-        } else if (_currentPage > 0) {
-            tft->fillTriangle(SCREEN_WIDTH/2 - 10, 238, SCREEN_WIDTH/2 + 10, 238, SCREEN_WIDTH/2, 230, COLOR_ACCENT);
-        }
-    }
-  }
-
   _lastSelectedIndex = _selectedIndex;
-  _lastPage = _currentPage;
+
+  if (force) {
+      // Page Indicators (only on full redraw/page change)
+      tft->setTextDatum(BC_DATUM);
+      tft->setTextSize(1);
+      tft->setTextColor(COLOR_SECONDARY);
+      
+      int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
+      
+      if (maxPage > 0) {
+          if (_currentPage < maxPage) {
+              tft->fillTriangle(SCREEN_WIDTH/2 - 10, 230, SCREEN_WIDTH/2 + 10, 230, SCREEN_WIDTH/2, 238, COLOR_ACCENT);
+          } else if (_currentPage > 0) {
+              tft->fillTriangle(SCREEN_WIDTH/2 - 10, 238, SCREEN_WIDTH/2 + 10, 238, SCREEN_WIDTH/2, 230, COLOR_ACCENT);
+          }
+      }
+  }
 }
 

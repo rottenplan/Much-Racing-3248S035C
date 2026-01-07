@@ -57,15 +57,10 @@ private:
   int _selectedMenuIdx;
   int _selectedDragModeIdx;
   int _selectedPredictiveIdx;
-  int _lastSelectedMenuIdx = -3;
-  int _lastSelectedDragModeIdx = -3;
-  int _lastSelectedPredictiveIdx = -3;
   int _lastTapIdx;
-  unsigned long _lastTapTime;
-
-  void drawMenu(bool force = false);
-  void drawDragModeMenu(bool force = false);
-  void drawPredictiveMenu(bool force = false);
+  unsigned long _lastTapTime;  void drawMenu();
+  void drawDragModeMenu();
+  void drawPredictiveMenu();
   void drawSummary();
   void handleMenuTouch(int idx);
   void handleDragModeTouch(int idx);

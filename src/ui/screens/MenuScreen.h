@@ -12,16 +12,15 @@ public:
 private:
   UIManager *_ui;
   int _selectedIndex;
-  int _lastSelectedIndex;
   
   // Pagination State
   int _currentPage;
-  int _lastPage;
   int _touchStartY;
   
   static const int ITEMS_PER_PAGE = 4;
   unsigned long _lastTouchTime = 0;
   
+  int _lastSelectedIndex;
   int _lastTapIdx;
   unsigned long _lastTapTime;
   

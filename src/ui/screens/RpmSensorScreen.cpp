@@ -108,30 +108,22 @@ void RpmSensorScreen::drawScreen() {
   TFT_eSPI *tft = _ui->getTft();
   tft->fillScreen(COLOR_BG);
   
-  // Standard Header
+  // Back Button (Moved below status bar)
   tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
   tft->setTextDatum(TL_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
   tft->drawString("<", 10, 25);
 
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  tft->setTextDatum(TC_DATUM);
-  tft->setTextSize(1);
-  tft->setTextFont(2);
-  tft->drawString("RPM SENSOR", SCREEN_WIDTH / 2, 40);
-
-  tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY);
-  
   // --- INFO BOX (Top) ---
-  int boxY = 60; // Shifted down
+  int boxY = 25; 
   int boxH = 50; 
   int lblW = 80;
   
   // Border
   tft->drawRect(10, boxY, SCREEN_WIDTH - 20, boxH, COLOR_TEXT);
   tft->drawFastHLine(10, boxY + 25, SCREEN_WIDTH - 20, COLOR_TEXT); 
-  
+  tft->drawFastVLine(10 + lblW, boxY, boxH, COLOR_TEXT); // Vertical separator for labels
   // Labels (White BG, Black Text)
   tft->fillRect(11, boxY + 1, lblW, 24, COLOR_TEXT);      
   tft->fillRect(11, boxY + 26, lblW, 23, COLOR_TEXT);     
@@ -158,7 +150,7 @@ void RpmSensorScreen::updateValues() {
     
     int valX = 10 + 80; 
     int w = SCREEN_WIDTH - 20 - 80 - 2;
-    int boxY = 60; // Matched new boxY
+    int boxY = 25; // New boxY below status bar
     
     char buf[10];
     
@@ -187,8 +179,8 @@ void RpmSensorScreen::updateValues() {
 
 void RpmSensorScreen::drawGraphGrid() {
      TFT_eSPI *tft = _ui->getTft();
-     int gY = 120; // Shifted Down
-     int gH = 85;  // Restore height
+     int gY = 85; // Shifted Down (BoxY 25 + BoxH 50 + 10 gap)
+     int gH = 125; // Adjusted height
      
      // Box
      tft->drawRect(10, gY, SCREEN_WIDTH - 20, gH, COLOR_TEXT);
@@ -222,9 +214,9 @@ void RpmSensorScreen::drawGraphGrid() {
 void RpmSensorScreen::drawGraphLine() {
     TFT_eSPI *tft = _ui->getTft();
     int gX = 40;
-    int gY = 120; // Match Grid
+    int gY = 85; // Match Grid
     int gW = SCREEN_WIDTH - 20 - 30; 
-    int gH = 85;
+    int gH = 125;
     
     tft->fillRect(gX, gY + 1, gW - 1, gH - 2, COLOR_BG); 
     

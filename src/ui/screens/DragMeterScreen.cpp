@@ -21,15 +21,14 @@ void DragMeterScreen::onShow() {
   _state = STATE_MENU;
   _selectedBtn = -1;
   _selectedMenuIdx = -1;
-  _lastSelectedMenuIdx = -3;
   _selectedDragModeIdx = -1;
-  _lastSelectedDragModeIdx = -3;
   _selectedPredictiveIdx = -1;
-  _lastSelectedPredictiveIdx = -3;
   _lastTapIdx = -1;
   _lastTapTime = 0;
   _menuItems = {"DRAG MODE", "DRAG SCREEN", "PREDICTIVE", "SUMMARY"};
   _dragModeItems = {"SPEED", "DISTANCE", "CUSTOM"};
+  _predictiveItems = {"NORMAL MODE", "PREDICTIVE MODE"};
+
   _predictiveItems = {"NORMAL MODE", "PREDICTIVE MODE"};
 
   // Initialize Default Disciplines (Distance by default or empty?)
@@ -92,21 +91,20 @@ void DragMeterScreen::update() {
                _ui->switchScreen(SCREEN_MENU);
            } else if (_state == STATE_DRAG_MODE_MENU) {
                _state = STATE_MENU;
-               _selectedDragModeIdx = -1;
-               _lastSelectedDragModeIdx = -3;
-               _ui->getTft()->fillScreen(COLOR_BG);
-               drawMenu(true);
+               _selectedDragModeIdx = -1; // Reset selection
+               _ui->getTft()->fillScreen(COLOR_BG); // Clear entire screen
+               drawMenu();
            } else if (_state == STATE_PREDICTIVE_MENU) {
                _state = STATE_MENU;
                _selectedPredictiveIdx = -1;
-               _lastSelectedPredictiveIdx = -3;
                _ui->getTft()->fillScreen(COLOR_BG);
-               drawMenu(true);
+               drawMenu();
            } else if (_state == STATE_SUMMARY_VIEW) {
                _state = STATE_MENU;
                _ui->getTft()->fillScreen(COLOR_BG);
-               drawMenu(true);
+               drawMenu();
            } else {
+               // If in running mode, go back to menu
                _state = STATE_MENU;
                _ui->getTft()->fillScreen(COLOR_BG);
                drawDashboardStatic();
@@ -146,9 +144,8 @@ void DragMeterScreen::update() {
                         _lastTapTime = now;
                         
                         if (_selectedMenuIdx != touchedIdx) {
-                            _lastSelectedMenuIdx = _selectedMenuIdx;
                             _selectedMenuIdx = touchedIdx;
-                            drawMenu(false);
+                            drawMenu();
                         }
                     }
                 }
@@ -183,9 +180,8 @@ void DragMeterScreen::update() {
                         _lastTapTime = now;
                         
                         if (_selectedDragModeIdx != touchedIdx) {
-                            _lastSelectedDragModeIdx = _selectedDragModeIdx;
                             _selectedDragModeIdx = touchedIdx;
-                            drawDragModeMenu(false);
+                            drawDragModeMenu();
                         }
                     }
                 }
@@ -239,9 +235,8 @@ void DragMeterScreen::update() {
             _lastTapTime = now;
             
             if (_selectedPredictiveIdx != touchedIdx) {
-                _lastSelectedPredictiveIdx = _selectedPredictiveIdx;
                 _selectedPredictiveIdx = touchedIdx;
-                drawPredictiveMenu(false);
+                drawPredictiveMenu();
             }
         }
      }
@@ -873,24 +868,22 @@ void DragMeterScreen::drawSummary() {
 
 }
 
-void DragMeterScreen::drawMenu(bool force) {
+void DragMeterScreen::drawMenu() {
     TFT_eSPI *tft = _ui->getTft();
     
-    if (force) {
-        // Title
-        tft->setTextColor(COLOR_TEXT, COLOR_BG);
-        tft->setTextDatum(TC_DATUM);
-        tft->setFreeFont(&Org_01);
-        tft->setTextSize(2);
-        tft->drawString("DRAG MENU", SCREEN_WIDTH / 2, 25);
+    // Title
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextDatum(TC_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(2);
+    tft->drawString("DRAG MENU", SCREEN_WIDTH / 2, 25);
 
-        // Back Button
-        tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-        tft->setTextDatum(TL_DATUM);
-        tft->drawString("<", 10, 25);
-        
-        tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
-    }
+    // Back Button
+    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("<", 10, 25);
+    
+    tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
     
     int startY = 55;
     int btnHeight = 35; 
@@ -899,39 +892,37 @@ void DragMeterScreen::drawMenu(bool force) {
     int x = (SCREEN_WIDTH - btnWidth) / 2;
     
     for (int i = 0; i < _menuItems.size(); i++) {
-        if (force || i == _selectedMenuIdx || i == _lastSelectedMenuIdx) {
-            int y = startY + (i * (btnHeight + gap));
-            uint16_t btnColor = (i == _selectedMenuIdx) ? TFT_RED : TFT_DARKGREY;
-            tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
-            tft->setTextColor(TFT_WHITE, btnColor);
-            tft->setTextDatum(MC_DATUM);
-            tft->setFreeFont(&Org_01);
-            tft->setTextSize(2); 
-            tft->drawString(_menuItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
-        }
+        int y = startY + (i * (btnHeight + gap));
+        
+        // Determine Color based on selection
+        uint16_t btnColor = (i == _selectedMenuIdx) ? TFT_RED : TFT_DARKGREY;
+        
+        tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+        tft->setTextColor(TFT_WHITE, btnColor);
+        tft->setTextDatum(MC_DATUM);
+        tft->setFreeFont(&Org_01);
+        tft->setTextSize(2); // Using Org_01 size 2 to match LapTimer
+        tft->drawString(_menuItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
     }
-    _lastSelectedMenuIdx = _selectedMenuIdx;
-    if (force) _ui->drawStatusBar(true);
+    _ui->drawStatusBar();
 }
 
-void DragMeterScreen::drawDragModeMenu(bool force) {
+void DragMeterScreen::drawDragModeMenu() {
     TFT_eSPI *tft = _ui->getTft();
     
-    if (force) {
-        // Title
-        tft->setTextColor(COLOR_TEXT, COLOR_BG);
-        tft->setTextDatum(TC_DATUM);
-        tft->setFreeFont(&Org_01);
-        tft->setTextSize(2);
-        tft->drawString("DRAG MODE", SCREEN_WIDTH / 2, 25);
+    // Title
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextDatum(TC_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(2);
+    tft->drawString("DRAG MODE", SCREEN_WIDTH / 2, 25);
 
-        // Back Button
-        tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-        tft->setTextDatum(TL_DATUM);
-        tft->drawString("<", 10, 25);
-        
-        tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
-    }
+    // Back Button
+    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("<", 10, 25);
+    
+    tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
     
     int startY = 55;
     int btnHeight = 35; 
@@ -940,40 +931,38 @@ void DragMeterScreen::drawDragModeMenu(bool force) {
     int x = (SCREEN_WIDTH - btnWidth) / 2;
     
     for (int i = 0; i < _dragModeItems.size(); i++) {
-        if (force || i == _selectedDragModeIdx || i == _lastSelectedDragModeIdx) {
-            int y = startY + (i * (btnHeight + gap));
-            uint16_t btnColor = (i == _selectedDragModeIdx) ? TFT_RED : TFT_DARKGREY;
-            tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
-            tft->setTextColor(TFT_WHITE, btnColor);
-            tft->setTextDatum(MC_DATUM);
-            tft->setFreeFont(&Org_01);
-            tft->setTextSize(2);
-            tft->drawString(_dragModeItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
-        }
+        int y = startY + (i * (btnHeight + gap));
+        
+        // Determine Color based on selection
+        uint16_t btnColor = (i == _selectedDragModeIdx) ? TFT_RED : TFT_DARKGREY;
+        
+        tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+        tft->setTextColor(TFT_WHITE, btnColor);
+        tft->setTextDatum(MC_DATUM);
+        tft->setFreeFont(&Org_01);
+        tft->setTextSize(2);
+        tft->drawString(_dragModeItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
     }
-    _lastSelectedDragModeIdx = _selectedDragModeIdx;
-    if (force) _ui->drawStatusBar(true);
+    _ui->drawStatusBar();
 }
 
 
-void DragMeterScreen::drawPredictiveMenu(bool force) {
+void DragMeterScreen::drawPredictiveMenu() {
     TFT_eSPI *tft = _ui->getTft();
     
-    if (force) {
-        // Title
-        tft->setTextColor(COLOR_TEXT, COLOR_BG);
-        tft->setTextDatum(TC_DATUM);
-        tft->setFreeFont(&Org_01);
-        tft->setTextSize(2);
-        tft->drawString("PREDICTIVE", SCREEN_WIDTH / 2, 25);
-        
-        // Back Button
-        tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-        tft->setTextDatum(TL_DATUM);
-        tft->drawString("<", 10, 25);
-        
-        tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
-    }
+    // Title
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextDatum(TC_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(2);
+    tft->drawString("PREDICTIVE", SCREEN_WIDTH / 2, 25);
+    
+    // Back Button
+    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("<", 10, 25);
+    
+    tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
     
     int startY = 55;
     int btnHeight = 35; 
@@ -982,19 +971,19 @@ void DragMeterScreen::drawPredictiveMenu(bool force) {
     int x = (SCREEN_WIDTH - btnWidth) / 2;
     
     for (int i = 0; i < _predictiveItems.size(); i++) {
-        if (force || i == _selectedPredictiveIdx || i == _lastSelectedPredictiveIdx) {
-            int y = startY + (i * (btnHeight + gap));
-            uint16_t btnColor = (i == _selectedPredictiveIdx) ? TFT_RED : TFT_DARKGREY;
-            tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
-            tft->setTextColor(TFT_WHITE, btnColor);
-            tft->setTextDatum(MC_DATUM);
-            tft->setFreeFont(&Org_01);
-            tft->setTextSize(2); 
-            tft->drawString(_predictiveItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
-        }
+        int y = startY + (i * (btnHeight + gap));
+        
+        // Determine Color based on selection
+        uint16_t btnColor = (i == _selectedPredictiveIdx) ? TFT_RED : TFT_DARKGREY;
+        
+        tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+        tft->setTextColor(TFT_WHITE, btnColor);
+        tft->setTextDatum(MC_DATUM);
+        tft->setFreeFont(&Org_01);
+        tft->setTextSize(2); // Using Org_01 size 2 to match LapTimer
+        tft->drawString(_predictiveItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
     }
-    _lastSelectedPredictiveIdx = _selectedPredictiveIdx;
-    if (force) _ui->drawStatusBar(true);
+    _ui->drawStatusBar();
 }
 
 void DragMeterScreen::handlePredictiveTouch(int idx) {

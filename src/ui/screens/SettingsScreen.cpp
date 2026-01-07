@@ -43,14 +43,13 @@ void sdProgressCallback(int percent, String status) {
 
 void SettingsScreen::onShow() {
   _selectedIdx = -1; 
-  _lastSelectedIdx = -3;
-  _lastWiFiSelectedIdx = -2;
-  _currentMode = MODE_MAIN; 
-  loadSettings(); 
+  _lastSelectedIdx = -1;
+  _currentMode = MODE_MAIN; // Start at Main
+  loadSettings(); // Reload to ensure sync
   
   TFT_eSPI *tft = _ui->getTft();
   tft->fillScreen(COLOR_BG);
-  drawList(true); // Force full draw
+  drawList(0, true);
 }
 
 void SettingsScreen::loadSettings() {
@@ -141,7 +140,19 @@ void SettingsScreen::saveSetting(int idx) {
     if (item.key == "brightness") {
       // Map 0-9 (10%-100%) to PWM duty cycle
       int duty = map(item.currentOptionIdx, 0, 9, 26, 255); // 10% to 100%
-      ledcWrite(0, duty); // Channel 0 for backlight
+      _ui->setBrightness(duty); 
+    }
+    
+    if (item.key == "power_save") {
+      unsigned long ms = 0;
+      switch(item.currentOptionIdx) {
+          case 0: ms = 60000; break;      // 1 min
+          case 1: ms = 300000; break;     // 5 min
+          case 2: ms = 600000; break;     // 10 min
+          case 3: ms = 1800000; break;    // 30 min
+          case 4: ms = 0; break;          // Never
+      }
+      _ui->setAutoOff(ms);
     }
   } else if (item.type == TYPE_TOGGLE) {
     _prefs.putBool(item.key.c_str(), item.checkState);
@@ -172,7 +183,7 @@ void SettingsScreen::update() {
           _scanCount = n;
           _ui->getTft()->fillScreen(COLOR_BG);
           _ui->drawStatusBar(true);
-          drawWiFiList(true);
+          drawWiFiList();
           _lastWiFiTouch = millis();
       }
       return; // Block other input while scanning
@@ -182,16 +193,15 @@ void SettingsScreen::update() {
   if (p.x == -1)
     return;
 
-  // Tombol Kembali (Area Header 20-60)
-  if (p.x < 60 && p.y < 60) {
+  // Tombol Kembali (Bottom-Left corner, y > 210)
+  if (p.x < 60 && p.y > 210) {
     if (millis() - lastSettingTouch < 200) return;
     lastSettingTouch = millis();
 
     // Visual Feedback (Selection)
     if (_selectedIdx != -2) {
-       _lastSelectedIdx = _selectedIdx;
        _selectedIdx = -2;
-       drawList(false);
+       drawList(_scrollOffset, false);
     }
     
     // Logic Back
@@ -203,17 +213,14 @@ void SettingsScreen::update() {
         loadSettings();
         _ui->getTft()->fillScreen(COLOR_BG);
         _ui->drawStatusBar(true);
-        drawList(true);
+        drawList(0, true);
     }
     return;
   }
 
-  // Daftar Sentuh
-  int listY = 55; // Header at 60, but we can start slightly higher or overlap line slightly? 
-  // Let's stick to 60 for safety, margin is tight.
-  // User wants 10 lines. 240 - 60 = 180. 180 / 10 = 18.
-  listY = 60;
-  int itemH = 18; // 18px * 10 = 180px. Exactly fits bottom.
+  // Daftar Sentuh (now starts at y=30, with gap after status bar)
+  int listY = 30;
+  int itemH = 20; // Match drawList
 
 
     // Debounce Check
@@ -236,9 +243,8 @@ void SettingsScreen::update() {
                       _lastTapTime = now;
                       
                       if (_selectedIdx != idx) {
-                          _lastSelectedIdx = _selectedIdx;
                           _selectedIdx = idx;
-                          drawList(false);
+                          drawList(_scrollOffset, false);
                       }
                  }
             }
@@ -370,11 +376,11 @@ void SettingsScreen::handleTouch(int idx) {
           item.currentOptionIdx = 0;
       }
       saveSetting(idx);
-      drawList(_scrollOffset);
+      drawList(_scrollOffset, false);
   } else if (item.type == TYPE_TOGGLE) {
       item.checkState = !item.checkState;
       saveSetting(idx);
-      drawList(_scrollOffset);
+      drawList(_scrollOffset, false);
   } else if (item.type == TYPE_ACTION) {
       if (item.name == "CLOCK SETTING") {
           _ui->switchScreen(SCREEN_TIME_SETTINGS);
@@ -384,7 +390,7 @@ void SettingsScreen::handleTouch(int idx) {
           loadSettings();
           _ui->getTft()->fillScreen(COLOR_BG);
           _ui->drawStatusBar(true);
-          drawList(0);
+          drawList(0, true);
       } else if (item.name == "WIFI SETUP") {
           // Start WiFi scan
           _currentMode = MODE_WIFI;
@@ -408,11 +414,12 @@ void SettingsScreen::handleTouch(int idx) {
           loadSettings();
           _ui->getTft()->fillScreen(COLOR_BG);
           _ui->drawStatusBar(true); // Redraw Status Bar
-          drawList(0);
+          drawList(0, true);
       } else if (item.name == "GPS STATUS") {
           _currentMode = MODE_GPS;
           _ui->getTft()->fillScreen(COLOR_BG);
           _ui->drawStatusBar(true); // Redraw Status Bar
+          drawGPSStatus(true);
       } else if (item.name == "SD CARD TEST") {
           _currentMode = MODE_SD_TEST;
           TFT_eSPI *tft = _ui->getTft();
@@ -452,136 +459,146 @@ void SettingsScreen::handleTouch(int idx) {
 void SettingsScreen::drawHeader(String title, uint16_t backColor) {
     TFT_eSPI *tft = _ui->getTft();
     
-    // Header
-    tft->setTextColor(backColor, COLOR_BG);
-    tft->setTextDatum(TL_DATUM);
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(2); 
-    tft->drawString("<", 10, 25);
+    // Draw horizontal line at bottom gap (above the arrow area, like status bar line)
+    tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
     
-    tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    tft->setTextDatum(TC_DATUM);
-    tft->setTextSize(1);
-    tft->setTextFont(2);
-    tft->drawString(title, SCREEN_WIDTH / 2, 40);
-    
-    tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY);
+    // Back Button at bottom-left - Blue filled triangle pointing LEFT
+    // Same size as MenuScreen arrows: 20px wide, 8px tall
+    // Points: left tip at (5, 225), right-top at (25, 221), right-bottom at (25, 229)
+    tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
 }
 
-void SettingsScreen::drawGPSStatus() {
-    // Rate Limiting: Update only every 1000ms (1Hz)
-    if (millis() - _lastGPSUpdate < 1000) return;
-    _lastGPSUpdate = millis();
-
+void SettingsScreen::drawGPSStatus(bool force) {
     TFT_eSPI *tft = _ui->getTft();
     
-    // 1. Draw Back Arrow (Static - Redrawn every 1s is fine, or check if specific)
-    // To prevent total flicker, we can rely on overwrite.
-    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-    tft->setTextDatum(TL_DATUM);
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(2);
-    tft->drawString("<", 10, 25); 
+    if (force) {
+        tft->fillScreen(COLOR_BG);
+        _ui->drawStatusBar(true);
+        
+        // Static Header
+        tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+        tft->setTextDatum(TL_DATUM);
+        tft->setFreeFont(&Org_01);
+        tft->setTextSize(2);
+        tft->drawString("<", 10, 25); 
+
+        // Static layout elements
+        int yStats = 62; 
+        int hStatsHeader = 18;
+        tft->fillRect(10, yStats, 160, hStatsHeader, TFT_WHITE);
+        tft->setTextColor(TFT_BLACK, TFT_WHITE);
+        tft->setTextSize(1);
+        tft->drawString("GPS STATUS", 15, yStats + 9);
+        
+        int listH = 6 * 15 + 8; // 6 items * 15px + pad
+        tft->drawRect(10, yStats + hStatsHeader, 160, listH, TFT_WHITE);
+        
+        // Radar
+        int cX = 245, cY = 120, r = 55;
+        tft->drawCircle(cX, cY, r, TFT_WHITE);
+        tft->drawCircle(cX, cY, r*0.66, COLOR_SECONDARY);
+        tft->drawCircle(cX, cY, r*0.33, COLOR_SECONDARY);
+        tft->drawFastHLine(cX - r, cY, 2*r, COLOR_SECONDARY);
+        tft->drawFastVLine(cX, cY - r, 2*r, COLOR_SECONDARY);
+        
+        auto drawCard = [&](String l, int x, int y) {
+            tft->fillCircle(x, y, 9, TFT_WHITE);
+            tft->setTextColor(TFT_BLACK, TFT_WHITE);
+            tft->setTextDatum(MC_DATUM);
+            tft->drawString(l, x, y+1);
+        };
+        drawCard("N", cX, cY - r);
+        drawCard("S", cX, cY + r);
+        drawCard("E", cX + r, cY);
+        drawCard("W", cX - r, cY);
+        
+        // Reset trackers
+        _lastSats = -1;
+        _lastHdopValue = -1.0;
+        _lastLat = 0;
+        _lastLon = 0;
+        _lastFixed = false;
+    }
+
+    // Rate Limiting
+    static unsigned long lastGPSDraw = 0;
+    if (!force && millis() - lastGPSDraw < 1000) return;
+    lastGPSDraw = millis();
 
     extern GPSManager gpsManager;
-    
-    // Layout
-    int yStats = 62; 
-    int hStatsHeader = 18;
-    int hItem = 15; 
-    
-    // Data
     int sats = gpsManager.getSatellites();
     double hdop = gpsManager.getHDOP();
     double lat = gpsManager.getLatitude();
     double lon = gpsManager.getLongitude();
+    bool fixed = gpsManager.isFixed();
     
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(1);
-    
-    // 4. GPS Status Group
-    // Draw Box Title only if needed, but simplest is to redraw
-    tft->fillRect(10, yStats, 160, hStatsHeader, TFT_WHITE);
-    tft->setTextColor(TFT_BLACK, TFT_WHITE);
-    tft->drawString("GPS STATUS", 15, yStats + 9);
-    
-    // List Box (Outline)
-    int listH = 6 * hItem + 8; // 6 items
-    tft->drawRect(10, yStats + hStatsHeader, 160, listH, TFT_WHITE);
-    
+    int yStats = 62;
+    int hStatsHeader = 18;
+    int hItem = 15;
     int curY = yStats + hStatsHeader + 4;
+
+    auto drawRowValue = [&](String label, String val, String lastVal, int y) {
+        if (force || val != lastVal) {
+            tft->setTextDatum(ML_DATUM);
+            tft->setTextColor(TFT_WHITE, COLOR_BG);
+            tft->setFreeFont(&Org_01);
+            tft->setTextSize(1);
+            
+            // Draw label and separator only on force
+            if (force) {
+                tft->drawString(label, 15, y + (hItem/2));
+                tft->drawString(":", 60, y + (hItem/2));
+                tft->drawFastHLine(10, y + hItem, 160, COLOR_SECONDARY); 
+            }
+            
+            // Clear and draw value
+            tft->fillRect(75, y, 90, hItem-1, COLOR_BG);
+            tft->drawString(val, 75, y + (hItem/2));
+        }
+    };
+
+    drawRowValue("GPS", String(sats) + " Sat", force ? "" : String(_lastSats) + " Sat", curY); curY += hItem;
+    drawRowValue("GLO", "- Sat", force ? "" : "- Sat", curY); curY += hItem;
+    drawRowValue("GAL", "- Sat", force ? "" : "- Sat", curY); curY += hItem;
+    drawRowValue("BEI", "- Sat", force ? "" : "- Sat", curY); curY += hItem;
+    drawRowValue("MBN", "A : -", force ? "" : "A : -", curY); curY += hItem;
+    drawRowValue("HDOP", String(hdop, 2), force ? "" : String(_lastHdopValue, 2), curY);
     
-    // Helper to draw row
-    auto drawRow = [&](String label, String val, int y) {
-        tft->setTextDatum(ML_DATUM);
-        // Clear old text area? setTextColor with BG handles it mostly if font is solid
-        // But for perfect anti-flicker, fillRect is safer if values change length
-        tft->fillRect(11, y, 158, hItem, COLOR_BG); // Clear row interior
-        
+    if (force || lat != _lastLat || lon != _lastLon) {
+        int tableBottom = yStats + hStatsHeader + (6 * hItem + 8);
+        int yLat = tableBottom + 10;
+        tft->fillRect(10, yLat, 200, 40, COLOR_BG);
         tft->setTextColor(TFT_WHITE, COLOR_BG);
-        tft->drawString(label, 15, y + (hItem/2));
-        tft->drawString(":", 60, y + (hItem/2));
-        tft->drawString(val, 75, y + (hItem/2));
-        tft->drawFastHLine(10, y + hItem, 160, COLOR_SECONDARY); 
-    };
-
-    drawRow("GPS", String(sats) + " Sat", curY); curY += hItem;
-    drawRow("GLO", "- Sat", curY); curY += hItem;
-    drawRow("GAL", "- Sat", curY); curY += hItem;
-    drawRow("BEI", "- Sat", curY); curY += hItem;
-    drawRow("MBN", "A : -", curY); curY += hItem;
-    drawRow("HDOP", String(hdop, 2), curY);
-    
-    // 5. Lat/Lon
-    int tableBottom = yStats + hStatsHeader + (6 * hItem + 8);
-    int yLat = tableBottom + 10;
-    
-    tft->fillRect(10, yLat, 200, 40, COLOR_BG); // Clear Lat/Lon area
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
-    tft->drawString("LAT : " + String(lat, 6), 15, yLat);
-    tft->drawString("LNG : " + String(lon, 6), 15, yLat + 18);
-    
-    // --- RIGHT SIDE: POLAR PLOT ---
-    int cX = 245;
-    int cY = 120;
-    int r = 55;
-    
-    // Clear Plot Area
-    tft->fillRect(cX - r - 5, cY - r - 5, (r*2)+10, (r*2)+10, COLOR_BG);
-
-    // Draw Radar Circles
-    tft->drawCircle(cX, cY, r, TFT_WHITE);
-    tft->drawCircle(cX, cY, r*0.66, COLOR_SECONDARY);
-    tft->drawCircle(cX, cY, r*0.33, COLOR_SECONDARY);
-
-    // Crosshairs
-    tft->drawFastHLine(cX - r, cY, 2*r, COLOR_SECONDARY);
-    tft->drawFastVLine(cX, cY - r, 2*r, COLOR_SECONDARY);
-    
-    auto drawCard = [&](String l, int x, int y) {
-        tft->fillCircle(x, y, 9, TFT_WHITE);
-        tft->setTextColor(TFT_BLACK, TFT_WHITE);
-        tft->setTextDatum(MC_DATUM);
-        tft->drawString(l, x, y+1);
-    };
-    
-    drawCard("N", cX, cY - r);
-    drawCard("S", cX, cY + r);
-    drawCard("E", cX + r, cY);
-    drawCard("W", cX - r, cY);
-    
-    if (gpsManager.isFixed()) {
-        unsigned long t = millis() / 1000;
-        int s1_ang = (t * 5) % 360;
-        int s1_r = r * 0.5;
-        float rad = s1_ang * DEG_TO_RAD;
-        tft->fillCircle(cX + cos(rad)*s1_r, cY + sin(rad)*s1_r, 3, TFT_GREEN);
-        
-        int s2_ang = (t * 2 + 120) % 360;
-        int s2_r = r * 0.8;
-        rad = s2_ang * DEG_TO_RAD;
-        tft->fillCircle(cX + cos(rad)*s2_r, cY + sin(rad)*s2_r, 3, TFT_GREEN);
+        tft->setTextDatum(TL_DATUM);
+        tft->drawString("LAT : " + String(lat, 6), 15, yLat);
+        tft->drawString("LNG : " + String(lon, 6), 15, yLat + 18);
     }
+
+    // Polar Plot Satellites (Simulated for feedback in code)
+    if (fixed != _lastFixed || fixed) {
+        int cX = 245, cY = 120, r = 55;
+        // Only clear plot area if state changed or we need to redraw blinkers
+        if (fixed) {
+            // Clear old dots (simplest is clear small r+5 area around dots, but radar is fast)
+            // Just redraw radar lines to "clean" old dots
+            tft->drawCircle(cX, cY, r*0.66, COLOR_SECONDARY);
+            tft->drawCircle(cX, cY, r*0.33, COLOR_SECONDARY);
+            tft->drawFastHLine(cX - r, cY, 2*r, COLOR_SECONDARY);
+            tft->drawFastVLine(cX, cY - r, 2*r, COLOR_SECONDARY);
+
+            unsigned long t = millis() / 1000;
+            float rad = ((t * 5) % 360) * DEG_TO_RAD;
+            tft->fillCircle(cX + cos(rad)*(r*0.5), cY + sin(rad)*(r*0.5), 3, TFT_GREEN);
+            rad = ((t * 2 + 120) % 360) * DEG_TO_RAD;
+            tft->fillCircle(cX + cos(rad)*(r*0.8), cY + sin(rad)*(r*0.8), 3, TFT_GREEN);
+        }
+    }
+
+    _lastSats = sats;
+    _lastHdopValue = hdop;
+    _lastLat = lat;
+    _lastLon = lon;
+    _lastFixed = fixed;
 }
 
 void SettingsScreen::drawSDTest() {
@@ -631,34 +648,46 @@ void SettingsScreen::drawSDTest() {
     tft->drawString(writeStr, 40, y);
 }
 
-void SettingsScreen::drawList(bool force) {
+void SettingsScreen::drawList(int scrollOffset, bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // 1. Force Redraw Header
+  // Determine Title
+  String title = "SETTINGS";
+  if (_currentMode == MODE_RPM) title = "RPM SETTING";
+  else if (_currentMode == MODE_ENGINE) title = "ENGINE HOURS";
+  
+  // Highlight Back Arrow if selected
+  uint16_t backColor = (_selectedIdx == -2) ? COLOR_HIGHLIGHT : COLOR_TEXT;
+  
   if (force) {
-    String title = "SETTINGS";
-    if (_currentMode == MODE_RPM) title = "RPM SETTING";
-    else if (_currentMode == MODE_ENGINE) title = "ENGINE HOURS";
-    
-    uint16_t backColor = (_selectedIdx == -2) ? COLOR_HIGHLIGHT : COLOR_TEXT;
-    drawHeader(title, backColor);
+    _ui->drawStatusBar(true);
+    // Draw horizontal line after status bar
+    tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
   }
 
-  // List
-  int listY = 60;
-  int itemH = 18; 
+  // List (starts at y=30, with gap after status bar)
+  int listY = 30;
+  int itemH = 20; // Slightly taller rows for better touch targets
+  int maxY = 200; // Leave room for bottom area (line at 210, arrow below)
   
   for (int i = 0; i < _settings.size(); i++) {
     SettingItem &item = _settings[i];
     int y = listY + (i * itemH);
+    
+    // Stop if we'd draw beyond the bottom area
+    if (y + itemH > maxY) break;
+    
     int sIdx = i;
 
-    // Only update if forced or selection changed for this item
-    if (force || sIdx == _selectedIdx || sIdx == _lastSelectedIdx) {
-      
+    // Only draw if forced OR if this item's selection state changed
+    bool stateChanged = (sIdx == _selectedIdx || sIdx == _lastSelectedIdx);
+    
+    if (force || stateChanged) {
+      // Background
       uint16_t bgColor = (sIdx == _selectedIdx) ? TFT_WHITE : COLOR_BG;
       uint16_t txtColor = (sIdx == _selectedIdx) ? TFT_BLACK : COLOR_TEXT;
 
+      // Explicitly clear background
       tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
       if (sIdx != _selectedIdx) {
           tft->drawFastHLine(0, y + itemH - 1, SCREEN_WIDTH, COLOR_SECONDARY);
@@ -667,7 +696,8 @@ void SettingsScreen::drawList(bool force) {
       // Name
       tft->setTextDatum(TL_DATUM);
       tft->setTextFont(1); 
-      tft->setTextSize(1);
+      tft->setTextSize(1); 
+      
       tft->setTextColor(txtColor, bgColor);
       tft->drawString(item.name, 10, y + 5); 
       
@@ -678,6 +708,8 @@ void SettingsScreen::drawList(bool force) {
           if (item.currentOptionIdx >= 0 && item.currentOptionIdx < item.options.size()) {
               valText = item.options[item.currentOptionIdx];
           }
+      } else if (item.type == TYPE_TOGGLE) {
+          valText = ""; 
       } else if (item.type == TYPE_ACTION) {
           valText = ">";
       }
@@ -703,6 +735,16 @@ void SettingsScreen::drawList(bool force) {
     }
   }
   _lastSelectedIdx = _selectedIdx;
+  
+  // Draw bottom elements AFTER list (so they're on top)
+  if (force) {
+    // Clear bottom area
+    tft->fillRect(0, 210, SCREEN_WIDTH, 30, COLOR_BG);
+    // Horizontal line separator
+    tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
+    // Blue triangle arrow pointing LEFT (20px wide, 16px tall)
+    tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
+  }
 }
 
 // WiFi Functions
@@ -710,53 +752,46 @@ void SettingsScreen::drawList(bool force) {
 void SettingsScreen::drawWiFiList(bool force) {
   TFT_eSPI *tft = _ui->getTft();
   
-  if (force) {
-    drawHeader("WIFI SETUP");
-  }
+  drawHeader("WIFI SETUP");
   
   // List networks
   int listY = 60;
   int itemH = 25;
   
   for (int i = 0; i < _scanCount && i < 8; i++) {
-    // Only update if forced or selection changed for this item
-    if (force || i == _selectedWiFiIdx || i == _lastWiFiSelectedIdx) {
-      String ssid = WiFi.SSID(i);
-      int rssi = WiFi.RSSI(i);
-      bool isSecure = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
-      
-      int y = listY + (i * itemH);
-      
-      // Background
-      uint16_t bgColor = (i == _selectedWiFiIdx) ? TFT_BLUE : COLOR_BG;
-      uint16_t txtColor = (i == _selectedWiFiIdx) ? TFT_WHITE : COLOR_TEXT;
-      
-      tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
-      
-      // SSID
-      tft->setTextColor(txtColor, bgColor);
-      tft->setTextDatum(TL_DATUM);
-      tft->drawString(ssid, 10, y + 5);
-      
-      // Signal strength
-      String signal = String(rssi) + "dBm";
-      tft->setTextDatum(TR_DATUM);
-      tft->drawString(signal, SCREEN_WIDTH - 30, y + 5);
-      
-      // Lock icon if secured
-      if (isSecure) {
-        tft->drawString("*", SCREEN_WIDTH - 10, y + 5);
-      }
+    String ssid = WiFi.SSID(i);
+    int rssi = WiFi.RSSI(i);
+    bool isSecure = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+    
+    int y = listY + (i * itemH);
+    
+    // Background
+    uint16_t bgColor = (i == _selectedWiFiIdx) ? TFT_BLUE : COLOR_BG;
+    uint16_t txtColor = (i == _selectedWiFiIdx) ? TFT_WHITE : COLOR_TEXT;
+    
+    tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
+    
+    // SSID
+    tft->setTextColor(txtColor, bgColor);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString(ssid, 10, y + 5);
+    
+    // Signal strength
+    String signal = String(rssi) + "dBm";
+    tft->setTextDatum(TR_DATUM);
+    tft->drawString(signal, SCREEN_WIDTH - 30, y + 5);
+    
+    // Lock icon if secured
+    if (isSecure) {
+      tft->drawString("*", SCREEN_WIDTH - 10, y + 5);
     }
   }
   
-  if (force && _scanCount == 0) {
+  if (_scanCount == 0) {
     tft->setTextColor(COLOR_TEXT, COLOR_BG);
     tft->setTextDatum(MC_DATUM);
     tft->drawString("No networks found", SCREEN_WIDTH / 2, 120);
   }
-
-  _lastWiFiSelectedIdx = _selectedWiFiIdx;
 }
 
 void SettingsScreen::drawKeyboard(bool fullRedraw) {

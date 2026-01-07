@@ -7,17 +7,13 @@ extern SessionManager sessionManager;
 
 void HistoryScreen::onShow() {
   _scrollOffset = 0;
-  _lastScrollOffset = -1;
-  _currentMode = MODE_MENU; 
+  _currentMode = MODE_MENU; // Start at Menu
   _selectedIdx = -1;
-  _lastSelectedIdx = -3;
-  _lastTapIdx = -1;
-  scanHistory(); 
+  scanHistory(); // Scan everything once
 
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
-  _ui->drawStatusBar(true);
-  drawMenu(true);
+  _ui->drawStatusBar();
+  drawMenu();
 }
 
 void HistoryScreen::update() {
@@ -72,20 +68,18 @@ void HistoryScreen::update() {
               }
               _currentMode = MODE_LIST;
               _scrollOffset = 0;
-              _selectedIdx = -1; 
-              _lastSelectedIdx = -3;
+              _selectedIdx = -1; // Reset for list
               _ui->getTft()->fillScreen(COLOR_BG);
-              _ui->drawStatusBar(true);
-              drawList(true);
+              _ui->drawStatusBar();
+              drawList(0);
           } else {
               // First Tap
               _lastTapIdx = touchedIdx;
               _lastTapTime = now;
               
               if (_selectedIdx != touchedIdx) {
-                  _lastSelectedIdx = _selectedIdx;
                   _selectedIdx = touchedIdx;
-                  drawMenu(false);
+                  drawMenu();
               }
           }
       }
@@ -96,11 +90,10 @@ void HistoryScreen::update() {
   if (_currentMode == MODE_LIST) {
       // Back Button
       if (p.x < 60 && p.y < 60) {
-          _selectedIdx = -1;
-          _lastSelectedIdx = -3;
+          _currentMode = MODE_MENU;
           _ui->getTft()->fillScreen(COLOR_BG);
-          _ui->drawStatusBar(true);
-          drawMenu(true);
+          _ui->drawStatusBar();
+          drawMenu();
           lastHistoryTouch = millis();
           return;
       }
@@ -142,8 +135,8 @@ void HistoryScreen::update() {
                  _lastTapTime = now;
                  
                  if (_selectedIdx != actualIdx) {
-                     _lastSelectedIdx = _selectedIdx; _selectedIdx = actualIdx;
-                     drawList(false);
+                     _selectedIdx = actualIdx;
+                     drawList(_scrollOffset);
                  }
              }
              lastHistoryTouch = now;
@@ -157,7 +150,7 @@ void HistoryScreen::update() {
       if (p.y < 40) { // Back header
           _currentMode = MODE_LIST;
           _ui->getTft()->fillScreen(COLOR_BG);
-          drawList(true);
+          drawList(_scrollOffset);
           lastHistoryTouch = millis();
           return;
       }
@@ -214,25 +207,25 @@ void HistoryScreen::scanHistory() {
   }
 }
 
-void HistoryScreen::drawMenu(bool force) {
+void HistoryScreen::drawMenu() {
     TFT_eSPI *tft = _ui->getTft();
     
-    if (force) {
-        // Header
-        tft->setTextColor(COLOR_TEXT, COLOR_BG);
-        tft->setTextDatum(TL_DATUM);
-        tft->setFreeFont(&Org_01);
-        tft->setTextSize(2);
-        tft->drawString("<", 10, 25);
-        
-        tft->setTextDatum(TC_DATUM);
-        tft->setFreeFont(&Org_01); 
-        tft->setTextSize(2);       
-        tft->drawString("HISTORY MENU", SCREEN_WIDTH/2, 40);
-        
-        tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY);
-    }
+    // Header
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(2);
+    tft->drawString("<", 10, 25);
     
+    tft->setTextDatum(TC_DATUM);
+    tft->setFreeFont(&Org_01); // Match LapTimer (was numeric font 2)
+    tft->setTextSize(2);       // Match LapTimer
+    // tft->setTextFont(2);    // Removed
+    tft->drawString("HISTORY MENU", SCREEN_WIDTH/2, 40);
+    
+    tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY);
+    
+    // Buttons
     int startY = 80;
     int btnHeight = 40;
     int gap = 20;
@@ -242,82 +235,92 @@ void HistoryScreen::drawMenu(bool force) {
     const char* items[] = {"TRACK HISTORY", "DRAG HISTORY"};
     
     for (int i = 0; i < 2; i++) {
-        if (force || i == _selectedIdx || i == _lastSelectedIdx) {
-            int y = startY + i * (btnHeight + gap);
-            uint16_t btnColor = (i == _selectedIdx) ? TFT_RED : TFT_DARKGREY;
-            tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
-            tft->setTextColor(TFT_WHITE, btnColor);
-            tft->setTextDatum(MC_DATUM);
-            tft->drawString(items[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
-        }
+        int y = startY + i * (btnHeight + gap);
+        
+        // Match LapTimer style: Red if selected, Dark Grey otherwise
+        uint16_t btnColor = (i == _selectedIdx) ? TFT_RED : TFT_DARKGREY;
+        
+        tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+        tft->setTextColor(TFT_WHITE, btnColor);
+        tft->setTextDatum(MC_DATUM);
+        tft->drawString(items[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
     }
-    _lastSelectedIdx = _selectedIdx;
 }
 
-void HistoryScreen::drawList(bool force) {
+void HistoryScreen::drawList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
   
-  if (force || _scrollOffset != _lastScrollOffset) {
-      _ui->drawStatusBar(true); 
-      tft->drawFastHLine(0, 20, SCREEN_WIDTH, TFT_WHITE);
-      
-      tft->setTextColor(TFT_WHITE, TFT_BLACK);
-      tft->setTextDatum(TC_DATUM);
-      tft->setFreeFont(&Org_01);
-      tft->setTextSize(1);
-      tft->drawString(_selectedType + " History", SCREEN_WIDTH/2, 25);
-      
-      tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
-  }
+  // Header
+  // tft->fillRect(0, 0, SCREEN_WIDTH, 20, TFT_BLACK); // Don't wipe it manually
+  _ui->drawStatusBar(); // Ensure it's drawn/redrawn
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, TFT_WHITE);
+  
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(1);
+  tft->drawString("Track History", SCREEN_WIDTH/2, 25);
+  
+  tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
 
+  // Daftar
   int startY = 50;
-  int itemH = 30; 
+  int itemH = 30; // Compact height
   int count = 0;
+  
   int skip = 0;
 
   for (int i = 0; i < _historyList.size(); i++) {
-     if (count >= 5) break; 
+     if (count >= 5) break; // Fit 5 items
+     
      if (_historyList[i].type != _selectedType) continue;
      
-     if (skip < _scrollOffset) {
+     if (skip < scrollOffset) {
          skip++;
          continue;
      }
 
-    if (force || _scrollOffset != _lastScrollOffset || i == _selectedIdx || i == _lastSelectedIdx) {
-        HistoryItem &item = _historyList[i];
-        int y = startY + (count * itemH);
+    HistoryItem &item = _historyList[i];
+    int y = startY + (count * itemH);
 
-        uint16_t bg = (i == _selectedIdx) ? TFT_WHITE : TFT_BLACK;
-        uint16_t fg = (i == _selectedIdx) ? TFT_BLACK : TFT_WHITE;
-        
-        tft->fillRect(0, y, SCREEN_WIDTH, itemH, bg);
-        tft->setTextColor(fg, bg);
-        tft->setTextDatum(TL_DATUM);
-        tft->setTextFont(2);
-        tft->setTextSize(1);
-        
-        String leftText = item.date.substring(0, 10) + " - " + String(item.laps) + " Laps";
-        tft->drawString(leftText, 5, y + 8);
+    // Style Match: Selected = White BG, Black Text. Unselected = Black BG, White Text
+    uint16_t bg = (i == _selectedIdx) ? TFT_WHITE : TFT_BLACK;
+    uint16_t fg = (i == _selectedIdx) ? TFT_BLACK : TFT_WHITE;
+    
+    tft->fillRect(0, y, SCREEN_WIDTH, itemH, bg);
+    tft->setTextColor(fg, bg);
 
-        tft->setTextDatum(TR_DATUM);
-        int ms = item.bestLap % 1000;
-        int s = (item.bestLap / 1000) % 60;
-        int m = (item.bestLap / 60000);
-        char buf[16];
-        sprintf(buf, "%d:%02d.%02d", m, s, ms / 10);
-        tft->drawString(buf, SCREEN_WIDTH - 5, y + 8);
-    }
+    // Left: Date/Filename - Laps
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextFont(2);
+    tft->setTextSize(1);
+    
+    // Parse Date for shorter display? "dd mmm yyyy"
+    // Using simple format "Date - X Laps"
+    String leftText = item.date.substring(0, 10) + " - " + String(item.laps) + " Laps";
+    // Or if filename is better? item.filename
+    
+    tft->drawString(leftText, 5, y + 8);
+
+    // Right: Best Lap
+    tft->setTextDatum(TR_DATUM);
+
+    int ms = item.bestLap % 1000;
+    int s = (item.bestLap / 1000) % 60;
+    int m = (item.bestLap / 60000);
+    char buf[16];
+    sprintf(buf, "%d:%02d.%02d", m, s, ms / 10);
+
+    tft->drawString(buf, SCREEN_WIDTH - 5, y + 8);
+
     count++;
   }
 
-  if (force && count == 0 && skip == 0) {
+  if (count == 0 && skip == 0) {
     tft->setTextDatum(MC_DATUM);
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->drawString("No Sessions Found", SCREEN_WIDTH / 2, 120);
   }
-  _lastSelectedIdx = _selectedIdx;
-  _lastScrollOffset = _scrollOffset;
 }
 
 void HistoryScreen::drawDetails(int idx) {

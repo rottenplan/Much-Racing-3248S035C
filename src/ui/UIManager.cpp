@@ -60,23 +60,21 @@ void UIManager::begin() {
   _rpmSensorScreen->begin(this);
   _rpmSensorScreen->begin(this);
 
-  // Initialize Sleep Logic (New System)
+  // Initialize Sleep Logic (Standardized with power_save)
   Preferences prefs;
   prefs.begin("laptimer", true);
-  bool autoOffEn = prefs.getBool("auto_off_en", false); // Default Off
-  int autoOffSec = prefs.getInt("auto_off_val", 30);    // Default 30s
+  int psIdx = prefs.getInt("power_save", 1); // Default 5 min
   prefs.end();
   
-  // Disable Auto Off Logic
-  /*
-  if (autoOffEn) {
-      setAutoOff(autoOffSec * 1000UL); 
-  } else {
-      setAutoOff(0);
+  unsigned long ms = 0;
+  switch(psIdx) {
+      case 0: ms = 60000; break;      // 1 min
+      case 1: ms = 300000; break;     // 5 min
+      case 2: ms = 600000; break;     // 10 min
+      case 3: ms = 1800000; break;    // 30 min
+      case 4: ms = 0; break;          // Never
   }
-  */
-  setAutoOff(0); // Force Disable
-
+  setAutoOff(ms); 
   _lastInteractionTime = millis();
   _isScreenOff = false;
   _currentBrightness = 255; // Default max, should load from prefs if we had a stored brightness variable
@@ -441,6 +439,12 @@ void UIManager::setAutoOff(unsigned long ms) {
     updateInteraction();
 }
 
+void UIManager::setBrightness(int level) {
+    _currentBrightness = level;
+    if (!_isScreenOff) {
+        ledcWrite(0, _currentBrightness);
+    }
+}
 void UIManager::updateInteraction() {
     _lastInteractionTime = millis();
     // if (_isScreenOff) {
