@@ -460,7 +460,7 @@ void SettingsScreen::drawHeader(String title, uint16_t backColor) {
     TFT_eSPI *tft = _ui->getTft();
     
     // Draw horizontal line at bottom gap (above the arrow area, like status bar line)
-    tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
+    // tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
     
     // Back Button at bottom-left - Blue filled triangle pointing LEFT
     // Same size as MenuScreen arrows: 20px wide, 8px tall
@@ -668,7 +668,7 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
   // List (starts at y=30, with gap after status bar)
   int listY = 30;
   int itemH = 20; // Slightly taller rows for better touch targets
-  int maxY = 200; // Leave room for bottom area (line at 210, arrow below)
+  int maxY = 210; // Leave room for bottom area (line at 210, arrow below)
   
   for (int i = 0; i < _settings.size(); i++) {
     SettingItem &item = _settings[i];
@@ -741,7 +741,7 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
     // Clear bottom area
     tft->fillRect(0, 210, SCREEN_WIDTH, 30, COLOR_BG);
     // Horizontal line separator
-    tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
+    // tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
     // Blue triangle arrow pointing LEFT (20px wide, 16px tall)
     tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
   }

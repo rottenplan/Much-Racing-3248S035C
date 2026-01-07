@@ -3,8 +3,8 @@
 
 #include "../UIManager.h"
 
-#include <vector>
 #include <Arduino.h>
+#include <vector>
 
 // GPS Point for track recording
 struct GPSPoint {
@@ -25,8 +25,14 @@ struct Track {
   double lon;
 };
 
-
-enum LapTimerState { STATE_MENU, STATE_TRACK_SELECT, STATE_SUMMARY, STATE_RACING, STATE_RECORD_TRACK, STATE_NO_GPS };
+enum LapTimerState {
+  STATE_MENU,
+  STATE_TRACK_SELECT,
+  STATE_SUMMARY,
+  STATE_RACING,
+  STATE_RECORD_TRACK,
+  STATE_NO_GPS
+};
 enum RaceMode { MODE_BEST, MODE_LAST, MODE_PREDICTIVE };
 enum RecordingState { RECORD_IDLE, RECORD_ACTIVE, RECORD_COMPLETE };
 
@@ -52,7 +58,7 @@ private:
   unsigned long _recordingStartTime;
   unsigned long _lastPointTime;
   double _totalDistance;
-  
+
   // Legacy (can be removed later)
   double _tempStartLat, _tempStartLon;
   int _tempSplitCount;
@@ -66,7 +72,6 @@ private:
   void drawTrackSelect();
   void drawRecordTrack(); // GPS Track Recording UI
   void drawNoGPS();
-
 
   // Lap Data
   double _finishLat, _finishLon;
@@ -83,8 +88,7 @@ private:
   int _selectedTrackIdx;
   int _selectedConfigIdx;
   String _currentTrackName; // Store selected track name
-  void loadTracks(); // Load dummy tracks
-
+  void loadTracks();        // Load dummy tracks
 
   void checkFinishLine();
 };
