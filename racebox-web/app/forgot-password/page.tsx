@@ -20,10 +20,13 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
-              Much Racing
-            </h1>
+          <Link href="/" className="inline-block relative w-64 h-24">
+            <h1 className="sr-only">Much Racing</h1>
+            <img 
+              src="/logo.png" 
+              alt="Much Racing Logo" 
+              className="w-full h-full object-contain"
+            />
           </Link>
         </div>
 

@@ -41,6 +41,7 @@ private:
   LapTimerState _state;
   RaceMode _raceMode;
   int _menuSelectionIdx = -1;
+  int _lastMenuSelectionIdx = -3;
   unsigned long _lastUpdate;
   unsigned long _lastTouchTime = 0;
   bool _isRecording;
@@ -62,7 +63,7 @@ private:
   void drawRacingStatic();
   void drawRacing();
   void drawLapList(int scrollOffset);
-  void drawMenu(); // Sub-menu
+  void drawMenu(bool force = false); // Sub-menu
   void drawTrackSelect();
   void drawRecordTrack(); // GPS Track Recording UI
   void drawNoGPS();

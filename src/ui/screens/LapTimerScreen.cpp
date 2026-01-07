@@ -27,6 +27,7 @@ void LapTimerScreen::onShow() {
   _lapTimes.clear();
   _listScroll = 0;
   _menuSelectionIdx = -1;
+  _lastMenuSelectionIdx = -3;
   
   // Initialize GPS recording state
   _recordingState = RECORD_IDLE;
@@ -43,7 +44,7 @@ void LapTimerScreen::onShow() {
   _state = STATE_MENU;
   TFT_eSPI *tft = _ui->getTft();
   // tft->fillScreen(COLOR_BG); 
-  drawMenu();
+  drawMenu(true);
 }
 
 void LapTimerScreen::loadTracks() {
@@ -79,8 +80,9 @@ void LapTimerScreen::update() {
               if (_menuSelectionIdx == -2) {
                    _ui->switchScreen(SCREEN_MENU);
               } else {
+                   _lastMenuSelectionIdx = _menuSelectionIdx;
                    _menuSelectionIdx = -2;
-                   drawMenu();
+                   drawMenu(false);
               }
               return;
           }
@@ -142,8 +144,9 @@ void LapTimerScreen::update() {
                       }
                   } else {
                       // First tap (or different button) -> Highlight Only
+                      _lastMenuSelectionIdx = _menuSelectionIdx;
                       _menuSelectionIdx = touchedIdx;
-                      drawMenu(); 
+                      drawMenu(false); 
                   }
                   
                   return;
@@ -162,9 +165,10 @@ void LapTimerScreen::update() {
                    // Execute Back
                    _state = STATE_MENU;
                    _menuSelectionIdx = -1;
+                   _lastMenuSelectionIdx = -3;
                    _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-                   drawMenu();
-                   _ui->drawStatusBar();
+                   drawMenu(true);
+                   _ui->drawStatusBar(true);
                } else {
                    _selectedConfigIdx = -2;
                    drawTrackSelect();
@@ -192,7 +196,7 @@ void LapTimerScreen::update() {
                            _state = STATE_SUMMARY; 
                            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
                            drawSummary();
-                           _ui->drawStatusBar();
+                           _ui->drawStatusBar(true);
                        } else {
                            // First Tap: Select/Highlight
                            _selectedConfigIdx = idx;
@@ -216,9 +220,10 @@ void LapTimerScreen::update() {
             // Back to Sub-Menu
             _state = STATE_MENU;
             _menuSelectionIdx = -1;
+            _lastMenuSelectionIdx = -3;
             _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-            drawMenu();
-            _ui->drawStatusBar();
+            drawMenu(true);
+            _ui->drawStatusBar(true);
         } else {
             _menuSelectionIdx = -2;
             drawSummary();
@@ -232,7 +237,7 @@ void LapTimerScreen::update() {
           _state = STATE_TRACK_SELECT;
           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawTrackSelect();
-          _ui->drawStatusBar();
+          _ui->drawStatusBar(true);
           return;
       }
     }
@@ -245,8 +250,8 @@ void LapTimerScreen::update() {
           if (p.x < 80 && p.y > SCREEN_HEIGHT - 30) {
               _state = STATE_MENU;
               _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-              drawMenu();
-              _ui->drawStatusBar();
+              drawMenu(true);
+              _ui->drawStatusBar(true);
               return;
           }
           
@@ -403,7 +408,7 @@ void LapTimerScreen::update() {
                _state = STATE_MENU;
                 _menuSelectionIdx = -1;
                 _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-                drawMenu();
+                drawMenu(true);
            } else {
                _menuSelectionIdx = -2;
                // Highlight Arrow
@@ -478,7 +483,7 @@ void LapTimerScreen::update() {
     // UI Update (10Hz)
     if (millis() - _lastUpdate > 100) {
       drawRacing();
-      _ui->drawStatusBar();
+      _ui->drawStatusBar(true);
       _lastUpdate = millis();
     }
   }
@@ -486,20 +491,22 @@ void LapTimerScreen::update() {
 
 // --- PEMBANTU PENGGAMBARAN ---
 
-void LapTimerScreen::drawMenu() {
+void LapTimerScreen::drawMenu(bool force) {
     TFT_eSPI *tft = _ui->getTft();
     
-    // Header
-    tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
-    tft->setTextDatum(TC_DATUM);
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(2);
-    tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    tft->drawString("LAP TIMER", SCREEN_WIDTH / 2, 25);
-    
-    // Back Arrow
-    tft->setTextDatum(TL_DATUM);
-    tft->drawString("<", 10, 25);
+    if (force) {
+        // Header
+        tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+        tft->setTextDatum(TC_DATUM);
+        tft->setFreeFont(&Org_01);
+        tft->setTextSize(2);
+        tft->setTextColor(COLOR_TEXT, COLOR_BG);
+        tft->drawString("LAP TIMER", SCREEN_WIDTH / 2, 25);
+        
+        // Back Arrow
+        tft->setTextDatum(TL_DATUM);
+        tft->drawString("<", 10, 25);
+    }
     
     // Buttons
     int startY = 55;
@@ -516,17 +523,20 @@ void LapTimerScreen::drawMenu() {
     };
     
     for (int i = 0; i < 4; i++) {
-        int y = startY + (i * (btnHeight + gap));
-        
-        // Determine Color based on selection
-        uint16_t btnColor = (i == _menuSelectionIdx) ? TFT_RED : TFT_DARKGREY;
-        
-        tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
-        tft->setTextColor(TFT_WHITE, btnColor);
-        tft->setTextDatum(MC_DATUM);
-        tft->drawString(menuItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
+        if (force || i == _menuSelectionIdx || i == _lastMenuSelectionIdx) {
+            int y = startY + (i * (btnHeight + gap));
+            
+            // Determine Color based on selection
+            uint16_t btnColor = (i == _menuSelectionIdx) ? TFT_RED : TFT_DARKGREY;
+            
+            tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+            tft->setTextColor(TFT_WHITE, btnColor);
+            tft->setTextDatum(MC_DATUM);
+            tft->drawString(menuItems[i], SCREEN_WIDTH / 2, y + btnHeight/2 + 2);
+        }
     }
-    _ui->drawStatusBar();
+    _lastMenuSelectionIdx = _menuSelectionIdx;
+    if (force) _ui->drawStatusBar(true);
 }
 
 void LapTimerScreen::drawTrackSelect() {
@@ -579,7 +589,7 @@ void LapTimerScreen::drawTrackSelect() {
       // Draw Config Name
       tft->drawString(t.configs[i].name, 20, y + 5); // Added slight Y offset for center
   }
-  _ui->drawStatusBar();
+  _ui->drawStatusBar(true);
   
   // 4. Create Custom Track (Bottom) - REMOVED (Moved to Sub-Menu)
 }
@@ -609,7 +619,7 @@ void LapTimerScreen::drawRecordTrack() {
         tft->setTextColor(TFT_WHITE, TFT_BLACK);
         tft->setTextDatum(BL_DATUM);
         tft->drawString("< Back", 10, SCREEN_HEIGHT - 10);
-        _ui->drawStatusBar();
+        _ui->drawStatusBar(true);
         return;
     }
     
@@ -697,7 +707,7 @@ void LapTimerScreen::drawRecordTrack() {
     tft->setTextDatum(BL_DATUM);
     tft->drawString("< Back", 10, SCREEN_HEIGHT - 10);
     
-    _ui->drawStatusBar();
+    _ui->drawStatusBar(true);
 }
 
 void LapTimerScreen::drawNoGPS() {
@@ -728,7 +738,7 @@ void LapTimerScreen::drawNoGPS() {
     tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
     tft->drawString("Continue", 235, btnY + 22);
     
-    _ui->drawStatusBar();
+    _ui->drawStatusBar(true);
 }
 
 
@@ -837,7 +847,7 @@ void LapTimerScreen::drawSummary() {
       tft->drawString(buf, SCREEN_WIDTH - 10, listY + (i * 40));
   }
   
-  _ui->drawStatusBar();
+  _ui->drawStatusBar(true);
 }
 
 void LapTimerScreen::drawRacingStatic() {
@@ -867,7 +877,7 @@ void LapTimerScreen::drawRacingStatic() {
   int bottomY = 200;
   tft->fillRect(0, bottomY, 100, 40, TFT_WHITE);
   
-  _ui->drawStatusBar();
+  _ui->drawStatusBar(true);
 }
 
 void LapTimerScreen::drawRacing() {

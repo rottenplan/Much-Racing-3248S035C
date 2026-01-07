@@ -48,8 +48,12 @@ export default function DashboardPage() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">R</span>
+              <div className="w-12 h-12 relative">
+                <img 
+                  src="/logo.png" 
+                  alt="Much Racing Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
               <span className="text-white text-2xl font-bold">Much Racing</span>
             </Link>
@@ -96,6 +100,73 @@ export default function DashboardPage() {
             value={stats.avgLapTime}
             color="purple"
           />
+        </div>
+
+        {/* GPX Upload Widget */}
+        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 mb-8">
+           <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+             <Upload className="w-6 h-6 mr-2 text-orange-500" />
+             Upload GPX Sessions
+           </h2>
+           
+           <div className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center hover:border-orange-500 transition cursor-pointer group relative">
+             <input 
+               type="file" 
+               multiple 
+               accept=".gpx"
+               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+               onChange={(e) => {
+                 // Mock upload logic
+                 const files = e.target.files;
+                 if (files && files.length > 0) {
+                   // Simulate upload progress
+                   const progressBar = document.getElementById('progress_bar');
+                   const progressText = document.getElementById('progress_text');
+                   if (progressBar && progressText) {
+                     progressBar.style.width = '0%';
+                     progressText.innerText = '0%';
+                     
+                     let progress = 0;
+                     const interval = setInterval(() => {
+                       progress += 5;
+                       progressBar.style.width = `${progress}%`;
+                       progressText.innerText = `${progress}%`;
+                       if (progress >= 100) {
+                         clearInterval(interval);
+                         setTimeout(() => {
+                            alert(`Successfully uploaded ${files.length} GPX files!`);
+                            progressBar.style.width = '0%';
+                            progressText.innerText = '';
+                         }, 500);
+                       }
+                     }, 100);
+                   }
+                 }
+               }}
+             />
+             <div className="flex flex-col items-center justify-center pointer-events-none">
+               <div className="bg-slate-800 p-4 rounded-full mb-4 group-hover:bg-slate-700 transition">
+                 <Upload className="w-8 h-8 text-slate-400 group-hover:text-orange-500 transition" />
+               </div>
+               <p className="text-lg text-slate-300 font-semibold mb-2">
+                 Drag & Drop GPX files here
+               </p>
+               <p className="text-slate-500 text-sm">
+                 or click to select manually
+               </p>
+             </div>
+           </div>
+
+           {/* Progress Bar Mockup */}
+           <div className="mt-6">
+             <div className="flex items-center justify-between mb-2">
+               <span className="text-slate-400 text-sm">Upload Status</span>
+               <span id="progress_text" className="text-orange-400 text-sm font-bold"></span>
+             </div>
+             <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+               <div id="progress_bar" className="bg-gradient-to-r from-orange-500 to-red-600 h-full rounded-full transition-all duration-200" style={{ width: '0%' }}></div>
+             </div>
+           </div>
         </div>
 
         {/* All My Sessions Table */}

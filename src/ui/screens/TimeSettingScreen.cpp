@@ -37,8 +37,22 @@ void TimeSettingScreen::update() {
 
        // 1. Back Button (Top Left)
        if (p.x < 60 && p.y < 60) {
-           _ui->switchScreen(SCREEN_SETTINGS);
-           return;
+           unsigned long now = millis();
+           if (_backTapCount == 0 || (now - _lastBackTap > 2000)) { // 2 Seconds timeout
+               _backTapCount = 1;
+               _lastBackTap = now;
+               
+               // Visual Warning
+               TFT_eSPI *tft = _ui->getTft();
+               tft->setTextSize(1);
+               tft->setTextColor(TFT_RED, COLOR_BG);
+               tft->setTextDatum(TL_DATUM);
+               tft->drawString("Tap again", 30, 25);
+           } else {
+               _ui->switchScreen(SCREEN_SETTINGS);
+               _backTapCount = 0;
+               return;
+           }
        }
 
        // Layout Constants Adjusted to prevent overlap with Header (at y=60)

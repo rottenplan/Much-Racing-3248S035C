@@ -5,10 +5,10 @@
 #include "../fonts/Org_01.h"
 #include "../fonts/Picopixel.h"
 #include "../../core/GPSManager.h"
-#include <WiFi.h>
-
+#include "../../core/WiFiManager.h"
 
 extern SessionManager sessionManager;
+extern WiFiManager wifiManager;
 
 // Static pointer for callback
 static TFT_eSPI* static_tft = nullptr;
@@ -42,13 +42,15 @@ void sdProgressCallback(int percent, String status) {
 }
 
 void SettingsScreen::onShow() {
-  _selectedIdx = -1; // Reset selection logic
-  _currentMode = MODE_MAIN; // Start at Main
-  loadSettings(); // Reload to ensure sync
+  _selectedIdx = -1; 
+  _lastSelectedIdx = -3;
+  _lastWiFiSelectedIdx = -2;
+  _currentMode = MODE_MAIN; 
+  loadSettings(); 
   
   TFT_eSPI *tft = _ui->getTft();
   tft->fillScreen(COLOR_BG);
-  drawList(0);
+  drawList(true); // Force full draw
 }
 
 void SettingsScreen::loadSettings() {
@@ -57,12 +59,27 @@ void SettingsScreen::loadSettings() {
   if (_currentMode == MODE_MAIN) {
       _settings.push_back({"CLOCK SETTING", TYPE_ACTION});
       
-      // Auto Off (Removed)
-      // SettingItem autoOff = {"AUTO SCREEN OFF", TYPE_ACTION, "auto_off"};
-      // _settings.push_back(autoOff);
+      _prefs.begin("laptimer", true);
       
-      // Drag Meter Settings Sub-menu
-      _settings.push_back({"DRAG METER SETTINGS", TYPE_ACTION});
+      // Power Save (Auto Off)
+      SettingItem powerSave = {"POWER SAVE", TYPE_VALUE, "power_save"};
+      powerSave.options = {"1 min", "5 min", "10 min", "30 min", "Never"};
+      powerSave.currentOptionIdx = _prefs.getInt("power_save", 1); // Default 5 min
+      _settings.push_back(powerSave);
+      
+      // Brightness
+      SettingItem brightness = {"BRIGHTNESS", TYPE_VALUE, "brightness"};
+      brightness.options = {"10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%"};
+      brightness.currentOptionIdx = _prefs.getInt("brightness", 9); // Default 100%
+      _settings.push_back(brightness);
+      
+      // Units
+      SettingItem units = {"UNITS", TYPE_VALUE, "units"};
+      units.options = {"Metric (km/h)", "Imperial (mph)"};
+      units.currentOptionIdx = _prefs.getInt("units", 0); // Default Metric
+      _settings.push_back(units);
+      
+      _prefs.end();
       
       // GPS Status Sub-menu
       _settings.push_back({"GPS STATUS", TYPE_ACTION});
@@ -72,17 +89,27 @@ void SettingsScreen::loadSettings() {
 
       // RPM Settings Sub-menu
       _settings.push_back({"RPM SETTING", TYPE_ACTION});
+      
+      // Engine Hours
+      _settings.push_back({"ENGINE HOURS", TYPE_ACTION});
+      
+      // WiFi Setup
+      _settings.push_back({"WIFI SETUP", TYPE_ACTION});
 
-      // WiFi Scan Sub-menu
-      _settings.push_back({"WIFI SCAN", TYPE_ACTION});
+
+
+
 
       
-  } else if (_currentMode == MODE_DRAG) {
-      _prefs.begin("laptimer", true); // Read-only
-// ... existing drag code ...
-      // Reset Reference
-      SettingItem resetRef = {"Reset Drag Ref", TYPE_ACTION, "reset_ref"};
-      _settings.push_back(resetRef);
+  } else if (_currentMode == MODE_ENGINE) {
+      _prefs.begin("laptimer", true);
+      
+      // Engine Hours (Read-only display)
+      SettingItem engineHours = {"TOTAL HOURS", TYPE_VALUE, "engine_hours"};
+      float hours = _prefs.getFloat("engine_hours", 0.0);
+      engineHours.options = {String(hours, 1) + " hrs"};
+      engineHours.currentOptionIdx = 0;
+      _settings.push_back(engineHours);
       
       _prefs.end();
   } else if (_currentMode == MODE_RPM) {
@@ -110,16 +137,11 @@ void SettingsScreen::saveSetting(int idx) {
   if (item.type == TYPE_VALUE) {
     _prefs.putInt(item.key.c_str(), item.currentOptionIdx);
     
-    // Terapkan efek langsung
-    if (item.name == "Brightness") {
-      int duty = 255;
-      switch (item.currentOptionIdx) {
-      case 0: duty = 64; break; // 25%
-      case 1: duty = 128; break; // 50%
-      case 2: duty = 192; break; // 75%
-      case 3: duty = 255; break; // 100%
-      }
-      ledcWrite(0, duty); // Saluran 0
+    // Apply immediate effects
+    if (item.key == "brightness") {
+      // Map 0-9 (10%-100%) to PWM duty cycle
+      int duty = map(item.currentOptionIdx, 0, 9, 26, 255); // 10% to 100%
+      ledcWrite(0, duty); // Channel 0 for backlight
     }
   } else if (item.type == TYPE_TOGGLE) {
     _prefs.putBool(item.key.c_str(), item.checkState);
@@ -129,6 +151,33 @@ void SettingsScreen::saveSetting(int idx) {
 
 void SettingsScreen::update() {
   static unsigned long lastSettingTouch = 0;
+  
+  // WiFi Scanning Animation (runs without touch)
+  if (_isScanning) {
+      if (millis() - _lastScanAnim > 500) {
+          _lastScanAnim = millis();
+          _scanAnimStep = (_scanAnimStep + 1) % 4;
+          
+          TFT_eSPI *tft = _ui->getTft();
+          tft->setTextColor(TFT_WHITE, COLOR_BG);
+          tft->setTextDatum(MC_DATUM);
+          String dots = "";
+          for(int i=0; i<_scanAnimStep; i++) dots += ".";
+          tft->drawString("Scanning" + dots + "   ", SCREEN_WIDTH / 2, 120);
+      }
+      
+      int n = WiFi.scanComplete();
+      if (n >= 0) {
+          _isScanning = false;
+          _scanCount = n;
+          _ui->getTft()->fillScreen(COLOR_BG);
+          _ui->drawStatusBar(true);
+          drawWiFiList(true);
+          _lastWiFiTouch = millis();
+      }
+      return; // Block other input while scanning
+  }
+  
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x == -1)
     return;
@@ -138,158 +187,23 @@ void SettingsScreen::update() {
     if (millis() - lastSettingTouch < 200) return;
     lastSettingTouch = millis();
 
-    // Special handling for GPS/SD/WiFi Mode (Single tap back)
-    if (_currentMode == MODE_GPS || _currentMode == MODE_SD_TEST || _currentMode == MODE_WIFI || _currentMode == MODE_WIFI_PASS) {
-        if (p.x < 50 && p.y < 50) { // Back Button
-              if (_currentMode == MODE_WIFI_PASS) {
-                  // Back to WiFi List
-                  _currentMode = MODE_WIFI;
-                  _ui->getTft()->fillScreen(COLOR_BG);
-                  _ui->drawStatusBar(true);
-                  drawWiFiScan();
-                  return;
-              }
-              
-              // Back to Main for GPS, SD_TEST, WIFI
-              _currentMode = MODE_MAIN;
-              loadSettings();
-              _ui->getTft()->fillScreen(COLOR_BG);
-              _ui->drawStatusBar(true);
-              drawList(0);
-              return;
-         }
-
-        // Mode Specific Touch
-        if (millis() - lastSettingTouch > 200) {
-            lastSettingTouch = millis();
-            
-            if (_currentMode == MODE_WIFI) {
-                // Check List Touches
-                // List starts Y=70, ItemH=25
-                int listY = 70;
-                int itemH = 25;
-                if (p.y > listY) {
-                    int idx = (p.y - listY) / itemH;
-                    if (idx >= 0 && idx < _scanCount && idx < 8) { // Limit 8 items
-                        _targetSSID = WiFi.SSID(idx);
-                        
-                        // Check if Open Network
-                        if (WiFi.encryptionType(idx) == WIFI_AUTH_OPEN) {
-                             // Direct Connect? Or just empty pass?
-                             _enteredPass = "";
-                             // Auto connect logic or show "Connect" button?
-                             // Let's go to keyboard anyway but user just hits Enter
-                        }
-                        
-                        _enteredPass = "";
-                        _currentMode = MODE_WIFI_PASS;
-                        _ui->getTft()->fillScreen(COLOR_BG);
-                        _ui->drawStatusBar(true);
-                        drawKeyboard(); // Initial Draw
-                    }
-                }
-            } else if (_currentMode == MODE_WIFI_PASS) {
-                // Keyboard Touch Logic
-                // Simple Grid Detection
-                // Keyboard Area: Y=120 to 240
-                if (p.y >= 120) {
-                     // Key Width is approx 320/10 = 32px
-                     int keyW = 32; 
-                     int keyH = 30;
-                     int row = (p.y - 120) / keyH;
-                     int col = p.x / keyW;
-                     
-                     char key = 0;
-                     // Mappings
-                     const char* r0 = "qwertyuiop"; // 10
-                     const char* r1 = "asdfghjkl";  // 9 (offset?)
-                     const char* r2 = "zxcvbnm";    // 7
-                     
-                     if (row == 0) { // QWERTY...
-                         if (col < 10) key = r0[col];
-                     } else if (row == 1) { // ASDF...
-                         // Indent 16px? If so, map x
-                         // Simplified: just align left for now or detect closest
-                         if (col < 9) key = r1[col];
-                     } else if (row == 2) { // ZXCV...
-                         // col 0: Shift (Toggle?)
-                         // col 1-7: Letters
-                         // col 8-9: Backspace
-                         if (col >= 1 && col <= 7) key = r2[col-1];
-                         else if (col >= 8) key = 8; // BS
-                     } else if (row == 3) { // Space/Enter
-                         // 0-1: 123
-                         // 2-6: Space (' ')
-                         // 7-9: Enter (13)
-                         if (col >= 2 && col <= 6) key = ' ';
-                         else if (col >= 7) key = 13; // Enter
-                     }
-                     
-                     if (key > 0) {
-                         if (key == 8) { // Backspace
-                             if (_enteredPass.length() > 0) _enteredPass.remove(_enteredPass.length()-1);
-                         } else if (key == 13) { // Enter
-                             // CONNECT
-                             _ui->getTft()->fillRect(0, 80, 320, 30, COLOR_BG);
-                             _ui->getTft()->drawString("Connecting...", 160, 95);
-                             
-                             WiFi.begin(_targetSSID.c_str(), _enteredPass.c_str());
-                             
-                             unsigned long t = millis();
-                             bool connected = false;
-                             while (millis() - t < 5000) { // 5s Timeout for UI feedback
-                                 if (WiFi.status() == WL_CONNECTED) {
-                                     connected = true;
-                                     break;
-                                 }
-                                 delay(100);
-                             }
-                             
-                             _ui->getTft()->fillRect(0, 80, 320, 30, COLOR_BG); // Clear msg
-                             if (connected) {
-                                 _ui->getTft()->setTextColor(TFT_GREEN, COLOR_BG);
-                                 _ui->getTft()->drawString("CONNECTED! IP: " + WiFi.localIP().toString(), 160, 95);
-                             } else {
-                                 _ui->getTft()->setTextColor(TFT_RED, COLOR_BG);
-                                 _ui->getTft()->drawString("FAILED!", 160, 95);
-                             }
-                             delay(2000); // Show result
-                             
-                             // Return to List
-                             _currentMode = MODE_WIFI;
-                             _ui->getTft()->fillScreen(COLOR_BG);
-                             _ui->drawStatusBar(true);
-                             drawWiFiScan();
-                             return;
-                             
-                         } else {
-                             _enteredPass += key;
-                         }
-                         
-                         // Redraw Input Box
-                         drawKeyboard(); 
-                     }
-                }
-            }
-        }
-        return;
-    }
-
-    if (_selectedIdx == -2) {
-       // Back pressed
-       if (_currentMode == MODE_MAIN) {
-           _ui->switchScreen(SCREEN_MENU);
-       } else {
-           // Go back to Main
-           _currentMode = MODE_MAIN;
-           loadSettings();
-           _ui->getTft()->fillScreen(COLOR_BG); // Clear
-           _ui->drawStatusBar(true);
-           drawList(0);
-       }
-    } else {
+    // Visual Feedback (Selection)
+    if (_selectedIdx != -2) {
+       _lastSelectedIdx = _selectedIdx;
        _selectedIdx = -2;
-       drawList(_scrollOffset);
+       drawList(false);
+    }
+    
+    // Logic Back
+    if (_currentMode == MODE_MAIN) {
+        _ui->switchScreen(SCREEN_MENU);
+    } else {
+        // Return to Main Settings
+        _currentMode = MODE_MAIN;
+        loadSettings();
+        _ui->getTft()->fillScreen(COLOR_BG);
+        _ui->drawStatusBar(true);
+        drawList(true);
     }
     return;
   }
@@ -305,7 +219,7 @@ void SettingsScreen::update() {
     // Debounce Check
     if (millis() - lastSettingTouch > 200) {
         // Only handle standard List Touch for list-based modes
-        if (_currentMode == MODE_MAIN || _currentMode == MODE_DRAG || _currentMode == MODE_RPM) {
+        if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM) {
             int idx = _scrollOffset + ((p.y - listY) / itemH);
             
             if (idx >= 0 && idx < _settings.size()) {
@@ -322,15 +236,121 @@ void SettingsScreen::update() {
                       _lastTapTime = now;
                       
                       if (_selectedIdx != idx) {
+                          _lastSelectedIdx = _selectedIdx;
                           _selectedIdx = idx;
-                          drawList(_scrollOffset);
+                          drawList(false);
                       }
                  }
             }
         }
         
         lastSettingTouch = millis();
+    } // End List Touch
+
+    // WiFi List Mode
+    if (_currentMode == MODE_WIFI && p.y > 60) {
+        if (millis() - _lastWiFiTouch > 300) {
+            _lastWiFiTouch = millis();
+            int idx = (p.y - 60) / 25;
+            if (idx >= 0 && idx < _scanCount) {
+                _selectedWiFiIdx = idx;
+                _targetSSID = WiFi.SSID(idx);
+                _enteredPass = "";
+                _currentMode = MODE_WIFI_PASS;
+                _ui->getTft()->fillScreen(COLOR_BG);
+                _ui->drawStatusBar(true);
+                drawKeyboard();
+                _lastKeyboardTouch = millis(); // Prevent immediate key press
+                return;
+            }
+        }
     }
+    
+    // WiFi Keyboard Mode - handle key presses
+    if (_currentMode == MODE_WIFI_PASS) {
+        if (millis() - _lastKeyboardTouch > 200) {
+            _lastKeyboardTouch = millis();
+            
+            int keyW = 28;
+            int keyH = 25; 
+            int startY = 115; 
+            
+            // QWERTY keyboard rows
+            String rows[] = {"1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"};
+            
+            for (int row = 0; row < 4; row++) {
+                String keys = rows[row];
+                int numKeys = keys.length();
+                int totalW = numKeys * keyW;
+                int startX = (SCREEN_WIDTH - totalW) / 2;
+                
+                for (int col = 0; col < numKeys; col++) {
+                    int x = startX + (col * keyW);
+                    int y = startY + (row * keyH);
+                    
+                    if (p.x >= x && p.x < x + keyW && p.y >= y && p.y < y + keyH) {
+                        char c = keys[col];
+                        if (!_isUppercase && c >= 'A' && c <= 'Z') {
+                            c = c + ('a' - 'A'); // Convert to lowercase
+                        }
+                        _enteredPass += c;
+                        // NO FULL REDRAW - Only update password field
+                        drawKeyboard(false); 
+                        return;
+                    }
+                }
+            }
+            
+            int specialY = startY + (4 * keyH);
+            int shiftW = 45;
+            int delW = 45;
+            int spaceW = 80;
+            int okW = 55;
+            int gap = 5;
+            int totalW = shiftW + delW + spaceW + okW + (3 * gap);
+            int startX = (SCREEN_WIDTH - totalW) / 2;
+            
+            int shiftX = startX;
+            int delX = shiftX + shiftW + gap;
+            int spaceX = delX + delW + gap;
+            int okX = spaceX + spaceW + gap;
+            
+            // Password Visibility Toggle (Touch area near the password field)
+            // Field is at y=80, h=25. Let's add a button area on the right
+            if (p.x >= SCREEN_WIDTH - 60 && p.x < SCREEN_WIDTH - 10 && p.y >= 80 && p.y < 105) {
+                _showPassword = !_showPassword;
+                drawKeyboard(false); // Update only the password field
+                return;
+            }
+
+            // SHIFT
+            if (p.x >= shiftX && p.x < shiftX + shiftW && p.y >= specialY && p.y < specialY + keyH) {
+                _isUppercase = !_isUppercase;
+                // NO FULL REDRAW - Only update SHIFT and char display
+                drawKeyboard(false);
+            }
+            // Del
+            else if (p.x >= delX && p.x < delX + delW && p.y >= specialY && p.y < specialY + keyH) {
+                 if (_enteredPass.length() > 0) {
+                    _enteredPass.remove(_enteredPass.length() - 1); 
+                    // NO FULL REDRAW
+                    drawKeyboard(false);
+                }
+            }
+            // Space
+            else if (p.x >= spaceX && p.x < spaceX + spaceW && p.y >= specialY && p.y < specialY + keyH) {
+                _enteredPass += " ";
+                // NO FULL REDRAW
+                drawKeyboard(false);
+            }
+            // OK
+            else if (p.x >= okX && p.x < okX + okW && p.y >= specialY && p.y < specialY + keyH) {
+                connectWiFi();
+            }
+        }
+    }
+
+
     
     // Continuous Update for GPS Mode
     if (_currentMode == MODE_GPS) {
@@ -359,6 +379,30 @@ void SettingsScreen::handleTouch(int idx) {
       if (item.name == "CLOCK SETTING") {
           _ui->switchScreen(SCREEN_TIME_SETTINGS);
           return; // STOP EXECUTION HERE
+      } else if (item.name == "ENGINE HOURS") {
+          _currentMode = MODE_ENGINE;
+          loadSettings();
+          _ui->getTft()->fillScreen(COLOR_BG);
+          _ui->drawStatusBar(true);
+          drawList(0);
+      } else if (item.name == "WIFI SETUP") {
+          // Start WiFi scan
+          _currentMode = MODE_WIFI;
+          TFT_eSPI *tft = _ui->getTft();
+          tft->fillScreen(COLOR_BG);
+          _ui->drawStatusBar(true);
+          
+          tft->setTextColor(TFT_WHITE, COLOR_BG);
+          tft->setTextDatum(MC_DATUM);
+          tft->drawString("Scanning...", SCREEN_WIDTH / 2, 120);
+          
+          WiFi.mode(WIFI_STA);
+          WiFi.disconnect();
+          delay(100);
+          WiFi.scanNetworks(true); // Async scan
+          _isScanning = true;
+          _lastScanAnim = millis();
+          _scanAnimStep = 0;
       } else if (item.name == "RPM SETTING") {
           _currentMode = MODE_RPM;
           loadSettings();
@@ -392,20 +436,11 @@ void SettingsScreen::handleTouch(int idx) {
           tft->fillScreen(COLOR_BG);
           _ui->drawStatusBar(true); // Redraw Status Bar
           drawSDTest();
-      } else if (item.name == "WIFI SCAN") {
-          // Show "Scanning..." first
-          _ui->getTft()->fillScreen(COLOR_BG);
-          _ui->drawStatusBar(true);
-          drawHeader("WIFI SCANNER");
-          _ui->getTft()->setTextDatum(MC_DATUM);
-          _ui->getTft()->drawString("Scanning...", SCREEN_WIDTH/2, 120);
+
           
-          _scanCount = WiFi.scanNetworks();
-          _currentMode = MODE_WIFI;
-          
-          _ui->getTft()->fillScreen(COLOR_BG);
-          _ui->drawStatusBar(true); 
-          drawWiFiScan();
+          /* WiFi Handlers removed
+          // ...
+          */
       } else if (item.key == "reset_ref") {
           _prefs.begin("laptimer", false);
           _prefs.remove("drag_ref"); // Key for reference run time
@@ -434,43 +469,28 @@ void SettingsScreen::drawHeader(String title, uint16_t backColor) {
 }
 
 void SettingsScreen::drawGPSStatus() {
+    // Rate Limiting: Update only every 1000ms (1Hz)
+    if (millis() - _lastGPSUpdate < 1000) return;
+    _lastGPSUpdate = millis();
+
     TFT_eSPI *tft = _ui->getTft();
-    // Background is cleared in update() loop if needed? 
-    // No, SettingsScreen::update calls this continuously.
-    // We should probably clear screen ONCE on entry, then just overwrite text.
-    // But SettingsScreen logic for other tabs uses fillRect to clear items.
-    // For GPS Mode, we probably want to minimize flicker.
-    // Let's assume background is black (COLOR_BG).
     
-    // Header is NOT used in the reference provided by user (custom aesthetics).
-    // Reference has "12/17/2025" logic at top.
-    // But we should keep the "BACK" button logic consistent?
-    // User asked "UI nya seperti ini" (Like this).
-    // I will try to replicate the "Look" but keep the navigation standard (Back arrow).
-    
-    // 1. Draw Back Arrow (Standard Position aligned with typical header area)
+    // 1. Draw Back Arrow (Static - Redrawn every 1s is fine, or check if specific)
+    // To prevent total flicker, we can rely on overwrite.
     tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
     tft->setTextDatum(TL_DATUM);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
-    tft->drawString("<", 10, 25); // Move to Y=25 to match other screens
+    tft->drawString("<", 10, 25); 
 
     extern GPSManager gpsManager;
     
-    // --- LAYOUT ---
-    // Shifted down to avoid overlap with top status bar (if any)
-    int startX = 35; // Indent for boxes to clear arrow area if side-by-side, or just general layout
-    
-    // Y Offsets
-    // Date/Time Removed as per user request to avoid overlap
-    // Centering Box with Polar Plot (cY=120)
-    // Box Height ~116. Target Center 120. Start Y = 120 - 58 = 62.
+    // Layout
     int yStats = 62; 
     int hStatsHeader = 18;
-    int hItem = 15; // Compact to 15px
+    int hItem = 15; 
     
-    // Data Preparation
-    // String dateStr = gpsManager.getDateString(); // Removed
+    // Data
     int sats = gpsManager.getSatellites();
     double hdop = gpsManager.getHDOP();
     double lat = gpsManager.getLatitude();
@@ -480,6 +500,7 @@ void SettingsScreen::drawGPSStatus() {
     tft->setTextSize(1);
     
     // 4. GPS Status Group
+    // Draw Box Title only if needed, but simplest is to redraw
     tft->fillRect(10, yStats, 160, hStatsHeader, TFT_WHITE);
     tft->setTextColor(TFT_BLACK, TFT_WHITE);
     tft->drawString("GPS STATUS", 15, yStats + 9);
@@ -488,13 +509,16 @@ void SettingsScreen::drawGPSStatus() {
     int listH = 6 * hItem + 8; // 6 items
     tft->drawRect(10, yStats + hStatsHeader, 160, listH, TFT_WHITE);
     
-    // Items
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
     int curY = yStats + hStatsHeader + 4;
     
     // Helper to draw row
     auto drawRow = [&](String label, String val, int y) {
         tft->setTextDatum(ML_DATUM);
+        // Clear old text area? setTextColor with BG handles it mostly if font is solid
+        // But for perfect anti-flicker, fillRect is safer if values change length
+        tft->fillRect(11, y, 158, hItem, COLOR_BG); // Clear row interior
+        
+        tft->setTextColor(TFT_WHITE, COLOR_BG);
         tft->drawString(label, 15, y + (hItem/2));
         tft->drawString(":", 60, y + (hItem/2));
         tft->drawString(val, 75, y + (hItem/2));
@@ -508,42 +532,32 @@ void SettingsScreen::drawGPSStatus() {
     drawRow("MBN", "A : -", curY); curY += hItem;
     drawRow("HDOP", String(hdop, 2), curY);
     
-    // 5. Lat/Lon (Bottom Left)
-    // Position relative to table bottom to ensure no overlap
+    // 5. Lat/Lon
     int tableBottom = yStats + hStatsHeader + (6 * hItem + 8);
     int yLat = tableBottom + 10;
     
+    tft->fillRect(10, yLat, 200, 40, COLOR_BG); // Clear Lat/Lon area
     tft->setTextColor(TFT_WHITE, COLOR_BG);
     tft->drawString("LAT : " + String(lat, 6), 15, yLat);
     tft->drawString("LNG : " + String(lon, 6), 15, yLat + 18);
-
-    
     
     // --- RIGHT SIDE: POLAR PLOT ---
-    // Center of Right Area
-    // Screen 320. Left takes ~170. 
-    // Center X = 170 + (150/2) = 245
-    // Center Y = 120
-    
     int cX = 245;
     int cY = 120;
-    int r = 55; // Reduced from 70 to 55
+    int r = 55;
     
+    // Clear Plot Area
+    tft->fillRect(cX - r - 5, cY - r - 5, (r*2)+10, (r*2)+10, COLOR_BG);
+
     // Draw Radar Circles
-    // Outer
     tft->drawCircle(cX, cY, r, TFT_WHITE);
-    // Mid
     tft->drawCircle(cX, cY, r*0.66, COLOR_SECONDARY);
-    // Inner
     tft->drawCircle(cX, cY, r*0.33, COLOR_SECONDARY);
 
-    
     // Crosshairs
     tft->drawFastHLine(cX - r, cY, 2*r, COLOR_SECONDARY);
     tft->drawFastVLine(cX, cY - r, 2*r, COLOR_SECONDARY);
     
-    // Labels N E S W
-    // Draw Small Circles with Letters
     auto drawCard = [&](String l, int x, int y) {
         tft->fillCircle(x, y, 9, TFT_WHITE);
         tft->setTextColor(TFT_BLACK, TFT_WHITE);
@@ -556,14 +570,8 @@ void SettingsScreen::drawGPSStatus() {
     drawCard("E", cX + r, cY);
     drawCard("W", cX - r, cY);
     
-    // Simulated Satellite Dots (Just for visual fidelity to reference if 'Fix' is present)
     if (gpsManager.isFixed()) {
-        // Randomly consistent spots? 
-        // Or based on actual time to rotate them?
-        // Let's create a few pseudo-random spots based on time
-        // Just 2-3 dots to show "active" status
         unsigned long t = millis() / 1000;
-        
         int s1_ang = (t * 5) % 360;
         int s1_r = r * 0.5;
         float rad = s1_ang * DEG_TO_RAD;
@@ -623,219 +631,298 @@ void SettingsScreen::drawSDTest() {
     tft->drawString(writeStr, 40, y);
 }
 
-void SettingsScreen::drawWiFiScan() {
-    TFT_eSPI *tft = _ui->getTft();
-    drawHeader("WIFI SCANNER");
-    
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
-    tft->setTextDatum(TC_DATUM);
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(1);
-    
-    tft->drawString("Scanning Networks...", SCREEN_WIDTH/2, 100);
-    
-    // Use cached scan result
-    int n = _scanCount;
-    
-    // Clear "Scanning..." (if any residue, though we clear screen before calling this)
-    // tft->fillRect(0, 80, SCREEN_WIDTH, 40, COLOR_BG);
-    
-    tft->setTextDatum(TL_DATUM);
-    int y = 70;
-    int hItem = 25; // Larger touch targets for WiFi list
-    
-    if (n == 0) {
-        tft->drawString("No networks found", 20, y);
-    } else {
-        tft->drawString(String(n) + " Networks Found:", 20, y);
-        y += 25;
-        
-        // List up to 8 networks to fit screen
-        int limit = (n > 8) ? 8 : n;
-        
-        for (int i = 0; i < limit; ++i) {
-            String ssid = WiFi.SSID(i);
-            int rssi = WiFi.RSSI(i);
-            String enc = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "Open" : "Sec";
-            
-            // Format: SSID (RSSI) [Enc]
-            String line = ssid.substring(0, 15); // Truncate long SSIDs
-            
-            tft->setTextColor(TFT_WHITE, COLOR_BG);
-            tft->drawString(line, 20, y);
-            
-            tft->setTextDatum(TR_DATUM);
-            String info = String(rssi) + "dB " + enc;
-            tft->drawString(info, SCREEN_WIDTH - 20, y);
-            tft->setTextDatum(TL_DATUM);
-            
-            y += hItem;
-        }
-    }
-}
-
-void SettingsScreen::drawList(int scrollOffset) {
+void SettingsScreen::drawList(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Determine Title
-  String title = "SETTINGS";
-  if (_currentMode == MODE_DRAG) title = "DRAG SETTINGS";
-  else if (_currentMode == MODE_RPM) title = "RPM SETTING";
-  
-  // Highlight Back Arrow if selected
-  uint16_t backColor = (_selectedIdx == -2) ? COLOR_HIGHLIGHT : COLOR_TEXT;
-  
-  drawHeader(title, backColor);
+  // 1. Force Redraw Header
+  if (force) {
+    String title = "SETTINGS";
+    if (_currentMode == MODE_RPM) title = "RPM SETTING";
+    else if (_currentMode == MODE_ENGINE) title = "ENGINE HOURS";
+    
+    uint16_t backColor = (_selectedIdx == -2) ? COLOR_HIGHLIGHT : COLOR_TEXT;
+    drawHeader(title, backColor);
+  }
 
   // List
   int listY = 60;
-  int itemH = 18; // 10 Lines
+  int itemH = 18; 
   
   for (int i = 0; i < _settings.size(); i++) {
     SettingItem &item = _settings[i];
     int y = listY + (i * itemH);
     int sIdx = i;
 
-    // Background
-    uint16_t bgColor = (sIdx == _selectedIdx) ? TFT_WHITE : COLOR_BG;
-    uint16_t txtColor = (sIdx == _selectedIdx) ? TFT_BLACK : COLOR_TEXT;
+    // Only update if forced or selection changed for this item
+    if (force || sIdx == _selectedIdx || sIdx == _lastSelectedIdx) {
+      
+      uint16_t bgColor = (sIdx == _selectedIdx) ? TFT_WHITE : COLOR_BG;
+      uint16_t txtColor = (sIdx == _selectedIdx) ? TFT_BLACK : COLOR_TEXT;
 
-    if (sIdx == _selectedIdx) {
-        tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
-    } else {
-        // Explicitly clear background for unselected items to prevent artifacts
-        tft->fillRect(0, y, SCREEN_WIDTH, itemH, COLOR_BG);
-        tft->drawFastHLine(0, y + itemH - 1, SCREEN_WIDTH, COLOR_SECONDARY);
+      tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
+      if (sIdx != _selectedIdx) {
+          tft->drawFastHLine(0, y + itemH - 1, SCREEN_WIDTH, COLOR_SECONDARY);
+      }
+
+      // Name
+      tft->setTextDatum(TL_DATUM);
+      tft->setTextFont(1); 
+      tft->setTextSize(1);
+      tft->setTextColor(txtColor, bgColor);
+      tft->drawString(item.name, 10, y + 5); 
+      
+      // Value / Toggle / Action
+      tft->setTextDatum(TR_DATUM);
+      String valText = "";
+      if (item.type == TYPE_VALUE) {
+          if (item.currentOptionIdx >= 0 && item.currentOptionIdx < item.options.size()) {
+              valText = item.options[item.currentOptionIdx];
+          }
+      } else if (item.type == TYPE_ACTION) {
+          valText = ">";
+      }
+      
+      tft->drawString(valText, SCREEN_WIDTH - 10, y + 5);
+      
+      // Custom Render for Toggle
+      if (item.type == TYPE_TOGGLE) {
+          int swW = 24; 
+          int swH = 12;
+          int swX = SCREEN_WIDTH - swW - 10; 
+          int swY = y + (itemH - swH) / 2;
+          int r = swH / 2; 
+
+          if (item.checkState) {
+            tft->fillRoundRect(swX, swY, swW, swH, r, TFT_GREEN);
+            tft->fillCircle(swX + swW - r, swY + r, r - 2, TFT_WHITE);
+          } else {
+            tft->fillRoundRect(swX, swY, swW, swH, r, TFT_RED);
+            tft->fillCircle(swX + r, swY + r, r - 2, TFT_WHITE);
+          }
+      }
     }
+  }
+  _lastSelectedIdx = _selectedIdx;
+}
 
-    // Name
-    tft->setTextDatum(TL_DATUM);
-    // Use Font 1 (GLCD) scaled to 2 = ~16px height? Or Size 1 = 8px?
-    // User asked "kecilkan lagi". Font 2 was ~16px.
-    // If I use Font 1 Size 1, it's 8px. Legible but small.
-    // If I use Font 1 Size 2, it's 16px (similar to Font 2).
-    // Let's use Font 1 Size 1.5? No. 
-    // Let's use Font 1 Size 1 but centered nicely? Or Font 2 scaled down? No scaling for bitmaps.
-    // Let's try Font 1 (Default) Size 2. It is slightly more compact horizontally than Font 2.
-    // AND it fits 18px height better than Font 2 which has large vertical padding.
-    tft->setTextFont(1); 
-    tft->setTextSize(1); // Size 1 is 8px. With 18px line, 5px pad top/bottom. Very clean.
-    // Wait, Size 1 might be TOO small for "Settings".
-    // Let's try Size 2 (16px). 1px pad top/bottom. Tight but maximizes use.
-    // Actually, let's stick to Size 1 for "Max Density" compliance? 
-    // "kecilkan lgi" -> make it smaller again.
-    // I will use Size 1. It is very safe for 18px line.
-    
-    tft->setTextColor(txtColor, bgColor);
-    tft->drawString(item.name, 10, y + 5); // Centered vertically (18-8)/2 = 5
-    
-    // Value / Toggle / Action
-    tft->setTextDatum(TR_DATUM);
-    String valText = "";
-    if (item.type == TYPE_VALUE) {
-        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < item.options.size()) {
-            valText = item.options[item.currentOptionIdx];
+// WiFi Functions
+
+void SettingsScreen::drawWiFiList(bool force) {
+  TFT_eSPI *tft = _ui->getTft();
+  
+  if (force) {
+    drawHeader("WIFI SETUP");
+  }
+  
+  // List networks
+  int listY = 60;
+  int itemH = 25;
+  
+  for (int i = 0; i < _scanCount && i < 8; i++) {
+    // Only update if forced or selection changed for this item
+    if (force || i == _selectedWiFiIdx || i == _lastWiFiSelectedIdx) {
+      String ssid = WiFi.SSID(i);
+      int rssi = WiFi.RSSI(i);
+      bool isSecure = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+      
+      int y = listY + (i * itemH);
+      
+      // Background
+      uint16_t bgColor = (i == _selectedWiFiIdx) ? TFT_BLUE : COLOR_BG;
+      uint16_t txtColor = (i == _selectedWiFiIdx) ? TFT_WHITE : COLOR_TEXT;
+      
+      tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
+      
+      // SSID
+      tft->setTextColor(txtColor, bgColor);
+      tft->setTextDatum(TL_DATUM);
+      tft->drawString(ssid, 10, y + 5);
+      
+      // Signal strength
+      String signal = String(rssi) + "dBm";
+      tft->setTextDatum(TR_DATUM);
+      tft->drawString(signal, SCREEN_WIDTH - 30, y + 5);
+      
+      // Lock icon if secured
+      if (isSecure) {
+        tft->drawString("*", SCREEN_WIDTH - 10, y + 5);
+      }
+    }
+  }
+  
+  if (force && _scanCount == 0) {
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString("No networks found", SCREEN_WIDTH / 2, 120);
+  }
+
+  _lastWiFiSelectedIdx = _selectedWiFiIdx;
+}
+
+void SettingsScreen::drawKeyboard(bool fullRedraw) {
+  TFT_eSPI *tft = _ui->getTft();
+  
+  if (fullRedraw) {
+      drawHeader("ENTER PASSWORD");
+      // Show SSID
+      tft->setTextColor(COLOR_TEXT, COLOR_BG);
+      tft->setTextDatum(TC_DATUM);
+      tft->drawString(_targetSSID, SCREEN_WIDTH / 2, 60);
+  }
+  
+  // ALWAYS Redraw entered password (it changes)
+  tft->fillRect(10, 80, SCREEN_WIDTH - 20, 25, TFT_DARKGREY);
+  tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextFont(2); 
+  
+  String displayPass = "";
+  if (_showPassword) {
+      displayPass = _enteredPass;
+  } else {
+      for (int i = 0; i < _enteredPass.length(); i++) displayPass += "*";
+  }
+  tft->drawString(displayPass, 15, 85);
+
+  // Draw Visibility Toggle Button (EYE Icon replacement with text)
+  tft->setTextDatum(TR_DATUM);
+  tft->setTextColor(COLOR_HIGHLIGHT, TFT_DARKGREY);
+  tft->drawString(_showPassword ? "HIDE" : "SHOW", SCREEN_WIDTH - 15, 85);
+  
+  int keyW = 28;
+  int keyH = 25; 
+  int startY = 115; 
+  
+  // QWERTY Keyboard Layout
+  String rows[] = {
+    "1234567890",
+    "QWERTYUIOP",
+    "ASDFGHJKL",
+    "ZXCVBNM"
+  };
+
+  // If fullRedraw OR shift state changed, we must redraw the character keys
+  // Actually, character keys change case, so we MUST redraw them if!fullRedraw too if SHIFT was pressed?
+  // Let's optimize: Redraw keys ONLY if fullRedraw is true OR if SHIFT was just toggled.
+  // Since we don't track "just toggled", let's redraw keys if fullRedraw is true.
+  // BUT the user wants to see lowercase characters when SHIFT is off.
+  // So if SHIFT toggles, we must redraw all keys.
+  
+  // [NEW LOGIC]: If fullRedraw is false, we are here because of a key press or SHIFT toggle.
+  // If SHIFT was toggled, we must redraw keys.
+  // How do we know if SHIFT was toggled? 
+  // Let's just always redraw keys if we want to be safe, but skip fillScreen. 
+  // Redrawing 30 keys without clearing screen is much faster than clearing whole screen.
+  
+  if (fullRedraw || true) { // Always redraw keys for now to ensure case is correct, but without clearing screen
+      tft->setTextFont(1); // Small font for keys
+      tft->setTextSize(1);
+      
+      for (int row = 0; row < 4; row++) {
+        String keys = rows[row];
+        int numKeys = keys.length();
+        int totalW = numKeys * keyW;
+        int startX = (SCREEN_WIDTH - totalW) / 2;
+        
+        for (int col = 0; col < numKeys; col++) {
+          int x = startX + (col * keyW);
+          int y = startY + (row * keyH);
+          
+          if (fullRedraw) tft->drawRect(x, y, keyW, keyH, TFT_WHITE);
+          else tft->fillRect(x+1, y+1, keyW-2, keyH-2, COLOR_BG); // Clear center
+          
+          tft->setTextColor(TFT_WHITE, COLOR_BG);
+          tft->setTextDatum(MC_DATUM);
+          
+          char c = keys[col];
+          if (!_isUppercase && c >= 'A' && c <= 'Z') {
+              c = c + ('a' - 'A');
+          }
+          tft->drawString(String(c), x + keyW/2, y + keyH/2);
         }
-    } else if (item.type == TYPE_TOGGLE) {
-        valText = ""; // Drawn graphically below
-    } else if (item.type == TYPE_ACTION) {
-        valText = ">";
-    }
-    
-    tft->drawString(valText, SCREEN_WIDTH - 10, y + 5);
-    
-    // Custom Render for Toggle
-    if (item.type == TYPE_TOGGLE) {
-        int swW = 24; // Smaller Switch
-        int swH = 12;
-        int swX = SCREEN_WIDTH - swW - 10; 
-        int swY = y + (itemH - swH) / 2;
-        int r = swH / 2; 
+      }
+      
+      // Special keys
+      int specialY = startY + (4 * keyH);
+      int shiftW = 45;
+      int delW = 45;
+      int spaceW = 80;
+      int okW = 55;
+      int gap = 5;
+      int totalW = shiftW + delW + spaceW + okW + (3 * gap);
+      int startX = (SCREEN_WIDTH - totalW) / 2;
+      
+      int shiftX = startX;
+      int delX = shiftX + shiftW + gap;
+      int spaceX = delX + delW + gap;
+      int okX = spaceX + spaceW + gap;
 
-        if (item.checkState) {
-          // ON (Green)
-          tft->fillRoundRect(swX, swY, swW, swH, r, TFT_GREEN);
-          tft->fillCircle(swX + swW - r, swY + r, r - 2, TFT_WHITE);
-        } else {
-          // OFF (Red)
-          tft->fillRoundRect(swX, swY, swW, swH, r, TFT_RED);
-          tft->fillCircle(swX + r, swY + r, r - 2, TFT_WHITE);
-        }
-    }
+      // SHIFT
+      uint16_t shiftColor = _isUppercase ? COLOR_HIGHLIGHT : COLOR_BG;
+      uint16_t shiftTxtColor = _isUppercase ? TFT_BLACK : TFT_WHITE;
+      
+      tft->fillRect(shiftX, specialY, shiftW, keyH, shiftColor);
+      if (!_isUppercase) tft->drawRect(shiftX, specialY, shiftW, keyH, TFT_WHITE);
+      
+      tft->setTextColor(shiftTxtColor, shiftColor);
+      tft->setTextDatum(MC_DATUM);
+      tft->drawString("SHFT", shiftX + shiftW/2, specialY + keyH/2);
+
+      if (fullRedraw) {
+          // Backspace
+          tft->drawRect(delX, specialY, delW, keyH, TFT_WHITE);
+          tft->setTextColor(TFT_WHITE, COLOR_BG);
+          tft->drawString("DEL", delX + delW/2, specialY + keyH/2);
+
+          // Space
+          tft->drawRect(spaceX, specialY, spaceW, keyH, TFT_WHITE);
+          tft->drawString("SPACE", spaceX + spaceW/2, specialY + keyH/2);
+          
+          // Connect
+          tft->fillRect(okX, specialY, okW, keyH, TFT_GREEN);
+          tft->setTextColor(TFT_BLACK, TFT_GREEN);
+          tft->drawString("OK", okX + okW/2, specialY + keyH/2);
+      }
   }
 }
 
-void SettingsScreen::drawKeyboard() {
-    TFT_eSPI *tft = _ui->getTft();
-    
-    // Header
-    drawHeader("PASS: " + _targetSSID);
-    
-    // Input Box
-    tft->drawRect(10, 70, 300, 40, TFT_WHITE);
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
-    tft->setTextDatum(ML_DATUM);
-    tft->setTextSize(2);
-    tft->setFreeFont(&Picopixel); // Or standard
-    tft->setTextFont(1); // Standard legible
-    
-    // Mask password?
-    String masked = "";
-    // for (int i=0; i<_enteredPass.length(); i++) masked += "*"; 
-    // Show plain text for easier typing on tiny screen
-    tft->drawString(_enteredPass + "_", 20, 90);
-    
-    // Keyboard Base Y = 120
-    int yBase = 120;
-    int keyW = 32;
-    int keyH = 30;
-    
-    tft->setTextSize(1);
-    tft->setTextDatum(MC_DATUM);
-    
-    const char* r0 = "qwertyuiop"; 
-    const char* r1 = "asdfghjkl";
-    const char* r2 = "zxcvbnm";
-    
-    auto drawKey = [&](char c, int r, int col, int w=1) {
-        int x = col * keyW;
-        int y = yBase + (r * keyH);
-        
-        // Key BG
-        tft->drawRect(x+1, y+1, (keyW*w)-2, keyH-2, COLOR_SECONDARY);
-        
-        // Char
-         tft->setTextColor(TFT_WHITE, COLOR_BG);
-        if (c == 8) tft->drawString("<-", x + (keyW*w)/2, y + keyH/2);
-        else if (c == 13) tft->drawString("OK", x + (keyW*w)/2, y + keyH/2);
-        else if (c == ' ') tft->drawString("_", x + (keyW*w)/2, y + keyH/2); // Space
-        else tft->drawChar(c, x + (keyW*w)/2, y + keyH/2, 2); 
-    };
-    
-    // Row 0
-    // QWERTYUIOP (10 keys)
-    for(int i=0; i<10; i++) drawKey(r0[i], 0, i);
-    
-    // Row 1
-    // ASDFGHJKL (9 keys)
-    for(int i=0; i<9; i++) drawKey(r1[i], 1, i);
-    
-    // Row 2
-    // ZXCVBNM + BS
-    // Space shift? 
-    // Let's do: Shift(dum) Z X C V B N M BS
-    // But simplified: 1 (Z) to 7 (M)
-    // Shift is complicating. Just lowercase for now.
-    
-    // drawKey('^', 2, 0); // Shift placeholder
-    for(int i=0; i<7; i++) drawKey(r2[i], 2, i+1);
-    drawKey(8, 2, 8, 2); // BS (Double width)
-    
-    // Row 3
-    // 123? Space OK
-    // drawKey('1', 3, 0); 
-    // drawKey('2', 3, 1);
-    drawKey(' ', 3, 2, 5); // Space (5 width)
-    drawKey(13, 3, 7, 3); // Enter (3 width)
+void SettingsScreen::connectWiFi() {
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillScreen(COLOR_BG);
+  _ui->drawStatusBar(true);
+  
+  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextDatum(MC_DATUM);
+  tft->drawString("Connecting...", SCREEN_WIDTH / 2, 120);
+  
+  // Use core manager for connection
+  bool success = wifiManager.connect(_targetSSID.c_str(), _enteredPass.c_str());
+  
+  if (success) {
+    tft->setTextColor(TFT_GREEN, COLOR_BG);
+    tft->drawString("Connected!", SCREEN_WIDTH / 2, 160);
+    delay(2000);
+
+    // Return to main settings only on success
+    _currentMode = MODE_MAIN;
+    loadSettings();
+    tft->fillScreen(COLOR_BG);
+    _ui->drawStatusBar(true);
+    drawList(0);
+  } else {
+    tft->setTextColor(TFT_RED, COLOR_BG);
+    tft->drawString("Failed!", SCREEN_WIDTH / 2, 160);
+    delay(2000);
+
+    // Stay in keyboard mode on failure
+    tft->fillScreen(COLOR_BG);
+    _ui->drawStatusBar(true);
+    drawKeyboard(true); // Full redraw to restore keyboard UI
+  }
 }
+
+
+
+
+
 

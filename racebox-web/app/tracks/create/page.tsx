@@ -207,8 +207,12 @@ export default function CreateTrack() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">R</span>
+              <div className="w-12 h-12 relative">
+                <img 
+                  src="/logo.png" 
+                  alt="Much Racing Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
               <span className="text-white text-2xl font-bold">Much Racing</span>
             </Link>

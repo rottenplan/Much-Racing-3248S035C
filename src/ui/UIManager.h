@@ -83,6 +83,7 @@ private:
   int _lastSignalStrength;
   int _lastBat;
   bool _lastLogging;
+  int _lastWifiStatus; // -1 = unknown, 0 = disconnected, 1 = connected
 
   // Sleep / Auto-Off
   unsigned long _lastInteractionTime;

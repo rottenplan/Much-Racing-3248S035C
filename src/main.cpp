@@ -3,6 +3,7 @@
 #include <TAMC_GT911.h>
 
 #include "core/SessionManager.h"
+#include "core/WiFiManager.h"
 #include "ui/UIManager.h"
 #include <Arduino.h>
 
@@ -16,6 +17,7 @@ TAMC_GT911 touch(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH,
 UIManager uiManager(&tft);
 GPSManager gpsManager;
 SessionManager sessionManager;
+WiFiManager wifiManager;
 
 // SPIClass touchSpi = SPIClass(HSPI); // Tidak diperlukan untuk I2C
 
@@ -49,6 +51,7 @@ void setup() {
   // Inisialisasi Inti
   gpsManager.begin();
   sessionManager.begin();
+  wifiManager.begin(); // Load and auto-connect wifi
 
   // Bersihkan layar sebelum menyalakan backlight
   tft.fillScreen(TFT_BLACK);
@@ -66,6 +69,7 @@ void loop() {
   gpsManager.update();
 
   uiManager.update();
+  wifiManager.update();
   // sessionManager menyimpan otomatis saat buffer flush jika diperlukan, tetapi kita tulis langsung untuk
   // saat ini
 }

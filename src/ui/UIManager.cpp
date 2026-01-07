@@ -1,7 +1,11 @@
 #include "UIManager.h"
 #include "../../config.h"
 #include <Preferences.h>
+#include <WiFi.h>
+#include "../core/WiFiManager.h"
 #include "fonts/Org_01.h"
+
+extern WiFiManager wifiManager;
 
 // Sertakan layar (dibuat di langkah berikutnya)
 #include "screens/DragMeterScreen.h"
@@ -26,6 +30,7 @@ UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _lastSignalStrength = -1;
   _lastBat = -1;
   _lastLogging = false;
+  _lastWifiStatus = -1;
 }
 
 void UIManager::begin() {
@@ -308,6 +313,42 @@ void UIManager::drawStatusBar(bool force) {
       }
       _lastFix = fix;
       _lastSignalStrength = signalStrength;
+  }
+
+  // --- WiFi Section ---
+  int wifiStatus = wifiManager.isConnected() ? 1 : 0;
+  if (force || wifiStatus != _lastWifiStatus) {
+      // Clear WiFi Area (60 to 80)
+      _tft->fillRect(60, 0, 20, 20, COLOR_BG);
+      
+      uint16_t color = (wifiStatus == 1) ? TFT_GREEN : TFT_RED;
+      int wx = 70;
+      int wy = 17;
+      
+      // WiFi Icon (Refined Pixel Art to match user image)
+      // Bottom Dot
+      _tft->fillCircle(wx, wy - 1, 1, color);
+      
+      // Arc 1 (Small)
+      _tft->drawFastHLine(wx - 1, wy - 4, 3, color);
+      _tft->drawPixel(wx - 2, wy - 3, color);
+      _tft->drawPixel(wx + 2, wy - 3, color);
+      
+      // Arc 2 (Medium)
+      _tft->drawFastHLine(wx - 3, wy - 7, 7, color);
+      _tft->drawPixel(wx - 4, wy - 6, color);
+      _tft->drawPixel(wx + 4, wy - 6, color);
+      _tft->drawPixel(wx - 5, wy - 5, color);
+      _tft->drawPixel(wx + 5, wy - 5, color);
+
+      // Arc 3 (Large/Top)
+      _tft->drawFastHLine(wx - 5, wy - 10, 11, color);
+      _tft->drawPixel(wx - 6, wy - 9, color);
+      _tft->drawPixel(wx + 6, wy - 9, color);
+      _tft->drawPixel(wx - 7, wy - 8, color);
+      _tft->drawPixel(wx + 7, wy - 8, color);
+      
+      _lastWifiStatus = wifiStatus;
   }
 
   // --- Bagian Waktu / Judul ---
