@@ -1,0 +1,315 @@
+#include "SyncManager.h"
+#include "SessionManager.h"
+#include <base64.h>
+#include <time.h>
+extern SessionManager sessionManager;
+
+SyncManager::SyncManager() {}
+
+bool SyncManager::isFirstSyncDone() {
+  _prefs.begin("sync", true);
+  bool done = _prefs.getBool("first_sync_done", false);
+  _prefs.end();
+  return done;
+}
+
+String SyncManager::getLastSyncTime() {
+  _prefs.begin("sync", true);
+  String lastSync = _prefs.getString("last_sync", "Never");
+  _prefs.end();
+  return lastSync;
+}
+
+String SyncManager::makeBasicAuthHeader(const char *username,
+                                        const char *password) {
+  String credentials = String(username) + ":" + String(password);
+  String encoded = base64::encode(credentials);
+  return "Basic " + encoded;
+}
+
+bool SyncManager::performFirstSync(const char *apiUrl, const char *username,
+                                   const char *password) {
+  // Check if first sync already done
+  if (isFirstSyncDone()) {
+    Serial.println("Sync: First sync already completed.");
+    return true;
+  }
+
+  Serial.println("Sync: Performing first sync...");
+
+  // Perform sync
+  bool success = syncSettings(apiUrl, username, password);
+
+  if (success) {
+    markSyncComplete();
+    Serial.println("Sync: First sync completed successfully!");
+  } else {
+    Serial.println("Sync: First sync failed.");
+  }
+
+  return success;
+}
+
+bool SyncManager::syncSettings(const char *apiUrl, const char *username,
+                               const char *password) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Sync: WiFi not connected.");
+    return false;
+  }
+
+  String authHeader = makeBasicAuthHeader(username, password);
+  bool success = downloadAndApplySettings(apiUrl, authHeader.c_str());
+
+  if (success) {
+    saveLastSyncTime();
+  }
+
+  return success;
+}
+
+bool SyncManager::downloadAndApplySettings(const char *apiUrl,
+                                           const char *authHeader) {
+  HTTPClient http;
+
+  Serial.print("Sync: Connecting to ");
+  Serial.println(apiUrl);
+
+  http.begin(apiUrl);
+  http.addHeader("Authorization", authHeader);
+
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    Serial.println("Sync: Response received");
+
+    // Parse JSON
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (error) {
+      Serial.print("Sync: JSON parse error: ");
+      Serial.println(error.c_str());
+      http.end();
+      return false;
+    }
+
+    // Check if response has success flag
+    if (!doc["success"].as<bool>()) {
+      Serial.println("Sync: API returned success=false");
+      http.end();
+      return false;
+    }
+
+    // Apply settings
+    applySettings(doc);
+    applyTrackSelection(doc);
+    applyEngineSettings(doc);
+
+    http.end();
+    return true;
+
+  } else if (httpCode == HTTP_CODE_UNAUTHORIZED) {
+    Serial.println("Sync: Authentication failed (401)");
+  } else {
+    Serial.print("Sync: HTTP error: ");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+  return false;
+}
+
+void SyncManager::applySettings(JsonDocument &doc) {
+  if (!doc["data"]["settings"].isNull()) {
+    JsonObject settings = doc["data"]["settings"];
+
+    _prefs.begin("laptimer", false);
+
+    // Units (0=Metric, 1=Imperial)
+    String units = settings["units"].as<String>();
+    _prefs.putInt("units", units == "kmh" ? 0 : 1);
+
+    // Brightness (0-9 for 10%-100%)
+    int brightness = settings["brightness"].as<int>();
+    int brightnessIdx = map(brightness, 10, 100, 0, 9);
+    _prefs.putInt("brightness", brightnessIdx);
+
+    // Power Save (0=1min, 1=5min, 2=10min, 3=30min, 4=Never)
+    int powerSave = settings["powerSave"].as<int>();
+    int powerSaveIdx = 1; // Default 5 min
+    switch (powerSave) {
+    case 1:
+      powerSaveIdx = 0;
+      break;
+    case 5:
+      powerSaveIdx = 1;
+      break;
+    case 10:
+      powerSaveIdx = 2;
+      break;
+    case 30:
+      powerSaveIdx = 3;
+      break;
+    case 0:
+      powerSaveIdx = 4;
+      break;
+    }
+    _prefs.putInt("power_save", powerSaveIdx);
+
+    // Contrast (store directly)
+    int contrast = settings["contrast"].as<int>();
+    _prefs.putInt("contrast", contrast);
+
+    _prefs.end();
+
+    Serial.println("Sync: Device settings applied");
+  }
+}
+
+void SyncManager::applyTrackSelection(JsonDocument &doc) {
+  if (!doc["data"]["tracks"].isNull()) {
+    JsonObject tracks = doc["data"]["tracks"];
+
+    // Store track country selection
+    _prefs.begin("tracks", false);
+
+    JsonArray countries = tracks["countries"];
+    String countryList = "";
+    for (JsonVariant country : countries) {
+      if (countryList.length() > 0)
+        countryList += ",";
+      countryList += country.as<String>();
+    }
+
+    _prefs.putString("countries", countryList);
+    _prefs.putInt("track_count", tracks["trackCount"].as<int>());
+
+    _prefs.end();
+
+    Serial.print("Sync: Track selection applied - ");
+    Serial.print(tracks["trackCount"].as<int>());
+    Serial.println(" tracks");
+  }
+}
+
+void SyncManager::applyEngineSettings(JsonDocument &doc) {
+  if (!doc["data"]["engines"].isNull()) {
+    JsonArray engines = doc["data"]["engines"];
+
+    _prefs.begin("laptimer", false);
+
+    // Store active engine
+    int activeEngine = doc["data"]["activeEngine"].as<int>();
+    _prefs.putInt("active_engine", activeEngine);
+
+    // Store engine hours for active engine
+    for (JsonVariant engine : engines) {
+      if (engine["id"].as<int>() == activeEngine) {
+        float hours = engine["hours"].as<float>();
+        _prefs.putFloat("engine_hours", hours);
+        Serial.print("Sync: Engine hours set to ");
+        Serial.println(hours);
+        break;
+      }
+    }
+
+    _prefs.end();
+
+    Serial.println("Sync: Engine settings applied");
+  }
+}
+
+void SyncManager::markSyncComplete() {
+  _prefs.begin("sync", false);
+  _prefs.putBool("first_sync_done", true);
+  _prefs.end();
+}
+
+void SyncManager::saveLastSyncTime() {
+  // Get current time as ISO string
+  time_t now = time(nullptr);
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+
+  char timeStr[25];
+  strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+
+  _prefs.begin("sync", false);
+  _prefs.putString("last_sync", String(timeStr));
+  _prefs.end();
+
+  Serial.print("Sync: Last sync time saved: ");
+  Serial.println(timeStr);
+}
+
+void SyncManager::triggerManualSync() {
+  // This would be called from Settings menu
+  // For now, just a placeholder
+  Serial.println("Sync: Manual sync triggered");
+}
+
+bool SyncManager::uploadSessions(const char *apiUrl, const char *username,
+                                 const char *password) {
+  if (WiFi.status() != WL_CONNECTED)
+    return false;
+
+  String authHeader = makeBasicAuthHeader(username, password);
+  String history = sessionManager.loadHistoryIndex();
+
+  // Simple line parsing
+  int lastIndex = 0;
+  while (true) {
+    int nextNewLine = history.indexOf('\n', lastIndex);
+    if (nextNewLine == -1)
+      break;
+
+    String line = history.substring(lastIndex, nextNewLine);
+    line.trim();
+    lastIndex = nextNewLine + 1;
+
+    if (line.length() == 0)
+      continue;
+
+    // CSV: filename,date,laps...
+    int commaIndex = line.indexOf(',');
+    if (commaIndex == -1)
+      continue;
+
+    String filename = line.substring(0, commaIndex);
+
+    // Upload logic
+    if (SD.exists(filename)) {
+      File f = SD.open(filename, FILE_READ);
+      if (!f)
+        continue;
+
+      String content = "";
+      while (f.available())
+        content += (char)f.read();
+      f.close();
+
+      HTTPClient http;
+      http.begin(apiUrl);
+      http.addHeader("Authorization", authHeader);
+      http.addHeader("Content-Type", "application/json");
+
+      JsonDocument doc;
+      doc["type"] = "upload_session";
+      doc["filename"] = filename;
+      doc["csv_data"] = content;
+
+      String jsonPayload;
+      serializeJson(doc, jsonPayload);
+
+      int code = http.POST(jsonPayload);
+      http.end();
+      if (code != 200) {
+        Serial.println("Failed to upload: " + filename);
+      } else {
+        Serial.println("Uploaded: " + filename);
+      }
+    }
+  }
+  return true;
+}

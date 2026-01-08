@@ -1,6 +1,7 @@
 #include "SplashScreen.h"
 #include "../fonts/Org_01.h"
 #include "SplashScreenAssets.h"
+#include <Preferences.h>
 
 void SplashScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
@@ -28,7 +29,8 @@ void SplashScreen::update() {
   // Logika Animasi
   // Lebar target adalah ~246 berdasarkan kode pengguna
   if (_progress < 246) {
-    // Pembaruan non-pemblokiran setiap 10ms (lebih cepat dari 100ms untuk kelancaran)
+    // Pembaruan non-pemblokiran setiap 10ms (lebih cepat dari 100ms untuk
+    // kelancaran)
     if (millis() - _lastUpdate > 10) {
       _progress += 2; // Penambahan lebih cepat
 
@@ -40,7 +42,20 @@ void SplashScreen::update() {
   } else {
     // Animasi selesai, tunggu sebentar lalu beralih
     if (millis() - _lastUpdate > 1000) {
-      _ui->switchScreen(SCREEN_MENU);
+      // Check if this is first launch
+      Preferences prefs;
+      prefs.begin("muchrace", true); // Read-only
+      bool setupDone = prefs.getBool("setup_done", false);
+      prefs.end();
+
+      if (!setupDone) {
+        // First launch - go to setup
+        Serial.println("First launch detected, showing setup screen");
+        _ui->switchScreen(SCREEN_SETUP);
+      } else {
+        // Normal launch - go to menu
+        _ui->switchScreen(SCREEN_MENU);
+      }
     }
   }
 }

@@ -1,12 +1,13 @@
 #ifndef SETTINGS_SCREEN_H
 #define SETTINGS_SCREEN_H
 
+#include "../../core/SessionManager.h" // Added for SDTestResult
 #include "../UIManager.h"
+#include "../components/KeyboardComponent.h"
 #include <Arduino.h>
 #include <Preferences.h>
-#include <vector>
 #include <WiFi.h>
-#include "../../core/SessionManager.h" // Added for SDTestResult
+#include <vector>
 
 class SettingsScreen : public UserScreen {
 public:
@@ -17,6 +18,7 @@ public:
 private:
   UIManager *_ui;
   Preferences _prefs;
+  KeyboardComponent _keyboard;
 
   enum SettingType { TYPE_TOGGLE, TYPE_VALUE, TYPE_ACTION };
 
@@ -39,8 +41,18 @@ private:
   std::vector<SettingItem> _settings;
   int _scrollOffset;
   int _selectedIdx;
-  
-  enum ScreenMode { MODE_MAIN, MODE_GPS, MODE_SD_TEST, MODE_RPM, MODE_ENGINE, MODE_WIFI, MODE_WIFI_PASS };
+
+  enum ScreenMode {
+    MODE_MAIN,
+    MODE_GPS,
+    MODE_GNSS_CONFIG,
+    MODE_SD_TEST,
+    MODE_RPM,
+    MODE_ENGINE,
+    MODE_CLOCK,
+    MODE_WIFI,
+    MODE_WIFI_PASS
+  };
   ScreenMode _currentMode;
   SessionManager::SDTestResult _sdResult;
 
@@ -83,12 +95,8 @@ private:
   void drawWiFiList(bool force = false);
   void drawKeyboard(bool fullRedraw = true);
   void connectWiFi();
-  
+
   void handleTouch(int idx);
-
-
-  
-
 };
 
 #endif

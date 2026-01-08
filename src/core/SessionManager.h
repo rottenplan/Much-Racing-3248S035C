@@ -20,6 +20,8 @@ public:
                             unsigned long bestLap, String type = "TRACK");
   String loadHistoryIndex(); // Returns full content for processing
 
+  bool deleteSession(String filename); // Delete file and update index
+
   bool getSDStatus(uint64_t &total, uint64_t &used);
 
   struct SDTestResult {
@@ -40,7 +42,7 @@ private:
   String _currentFilename;
 
 public:
-  String getCurrentFilename() { return _currentFilename; } 
+  String getCurrentFilename() { return _currentFilename; }
 };
 
 #endif

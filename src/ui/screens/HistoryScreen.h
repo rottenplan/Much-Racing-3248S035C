@@ -25,19 +25,44 @@ private:
   std::vector<HistoryItem> _historyList;
   void scanHistory();
   void drawList(int scrollOffset);
-  
+
   int _scrollOffset = 0;
 
-  enum HistoryMode { MODE_MENU, MODE_LIST, MODE_DETAILS };
+  enum HistoryMode {
+    MODE_MENU,          // Track vs Drag
+    MODE_GROUPS,        // Year-Month Folders
+    MODE_LIST,          // Session List (filtered by Group)
+    MODE_OPTIONS,       // View/Sync/Delete
+    MODE_VIEW_DATA,     // 5 Pages of Data
+    MODE_CONFIRM_DELETE // Safety check
+  };
   HistoryMode _currentMode;
-  
-  String _selectedType; // "TRACK" or "DRAG"
 
-  int _selectedIdx;
-  
+  String _selectedType;  // "TRACK" or "DRAG"
+  String _selectedGroup; // "YYYY-MM"
+  int _selectedIdx;      // Index in filtered list (or group list)
+
+  // Data View
+  int _viewPage; // 0=Speed, 1=RPM, 2=Temp, 3=Sector, 4=Replay
+
   int _lastTapIdx;
-  unsigned long _lastTapTime;  void drawMenu();
-  void drawDetails(int idx);
+  unsigned long _lastTapTime;
+
+  std::vector<String> _groups; // Unique Year-Month list
+
+  void scanGroups(); // Populate _groups based on _selectedType
+
+  // Scroll Logic
+  int _lastTouchY = -1;
+  bool _isDragging = false;
+  int _dragThreshold = 10;
+
+  void drawMenu();
+  void drawGroups(int scrollOffset);
+  // drawList is already declared above
+  void drawOptions();
+  void drawViewData();
+  void drawConfirmDelete();
 };
 
 #endif

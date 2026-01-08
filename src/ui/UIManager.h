@@ -9,6 +9,7 @@ class UIManager;
 
 enum ScreenType {
   SCREEN_SPLASH,
+  SCREEN_SETUP,
   SCREEN_MENU,
   SCREEN_LAP_TIMER,
   SCREEN_DRAG_METER,
@@ -16,7 +17,10 @@ enum ScreenType {
   SCREEN_SETTINGS,
   SCREEN_TIME_SETTINGS,
   SCREEN_AUTO_OFF,
-  SCREEN_RPM_SENSOR
+  SCREEN_RPM_SENSOR,
+  SCREEN_SPEEDOMETER,
+  SCREEN_GPS_STATUS,
+  SCREEN_SYNCHRONIZE
 };
 
 class UserScreen {
@@ -39,6 +43,7 @@ public:
   void update();
   void switchScreen(ScreenType type);
   void drawStatusBar(bool force = false); // Added force parameter
+  void setTitle(String title) { _screenTitle = title; }
   void setAutoOff(unsigned long ms);
   void setBrightness(int level);
   void wakeUp();
@@ -66,6 +71,7 @@ private:
 
   // Screens
   UserScreen *_splashScreen;
+  UserScreen *_setupScreen;
   UserScreen *_menuScreen;
   UserScreen *_lapTimerScreen;
   UserScreen *_dragMeterScreen;
@@ -74,9 +80,12 @@ private:
   UserScreen *_timeSettingScreen;
   // UserScreen *_autoOffScreen;
   UserScreen *_rpmSensorScreen;
-  
+  UserScreen *_speedometerScreen;
+  UserScreen *_gpsStatusScreen;
+  UserScreen *_synchronizeScreen;
+
   String _screenTitle; // Added title
-  
+
   // Status Bar State Trackers
   String _lastTimeStr;
   double _lastHdop;
@@ -91,7 +100,7 @@ private:
   unsigned long _autoOffMs;
   bool _isScreenOff;
   int _currentBrightness; // To restore after sleep
-  
+
   // Wakeup
   unsigned long _lastTapTime;
   bool _wasTouched;

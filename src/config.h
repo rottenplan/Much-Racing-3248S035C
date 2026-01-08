@@ -42,7 +42,8 @@
 #define PIN_RGB_BLUE 17
 #define PIN_LIGHT_SENSOR 34
 #define PIN_SPEAKER 26
-#define PIN_RPM_INPUT 35  // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
+#define PIN_RPM_INPUT                                                          \
+  35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
 
 // Legacy / Conflicting Pins (Disabled)
 // #define PIN_GPS_RX 16 // CONFLICT with RGB Green
@@ -64,6 +65,7 @@
 #define COLOR_BG 0x0000        // Black
 #define COLOR_TEXT 0xFFFF      // White
 #define COLOR_ACCENT 0x04DF    // Blue-Green (RaceBox Teal)
+#define COLOR_PRIMARY 0x04DF   // Primary UI color (same as accent)
 #define COLOR_HIGHLIGHT 0xF800 // Red
 #define COLOR_SECONDARY 0x7BEF // Greyish
 
@@ -79,5 +81,8 @@
 #define FONT_SIZE_LAP_TIME 2  // Current Lap Time
 #define FONT_SIZE_LAP_LIST 2  // History List Text
 #define FONT_SIZE_LAP_BEST 3  // Best Lap Time Display
+
+// API Configuration
+#define API_URL "http://192.168.1.3:3000/api/device/sync"
 
 #endif

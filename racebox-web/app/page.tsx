@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MapPin, Clock, TrendingUp, Wifi } from 'lucide-react';
+import MapWrapper from "./components/MapWrapper";
 
 export default function Home() {
   return (
@@ -10,9 +11,9 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-12 h-12 relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Much Racing Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Much Racing Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -31,7 +32,6 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <div className="container mx-auto px-6 py-20">
         <div className="text-center max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
@@ -45,12 +45,23 @@ export default function Home() {
             Sync your Much Racing device and unlock detailed performance insights.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/dashboard" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition">
-              Get Started
+            <Link href="/tracking" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition flex items-center justify-center gap-2">
+              <Wifi className="w-5 h-5" /> Open Live Satellite
             </Link>
             <Link href="/tracks" className="bg-slate-700 hover:bg-slate-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition">
               Browse Tracks
             </Link>
+          </div>
+        </div>
+
+        {/* Live Map Preview Section */}
+        <div className="mt-20">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white">Live Telemetry Preview</h2>
+            <p className="text-slate-400">Real-time data from your Much Racing device.</p>
+          </div>
+          <div className="w-full h-[600px] bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 relative shadow-2xl shadow-orange-500/10">
+            <MapWrapper />
           </div>
         </div>
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { User, Lock, Mail, UserPlus } from 'lucide-react';
+import { User, Lock, Mail, UserPlus, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<'signin' | 'register'>('signin');
@@ -12,51 +12,79 @@ export default function LoginPage() {
     confirmPassword: '',
     name: ''
   });
+  const [passwordError, setPasswordError] = useState('');
+
+  // Allowed characters: 0-9, a-z, A-Z, ! # $ % & ' ( ) * + , – . @ : ; =
+  const ALLOWED_PASSWORD_CHARS = /^[0-9a-zA-Z!#$%&'()*+,\-.@:;=]*$/;
+
+  const validatePassword = (password: string): string => {
+    if (!password) return '';
+    if (!ALLOWED_PASSWORD_CHARS.test(password)) {
+      return 'Password contains invalid characters. Only allowed: 0-9, a-z, A-Z, ! # $ % & \' ( ) * + , – . @ : ; =';
+    }
+    return '';
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setFormData({ ...formData, password: value });
+    setPasswordError(validatePassword(value));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate password on registration
+    if (activeTab === 'register') {
+      const error = validatePassword(formData.password);
+      if (error) {
+        setPasswordError(error);
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        setPasswordError('Passwords do not match');
+        return;
+      }
+    }
+
     // TODO: Implement authentication logic
     console.log('Form submitted:', formData);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block relative w-64 h-24">
-            <h1 className="sr-only">Much Racing</h1>
-             {/* Using standard img tag for simplicity or Next.js Image if preferred, sticking to img for now to avoid config issues quickly */}
-            <img 
-              src="/logo.png" 
-              alt="Much Racing Logo" 
-              className="w-full h-full object-contain"
-            />
-          </Link>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col items-center justify-center p-4">
+      {/* Logo Container - Wide enough for massive logo */}
+      <div className="w-full flex justify-center mb-8">
+        <Link href="/" className="relative w-[800px] h-[300px]">
+          <h1 className="sr-only">Much Racing</h1>
+          <img
+            src="/logo.png"
+            alt="Much Racing Logo"
+            className="w-full h-full object-contain"
+          />
+        </Link>
+      </div>
 
-        {/* Login Card */}
+      {/* Login Card - Stay compact */}
+      <div className="w-full max-w-md">
         <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
           {/* Tabs */}
           <div className="flex border-b border-slate-700">
             <button
               onClick={() => setActiveTab('signin')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-4 px-6 transition ${
-                activeTab === 'signin'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700/50 text-slate-400 hover:text-white'
-              }`}
+              className={`flex-1 flex items-center justify-center space-x-2 py-4 px-6 transition ${activeTab === 'signin'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-700/50 text-slate-400 hover:text-white'
+                }`}
             >
               <User className="w-5 h-5" />
               <span className="font-semibold">Sign In</span>
             </button>
             <button
               onClick={() => setActiveTab('register')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-4 px-6 transition ${
-                activeTab === 'register'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700/50 text-slate-400 hover:text-white'
-              }`}
+              className={`flex-1 flex items-center justify-center space-x-2 py-4 px-6 transition ${activeTab === 'register'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-700/50 text-slate-400 hover:text-white'
+                }`}
             >
               <UserPlus className="w-5 h-5" />
               <span className="font-semibold">Register</span>
@@ -182,13 +210,23 @@ export default function LoginPage() {
                       <input
                         type="password"
                         value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                        onChange={(e) => handlePasswordChange(e.target.value)}
+                        className={`w-full bg-slate-900/50 border rounded-lg px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none transition ${passwordError ? 'border-red-500 focus:border-red-500' : 'border-slate-600 focus:border-blue-500'
+                          }`}
                         placeholder="Create a password"
                         required
                       />
                       <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                     </div>
+                    {passwordError && (
+                      <div className="flex items-start gap-2 mt-2 text-red-400 text-xs">
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>{passwordError}</span>
+                      </div>
+                    )}
+                    <p className="text-slate-500 text-xs mt-2">
+                      Allowed: 0-9, a-z, A-Z, ! # $ % &amp; ' ( ) * + , – . @ : ; =
+                    </p>
                   </div>
 
                   {/* Confirm Password Field */}
@@ -209,11 +247,19 @@ export default function LoginPage() {
                     </div>
                   </div>
 
+                  {/* WiFi Notice */}
+                  <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3">
+                    <p className="text-blue-300 text-xs">
+                      <strong>Note:</strong> Your device requires WiFi connection. If your WiFi password contains unsupported characters, create a 2.4 GHz hotspot with a compatible password.
+                    </p>
+                  </div>
+
                   {/* Register Button */}
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition shadow-lg hover:shadow-xl"
+                      disabled={!!passwordError}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold px-8 py-3 rounded-lg transition shadow-lg hover:shadow-xl"
                     >
                       Register
                     </button>
