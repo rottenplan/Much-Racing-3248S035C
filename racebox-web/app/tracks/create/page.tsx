@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, MapPin, Trash2, RotateCcw, Save } from 'lucide-react';
+import TrackCreatorMapWrapper from '../../components/TrackCreatorMapWrapper';
 
 interface TrackPoint {
-  x: number;
-  y: number;
   lat: number;
   lng: number;
 }
@@ -24,7 +23,6 @@ export default function CreateTrack() {
   const [uid, setUid] = useState('');
   const [startLineWidth, setStartLineWidth] = useState(12);
   const [startLineBearing, setStartLineBearing] = useState(0);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Generate UID on mount
   useEffect(() => {
@@ -38,82 +36,8 @@ export default function CreateTrack() {
     setUid(generateUID());
   }, []);
 
-  // Draw map and track points
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw grid pattern (satellite-style)
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < canvas.width; i += 50) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
-      ctx.stroke();
-    }
-    for (let i = 0; i < canvas.height; i += 50) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
-      ctx.stroke();
-    }
-
-    // Draw track points and lines
-    if (trackPoints.length > 0) {
-      // Draw lines connecting points
-      ctx.strokeStyle = '#f97316';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
-      for (let i = 1; i < trackPoints.length; i++) {
-        ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
-      }
-      ctx.stroke();
-
-      // Draw points
-      trackPoints.forEach((point, index) => {
-        ctx.fillStyle = index === 0 ? '#22c55e' : '#f97316';
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw point number
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px sans-serif';
-        ctx.fillText((index + 1).toString(), point.x + 10, point.y - 10);
-      });
-    }
-
-    // Draw placeholder text
-    if (trackPoints.length === 0) {
-      ctx.fillStyle = '#64748b';
-      ctx.font = '16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Click on the map to add track points', canvas.width / 2, canvas.height / 2);
-    }
-  }, [trackPoints]);
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Mock lat/lng conversion (in production, use real map coordinates)
-    const lat = 0 + (y / canvas.height) * 0.01;
-    const lng = 0 + (x / canvas.width) * 0.01;
-
-    setTrackPoints([...trackPoints, { x, y, lat, lng }]);
+  const handlePointAdd = (lat: number, lng: number) => {
+    setTrackPoints([...trackPoints, { lat, lng }]);
   };
 
   const handleRemoveLastPoint = () => {
@@ -137,7 +61,7 @@ export default function CreateTrack() {
     }
   };
 
-  const handleSaveTrack = () => {
+  const handleSaveTrack = async () => {
     if (!trackName || trackPoints.length < 3) {
       alert('Please enter a track name and add at least 3 points on the map.');
       return;
@@ -158,14 +82,26 @@ export default function CreateTrack() {
       createdAt: new Date().toISOString(),
     };
 
-    // Save to localStorage (in production, send to API)
-    const savedTracks = JSON.parse(localStorage.getItem('muchracing_tracks') || '[]');
-    savedTracks.push(trackData);
-    localStorage.setItem('muchracing_tracks', JSON.stringify(savedTracks));
+    // Save to API
+    try {
+      const response = await fetch('/api/tracks/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trackData)
+      });
 
-    alert('Track saved successfully!');
-    // Optionally redirect to tracks list
-    // window.location.href = '/tracks';
+      const result = await response.json();
+
+      if (response.ok) {
+        alert('Track saved to server successfully!');
+        // clear form?
+      } else {
+        alert('Failed to save track: ' + result.error);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Network error saving track');
+    }
   };
 
   const countries = [
@@ -208,9 +144,9 @@ export default function CreateTrack() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-12 h-12 relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Much Racing Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Much Racing Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -233,9 +169,8 @@ export default function CreateTrack() {
       <div className="flex h-[calc(100vh-73px)]">
         {/* Sidebar */}
         <div
-          className={`bg-slate-800/50 backdrop-blur-sm border-r border-slate-700 transition-all duration-300 overflow-y-auto ${
-            sidebarVisible ? 'w-full md:w-96' : 'w-0'
-          }`}
+          className={`bg-slate-800/50 backdrop-blur-sm border-r border-slate-700 transition-all duration-300 overflow-y-auto ${sidebarVisible ? 'w-full md:w-96' : 'w-0'
+            }`}
         >
           {sidebarVisible && (
             <div className="p-6 space-y-6">
@@ -441,19 +376,16 @@ export default function CreateTrack() {
           {!sidebarVisible && (
             <button
               onClick={() => setSidebarVisible(true)}
-              className="absolute top-4 left-4 z-10 bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition"
+              className="absolute top-4 left-4 z-[999] bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition shadow-lg"
             >
               <ChevronRight className="w-6 h-6" />
             </button>
           )}
 
-          {/* Canvas */}
-          <canvas
-            ref={canvasRef}
-            width={1200}
-            height={800}
-            onClick={handleCanvasClick}
-            className="w-full h-full cursor-crosshair"
+          {/* Map Component */}
+          <TrackCreatorMapWrapper
+            points={trackPoints}
+            onPointAdd={handlePointAdd}
           />
         </div>
       </div>

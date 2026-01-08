@@ -1,15 +1,33 @@
 import Link from 'next/link';
-import { Clock, MapPin, Calendar, TrendingUp } from 'lucide-react';
+import { Clock, MapPin, Calendar, TrendingUp, Gauge, Activity } from 'lucide-react';
+import fs from 'fs';
+import path from 'path';
 
-// Mock sessions data
-const sessions = [
-  { id: 1, track: 'Genk Karting Belgium', date: '2026-01-06', time: '14:30', laps: 25, bestLap: '48.234', avgLap: '51.123', totalTime: '21:15' },
-  { id: 2, track: 'BSD Karting Track', date: '2026-01-05', time: '16:45', laps: 18, bestLap: '45.891', avgLap: '47.234', totalTime: '14:10' },
-  { id: 3, track: 'Sentul Karting Circuit', date: '2026-01-03', time: '10:20', laps: 22, bestLap: '52.891', avgLap: '54.567', totalTime: '19:45' },
-  { id: 4, track: 'Genk Karting Belgium', date: '2025-12-28', time: '15:00', laps: 20, bestLap: '49.123', avgLap: '52.456', totalTime: '17:30' },
-];
+// Helper to get sessions from disk
+async function getSessions() {
+  const sessionsDir = path.join(process.cwd(), 'data', 'sessions');
+  if (!fs.existsSync(sessionsDir)) {
+    return [];
+  }
 
-export default function SessionsPage() {
+  const files = fs.readdirSync(sessionsDir).filter(file => file.endsWith('.json'));
+  const sessions = files.map(file => {
+    try {
+      const content = fs.readFileSync(path.join(sessionsDir, file), 'utf-8');
+      return JSON.parse(content);
+    } catch (e) {
+      console.error(`Error reading session file ${file}`, e);
+      return null;
+    }
+  }).filter(s => s !== null);
+
+  // Sort by date desc
+  return sessions.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+}
+
+export default async function SessionsPage() {
+  const sessions = await getSessions();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       {/* Navigation */}
@@ -18,9 +36,9 @@ export default function SessionsPage() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-12 h-12 relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Much Racing Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Much Racing Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -50,9 +68,16 @@ export default function SessionsPage() {
 
         {/* Sessions List */}
         <div className="space-y-4">
-          {sessions.map((session) => (
-            <SessionCard key={session.id} session={session} />
-          ))}
+          {sessions.length === 0 ? (
+            <div className="text-center py-20 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
+              <p className="text-slate-400 text-lg">No sessions found.</p>
+              <p className="text-slate-500 text-sm mt-2">Sync your device to see your runs here.</p>
+            </div>
+          ) : (
+            sessions.map((session: any) => (
+              <SessionCard key={session.id} session={session} />
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -60,6 +85,21 @@ export default function SessionsPage() {
 }
 
 function SessionCard({ session }: { session: any }) {
+  const dateObj = new Date(session.uploadDate);
+  const dateStr = dateObj.toLocaleDateString();
+  const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Calculate Duration roughly (last point time - first point time)
+  let duration = "00:00";
+  if (session.points && session.points.length > 0) {
+    const start = parseFloat(session.points[0].time);
+    const end = parseFloat(session.points[session.points.length - 1].time);
+    const diffSeconds = (end - start) / 1000;
+    const mins = Math.floor(diffSeconds / 60);
+    const secs = Math.floor(diffSeconds % 60);
+    duration = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
   return (
     <Link href={`/sessions/${session.id}`}>
       <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-orange-500 transition">
@@ -67,45 +107,50 @@ function SessionCard({ session }: { session: any }) {
           <div>
             <h3 className="text-white text-xl font-semibold mb-2 flex items-center">
               <MapPin className="w-5 h-5 mr-2 text-orange-500" />
-              {session.track}
+              {session.originalFilename || "Unknown Session"}
             </h3>
             <div className="flex items-center space-x-4 text-sm text-slate-400">
               <span className="flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
-                {session.date}
+                {dateStr}
               </span>
               <span className="flex items-center">
                 <Clock className="w-4 h-4 mr-1" />
-                {session.time}
+                {timeStr}
               </span>
             </div>
           </div>
-          <div className="mt-4 md:mt-0">
-            <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
-              {session.bestLap}
-            </div>
-            <div className="text-slate-400 text-sm text-center">Best Lap</div>
+          <div className="mt-4 md:mt-0 text-right">
+            {/* Placeholder for Best Lap if available later */}
+            <div className="text-slate-500 text-sm">Session ID</div>
+            <div className="text-slate-300 font-mono text-sm">{session.id}</div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-700">
           <div>
-            <div className="text-slate-500 text-sm">Total Laps</div>
-            <div className="text-white font-semibold">{session.laps}</div>
+            <div className="text-slate-500 text-sm">Data Points</div>
+            <div className="text-white font-semibold">{session.stats?.totalPoints || 0}</div>
           </div>
           <div>
-            <div className="text-slate-500 text-sm">Avg Lap</div>
-            <div className="text-white font-semibold">{session.avgLap}</div>
+            <div className="text-slate-500 text-sm">Top Speed</div>
+            <div className="text-white font-semibold flex items-center">
+              <Gauge className="w-4 h-4 mr-1 text-blue-400" />
+              {session.stats?.maxSpeed?.toFixed(1) || 0} km/h
+            </div>
           </div>
           <div>
-            <div className="text-slate-500 text-sm">Total Time</div>
-            <div className="text-white font-semibold">{session.totalTime}</div>
+            <div className="text-slate-500 text-sm">Max RPM</div>
+            <div className="text-white font-semibold flex items-center">
+              <Activity className="w-4 h-4 mr-1 text-red-500" />
+              {session.stats?.maxRpm?.toFixed(0) || 0}
+            </div>
           </div>
           <div>
-            <div className="text-slate-500 text-sm">Improvement</div>
+            <div className="text-slate-500 text-sm">Duration</div>
             <div className="text-green-400 font-semibold flex items-center">
-              <TrendingUp className="w-4 h-4 mr-1" />
-              -2.3s
+              <Clock className="w-4 h-4 mr-1" />
+              {duration}
             </div>
           </div>
         </div>

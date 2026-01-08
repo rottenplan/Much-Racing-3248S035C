@@ -37,9 +37,9 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
     // Header using standard font
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
-    tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
+    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG); // Highlighted title
     tft->setTextDatum(TC_DATUM);
-    tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, 20);
+    tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, 35); // Lowered position
 
     // Back Arrow
     tft->setTextSize(2);

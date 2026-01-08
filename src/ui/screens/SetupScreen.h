@@ -3,6 +3,7 @@
 
 #include "../UIManager.h"
 #include "../components/KeyboardComponent.h"
+#include <Arduino.h>
 #include <Preferences.h>
 
 class SetupScreen : public UserScreen {
@@ -19,7 +20,13 @@ private:
   bool _cursorVisible;
 
   // Setup flow state
-  enum SetupStep { STEP_WELCOME, STEP_ACCOUNT, STEP_WIFI, STEP_COMPLETE };
+  enum SetupStep {
+    STEP_WELCOME,
+    STEP_ACCOUNT,
+    STEP_WIFI_SCAN,
+    STEP_WIFI,
+    STEP_COMPLETE
+  };
 
   SetupStep _currentStep;
 
@@ -30,6 +37,8 @@ private:
   // WiFi data
   String _wifiSSID;
   String _wifiPassword;
+  int _scanCount = 0;
+  int _scrollOffset = 0; // For scrolling scan results
 
   // Input handling
   bool _isEditingUsername;
@@ -44,8 +53,9 @@ private:
 
   // Drawing methods
   void drawWelcome();
-  void drawAccountSetup();
-  void drawWiFiSetup();
+  void drawAccountSetup(bool fullRedraw = true);
+  void drawWiFiScan();
+  void drawWiFiSetup(bool fullRedraw = true);
   void drawComplete();
 
   void drawKeyboard(int y, bool isPassword = false);
@@ -57,6 +67,7 @@ private:
   // Input methods
   void handleWelcomeTouch(int x, int y);
   void handleAccountTouch(int x, int y);
+  void handleWiFiScanTouch(int x, int y);
   void handleWiFiTouch(int x, int y);
   void handleCompleteTouch(int x, int y);
 

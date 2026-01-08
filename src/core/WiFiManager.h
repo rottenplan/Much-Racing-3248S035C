@@ -17,7 +17,11 @@ public:
 
   // Connection Methods
   bool connect(const char *ssid, const char *pass);
-  bool tryAutoConnect(); // Try with saved credentials
+  int scanNetworks(); // Returns count of found networks
+  String getSSID(int index);
+  int getRSSI(int index);
+  void connectTo(int index, const char *pass); // Connect by index
+  bool tryAutoConnect();                       // Try with saved credentials
   void disconnect();
 
   // Persistence

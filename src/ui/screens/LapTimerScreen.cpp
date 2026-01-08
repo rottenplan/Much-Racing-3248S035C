@@ -46,20 +46,57 @@ void LapTimerScreen::onShow() {
   drawMenu();
 }
 
+#include <ArduinoJson.h>
+
 void LapTimerScreen::loadTracks() {
   _tracks.clear();
 
+  // Load from SD Card if available
+  if (SD.exists("/tracks.json")) {
+    File file = SD.open("/tracks.json", FILE_READ);
+    if (file) {
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, file);
+      file.close();
+
+      if (!error && doc["tracks"].is<JsonArray>()) {
+        JsonArray trackArray = doc["tracks"];
+        for (JsonVariant t : trackArray) {
+          Track newTrack;
+          newTrack.name = t["name"].as<String>();
+          newTrack.lat = t["lat"].as<double>();
+          newTrack.lon = t["lon"].as<double>();
+          // Heading/Width can be added to Track struct later if needed
+
+          // Configs
+          JsonArray configs = t["configs"];
+          if (configs.size() > 0) {
+            for (JsonVariant c : configs) {
+              newTrack.configs.push_back({c.as<String>()});
+            }
+          } else {
+            newTrack.configs.push_back({"Default"});
+          }
+
+          _tracks.push_back(newTrack);
+        }
+        Serial.println("Tracks loaded from SD");
+        return; // Success
+      } else {
+        Serial.print("Failed to parse tracks.json: ");
+        Serial.println(error.c_str());
+      }
+    }
+  }
+
+  // Fallback / Default
   Track sonoma;
-  sonoma.name = "Sonoma Raceway";
+  sonoma.name = "Sonoma";
   sonoma.lat = 38.1613;
   sonoma.lon = -122.4561;
   sonoma.configs.push_back({"Default"});
-  sonoma.configs.push_back({"Alternative long"});
-  sonoma.configs.push_back({"Long"});
-  sonoma.configs.push_back({"Short"});
 
   _tracks.push_back(sonoma);
-  // Tambahkan lebih banyak jika diperlukan
 }
 
 void LapTimerScreen::update() {

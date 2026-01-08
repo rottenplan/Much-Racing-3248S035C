@@ -110,6 +110,20 @@ bool WiFiManager::connect(const char *ssid, const char *pass) {
   }
 }
 
+int WiFiManager::scanNetworks() {
+  Serial.println("WiFi: Scanning...");
+  WiFi.mode(WIFI_AP_STA);
+  int n = WiFi.scanNetworks();
+  Serial.print("WiFi: Found ");
+  Serial.print(n);
+  Serial.println(" networks");
+  return n;
+}
+
+String WiFiManager::getSSID(int index) { return WiFi.SSID(index); }
+
+int WiFiManager::getRSSI(int index) { return WiFi.RSSI(index); }
+
 void WiFiManager::disconnect() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_AP);

@@ -32,6 +32,7 @@ private:
   // HTTP helpers
   String makeBasicAuthHeader(const char *username, const char *password);
   bool downloadAndApplySettings(const char *apiUrl, const char *authHeader);
+  bool downloadTracks(const char *apiUrl, const char *authHeader);
 
   // Settings application
   void applySettings(JsonDocument &doc);

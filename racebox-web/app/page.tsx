@@ -2,35 +2,13 @@ import Link from 'next/link';
 import { MapPin, Clock, TrendingUp, Wifi } from 'lucide-react';
 import MapWrapper from "./components/MapWrapper";
 
+import Navbar from "./components/Navbar";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       {/* Navigation */}
-      <nav className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-12 h-12 relative">
-                <img
-                  src="/logo.png"
-                  alt="Much Racing Logo"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <span className="text-white text-2xl font-bold">Much Racing</span>
-            </div>
-            <div className="hidden md:flex space-x-6">
-              <Link href="/dashboard" className="text-slate-300 hover:text-white transition">Dashboard</Link>
-              <Link href="/tracks" className="text-slate-300 hover:text-white transition">Tracks</Link>
-              <Link href="/sessions" className="text-slate-300 hover:text-white transition">Sessions</Link>
-              <Link href="/device" className="text-slate-300 hover:text-white transition">Device</Link>
-            </div>
-            <Link href="/login" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg transition">
-              Login
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="container mx-auto px-6 py-20">
         <div className="text-center max-w-4xl mx-auto">

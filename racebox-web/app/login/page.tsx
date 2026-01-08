@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { User, Lock, Mail, UserPlus, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { User, Lock, Mail, UserPlus, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<'signin' | 'register'>('signin');
@@ -30,24 +31,60 @@ export default function LoginPage() {
     setPasswordError(validatePassword(value));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
 
-    // Validate password on registration
+  const router = useRouter();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
     if (activeTab === 'register') {
-      const error = validatePassword(formData.password);
-      if (error) {
-        setPasswordError(error);
+      const passError = validatePassword(formData.password);
+      if (passError) {
+        setPasswordError(passError);
+        setLoading(false);
         return;
       }
       if (formData.password !== formData.confirmPassword) {
         setPasswordError('Passwords do not match');
+        setLoading(false);
         return;
       }
     }
 
-    // TODO: Implement authentication logic
-    console.log('Form submitted:', formData);
+    try {
+      // Use the same API for both for now (mock)
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        // Set cookie (valid for 7 days)
+        // Set cookie (valid for 7 days)
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7);
+        document.cookie = `auth_token=${data.token}; path=/; expires=${expires.toUTCString()}`;
+
+        // Redirect to dashboard
+        router.push('/dashboard');
+      } else {
+        setError(data.message || 'Authentication failed');
+      }
+    } catch (err) {
+      setError('Connection error. Please check server.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -48,6 +48,7 @@ void sdProgressCallback(int percent, String status) {
 void SettingsScreen::onShow() {
   _selectedIdx = -1;
   _lastSelectedIdx = -1;
+  _scrollOffset = 0;        // Reset scroll
   _currentMode = MODE_MAIN; // Start at Main
   loadSettings();           // Reload to ensure sync
 
@@ -62,7 +63,7 @@ void SettingsScreen::loadSettings() {
   if (_currentMode == MODE_MAIN) {
     _settings.push_back({"CLOCK SETTING", TYPE_ACTION});
 
-    _prefs.begin("laptimer", true);
+    _prefs.begin("laptimer", false);
 
     // Power Save (Auto Off)
     SettingItem powerSave = {"POWER SAVE", TYPE_VALUE, "power_save"};
@@ -110,7 +111,7 @@ void SettingsScreen::loadSettings() {
     _settings.push_back({"REMOVE ACCOUNT", TYPE_ACTION});
 
   } else if (_currentMode == MODE_ENGINE) {
-    _prefs.begin("laptimer", true);
+    _prefs.begin("laptimer", false);
 
     // Engine Hours (Read-only display)
     SettingItem engineHours = {"TOTAL HOURS", TYPE_VALUE, "engine_hours"};
@@ -121,7 +122,7 @@ void SettingsScreen::loadSettings() {
 
     _prefs.end();
   } else if (_currentMode == MODE_RPM) {
-    _prefs.begin("laptimer", true);
+    _prefs.begin("laptimer", false);
 
     // Pulses Per Revolution (PPR)
     SettingItem ppr = {"PULSE PER REV", TYPE_VALUE, "rpm_ppr"};
@@ -135,7 +136,7 @@ void SettingsScreen::loadSettings() {
 
     _prefs.end();
   } else if (_currentMode == MODE_CLOCK) {
-    _prefs.begin("laptimer", true);
+    _prefs.begin("laptimer", false);
 
     // UTC Time Zone
     SettingItem utcZone = {"UTC TIME ZONE", TYPE_VALUE, "utc_offset_idx"};
@@ -159,7 +160,7 @@ void SettingsScreen::loadSettings() {
 
     _prefs.end();
   } else if (_currentMode == MODE_GNSS_CONFIG) {
-    _prefs.begin("laptimer", true);
+    _prefs.begin("laptimer", false);
 
     // 1. GNSS Mode
     SettingItem mode = {"GNSS MODE", TYPE_VALUE, "gnss_mode"};
@@ -359,7 +360,39 @@ void SettingsScreen::update() {
       loadSettings();
       _ui->getTft()->fillScreen(COLOR_BG);
       _ui->drawStatusBar(true);
+      _scrollOffset = 0;
       drawList(0, true);
+    }
+    return;
+  }
+
+  // Scroll Down Button (Bottom-Right, y > 210, x > 290)
+  if (p.x > 290 && p.y > 210) {
+    if (millis() - lastSettingTouch < 200)
+      return;
+    lastSettingTouch = millis();
+
+    int listY = 30;
+    int itemH = 20;
+    int maxY = 210;
+    int visibleItems = (maxY - listY) / itemH;
+
+    if (_scrollOffset + visibleItems < _settings.size()) {
+      _scrollOffset++;
+      drawList(_scrollOffset, true); // Force redraw.
+    }
+    return;
+  }
+
+  // Scroll Up Button (Bottom-Right, y > 210, x 260-290)
+  if (p.x > 260 && p.x <= 290 && p.y > 210) {
+    if (millis() - lastSettingTouch < 200)
+      return;
+    lastSettingTouch = millis();
+
+    if (_scrollOffset > 0) {
+      _scrollOffset--;
+      drawList(_scrollOffset, true);
     }
     return;
   }
@@ -535,19 +568,29 @@ void SettingsScreen::handleTouch(int idx) {
       tft->drawString("Syncing...", SCREEN_WIDTH / 2, 100);
 
       // Get user credentials from NVS
-      _prefs.begin("user", true);
+      _prefs.begin("muchrace", false);
       String username = _prefs.getString("username", "");
       String password = _prefs.getString("password", "");
       _prefs.end();
 
+      Serial.print("DEBUG: Checking 'muchrace' namespace. Username: '");
+      Serial.print(username);
+      Serial.println("'");
+
+      Serial.print("DEBUG: Checking 'muchrace' namespace. Username: '");
+      Serial.print(username);
+      Serial.println("'");
+
       if (username.length() == 0) {
         tft->fillRect(0, 80, SCREEN_WIDTH, 80, COLOR_BG);
         tft->setTextColor(TFT_RED, COLOR_BG);
-        tft->drawString("No account!", SCREEN_WIDTH / 2, 100);
+        tft->drawString("No account!", SCREEN_WIDTH / 2, 80);
+        tft->drawString("Run Setup again", SCREEN_WIDTH / 2,
+                        100); // More helpful message
         delay(2000);
       } else {
-        // Use localhost for testing
-        String apiUrl = "http://192.168.1.100:3000/api/device/sync";
+        // Use API_URL from config.h
+        String apiUrl = API_URL;
 
         // Perform sync
         bool success = syncManager.syncSettings(
@@ -579,13 +622,13 @@ void SettingsScreen::handleTouch(int idx) {
 
       tft->setTextColor(TFT_YELLOW, COLOR_BG);
       tft->setTextDatum(MC_DATUM);
+      tft->setTextFont(2); // Use Standard Font 2 (Sans Serif)
       tft->setTextSize(1);
-      tft->setFreeFont(&Org_01);
       tft->drawString("Removing Account...", SCREEN_WIDTH / 2, 100);
 
       // Clear user credentials from NVS
-      _prefs.begin("user", false);
-      _prefs.clear(); // Clear all user data
+      _prefs.begin("muchrace", false);
+      _prefs.clear(); // Clear all user data (including setup_done)
       _prefs.end();
 
       // Also clear WiFi credentials
@@ -596,21 +639,21 @@ void SettingsScreen::handleTouch(int idx) {
       delay(1000);
 
       // Show confirmation
-      tft->fillRect(0, 80, SCREEN_WIDTH, 80, COLOR_BG);
+      tft->fillRect(0, 80, SCREEN_WIDTH, 120, COLOR_BG); // Clear larger area
       tft->setTextColor(TFT_GREEN, COLOR_BG);
+      tft->setTextFont(2); // Ensure Font 2
       tft->drawString("Account Removed!", SCREEN_WIDTH / 2, 100);
-      tft->setTextSize(1);
+      tft->setTextColor(TFT_WHITE, COLOR_BG);
       tft->drawString("Device will restart", SCREEN_WIDTH / 2, 130);
       tft->drawString("on next setup...", SCREEN_WIDTH / 2, 150);
 
       delay(3000);
 
       // Return to settings menu
-      _currentMode = MODE_MAIN;
-      loadSettings();
-      tft->fillScreen(COLOR_BG);
-      _ui->drawStatusBar(true);
-      drawList(0, true);
+      delay(3000);
+
+      // Automatic Restart
+      ESP.restart();
     } else if (item.name == "RPM SETTING") {
       _currentMode = MODE_RPM;
       loadSettings();
@@ -868,17 +911,6 @@ void SettingsScreen::drawSDTest() {
 void SettingsScreen::drawList(int scrollOffset, bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Determine Title
-  String title = "SETTINGS";
-  if (_currentMode == MODE_RPM)
-    title = "RPM SETTING";
-  else if (_currentMode == MODE_ENGINE)
-    title = "ENGINE HOURS";
-  else if (_currentMode == MODE_CLOCK)
-    title = "CLOCK SETTING";
-  else if (_currentMode == MODE_GNSS_CONFIG)
-    title = "GNSS CONFIG";
-
   // Highlight Back Arrow if selected
   uint16_t backColor = (_selectedIdx == -2) ? COLOR_HIGHLIGHT : COLOR_TEXT;
 
@@ -890,20 +922,25 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
 
   // List (starts at y=30, with gap after status bar)
   int listY = 30;
-  int itemH = 20; // Slightly taller rows for better touch targets
-  int maxY = 210; // Leave room for bottom area (line at 210, arrow below)
+  int itemH = 20;
+  int maxY = 210; // Bottom limit for list
 
-  for (int i = 0; i < _settings.size(); i++) {
-    SettingItem &item = _settings[i];
-    int y = listY + (i * itemH);
+  // Clear list area to prevent ghosts when scrolling
+  if (force) {
+    tft->fillRect(0, listY, SCREEN_WIDTH, maxY - listY, COLOR_BG);
+  }
 
-    // Stop if we'd draw beyond the bottom area
-    if (y + itemH > maxY)
+  int visibleItems = (maxY - listY) / itemH;
+
+  for (int i = 0; i < visibleItems; i++) {
+    int idx = scrollOffset + i;
+    if (idx >= _settings.size())
       break;
 
-    int sIdx = i;
+    SettingItem &item = _settings[idx];
+    int y = listY + (i * itemH);
 
-    // Only draw if forced OR if this item's selection state changed
+    int sIdx = idx;
     bool stateChanged = (sIdx == _selectedIdx || sIdx == _lastSelectedIdx);
 
     if (force || stateChanged) {
@@ -921,14 +958,12 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
       tft->setTextDatum(TL_DATUM);
       tft->setTextFont(1);
       tft->setTextSize(1);
-
       tft->setTextColor(txtColor, bgColor);
 
       String displayName = item.name;
       if (_currentMode == MODE_GNSS_CONFIG) {
-        displayName = String(i + 1) + ". " + item.name;
+        displayName = String(idx + 1) + ". " + item.name;
       }
-
       tft->drawString(displayName, 10, y + 5);
 
       // Value / Toggle / Action
@@ -944,7 +979,6 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
       } else if (item.type == TYPE_ACTION) {
         valText = ">";
       }
-
       tft->drawString(valText, SCREEN_WIDTH - 10, y + 5);
 
       // Custom Render for Toggle
@@ -967,14 +1001,24 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
   }
   _lastSelectedIdx = _selectedIdx;
 
-  // Draw bottom elements AFTER list (so they're on top)
+  // Draw bottom elements AFTER list
   if (force) {
     // Clear bottom area
     tft->fillRect(0, 210, SCREEN_WIDTH, 30, COLOR_BG);
-    // Horizontal line separator
-    // tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
-    // Blue triangle arrow pointing LEFT (20px wide, 16px tall)
+
+    // Back Button (Left)
     tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
+
+    // Scroll Buttons (Right)
+    // Up Arrow (Left of the pair)
+    if (scrollOffset > 0) {
+      tft->fillTriangle(270, 233, 290, 233, 280, 217, COLOR_ACCENT);
+    }
+
+    // Down Arrow (Far Right)
+    if (scrollOffset + visibleItems < _settings.size()) {
+      tft->fillTriangle(300, 217, 320, 217, 310, 233, COLOR_ACCENT);
+    }
   }
 }
 

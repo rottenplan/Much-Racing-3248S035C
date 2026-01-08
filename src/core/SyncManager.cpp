@@ -7,14 +7,14 @@ extern SessionManager sessionManager;
 SyncManager::SyncManager() {}
 
 bool SyncManager::isFirstSyncDone() {
-  _prefs.begin("sync", true);
+  _prefs.begin("sync", false);
   bool done = _prefs.getBool("first_sync_done", false);
   _prefs.end();
   return done;
 }
 
 String SyncManager::getLastSyncTime() {
-  _prefs.begin("sync", true);
+  _prefs.begin("sync", false);
   String lastSync = _prefs.getString("last_sync", "Never");
   _prefs.end();
   return lastSync;
@@ -56,11 +56,15 @@ bool SyncManager::syncSettings(const char *apiUrl, const char *username,
     Serial.println("Sync: WiFi not connected.");
     return false;
   }
+  Serial.print("Sync: WiFi Connected. Device IP: ");
+  Serial.println(WiFi.localIP());
 
   String authHeader = makeBasicAuthHeader(username, password);
   bool success = downloadAndApplySettings(apiUrl, authHeader.c_str());
 
   if (success) {
+    // Also sync tracks
+    downloadTracks(apiUrl, authHeader.c_str());
     saveLastSyncTime();
   }
 
@@ -312,4 +316,54 @@ bool SyncManager::uploadSessions(const char *apiUrl, const char *username,
     }
   }
   return true;
+}
+
+bool SyncManager::downloadTracks(const char *apiUrl, const char *authHeader) {
+  // Construct URL: Replace "api/device/sync" with "api/tracks/list"
+  String url = String(apiUrl);
+  int idx = url.indexOf("/api/device/sync");
+  if (idx > 0) {
+    url = url.substring(0, idx) + "/api/tracks/list";
+  } else {
+    Serial.println("Sync: Invalid API URL format for tracks");
+    return false;
+  }
+
+  HTTPClient http;
+  Serial.print("Sync: Downloading tracks from ");
+  Serial.println(url);
+
+  http.begin(url);
+  http.addHeader("Authorization", authHeader);
+
+  int httpCode = http.GET();
+  bool success = false;
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    Serial.println("Sync: Tracks received");
+
+    // Save directly to SD card
+    if (SD.exists("/tracks.json")) {
+      SD.remove("/tracks.json");
+    }
+
+    // Requires SD to be initialized (done in GPSManager typically)
+    // Check if SD is ready?
+    File file = SD.open("/tracks.json", FILE_WRITE);
+    if (file) {
+      file.print(payload);
+      file.close();
+      Serial.println("Sync: Tracks saved to /tracks.json");
+      success = true;
+    } else {
+      Serial.println("Sync: Failed to open /tracks.json for writing");
+    }
+  } else {
+    Serial.print("Sync: HTTP error downloading tracks: ");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+  return success;
 }

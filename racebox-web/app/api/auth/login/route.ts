@@ -7,6 +7,20 @@ export async function POST(request: Request) {
 
     // TODO: Connect to real database
     // For now, simple mock authentication
+    // Check for Admin (matches Device Sync)
+    if (email === 'admin' && password === '1111') {
+      return NextResponse.json({
+        success: true,
+        token: 'admin_token_' + Date.now(),
+        user: {
+          id: 999,
+          name: 'Admin User',
+          email: 'admin'
+        }
+      });
+    }
+
+    // Default Demo User
     if (email === 'user@example.com' && password === 'password123') {
       return NextResponse.json({
         success: true,
@@ -21,15 +35,15 @@ export async function POST(request: Request) {
 
     // Allow any "valid-looking" login for testing purposes if not specific mock
     if (password && password.length >= 6) {
-         return NextResponse.json({
-            success: true,
-            token: 'mock_jwt_token_' + Date.now(),
-            user: {
-              id: Math.floor(Math.random() * 1000),
-              name: 'Test User',
-              email: email
-            }
-          });
+      return NextResponse.json({
+        success: true,
+        token: 'mock_jwt_token_' + Date.now(),
+        user: {
+          id: Math.floor(Math.random() * 1000),
+          name: 'Test User',
+          email: email
+        }
+      });
     }
 
     return NextResponse.json(
