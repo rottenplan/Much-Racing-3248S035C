@@ -12,24 +12,34 @@ public:
 private:
   UIManager *_ui;
   void drawScreen();
-  
+
   // UI Helpers
   void drawGraphGrid();
   void drawGraphLine();
   void updateValues();
-  
+
+  // Constants
+  static const int GRAPH_WIDTH = 298;
+  static const int GRAPH_HEIGHT = 115;
+  const int MAX_SPEED_SCALE = 150; // Max speed for graph scaling (km/h)
+
+  TFT_eSprite *_graphSprite = nullptr;
+
   // State
   int _currentRpm;
   int _maxRpm;
-  int _currentLvl; // Just a secondary value from image "LVL"
-  
-  static const int GRAPH_WIDTH = 280;
-  static const int GRAPH_HEIGHT = 80;
+  int _currentLvl;
+
+  // Speed Tracking
+  int _currentSpeed;
+  int _speedHistory[GRAPH_WIDTH];
+
+  // Graph Data
   int _graphHistory[GRAPH_WIDTH];
   int _graphIndex;
-  
+
   unsigned long _lastUpdate;
-  
+
   // Interrupt Handling
   static volatile unsigned long _rpmPulses;
   static volatile unsigned long _lastPulseMicros;
