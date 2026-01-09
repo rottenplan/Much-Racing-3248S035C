@@ -83,6 +83,6 @@
 #define FONT_SIZE_LAP_BEST 3  // Best Lap Time Display
 
 // API Configuration
-#define API_URL "http://192.168.1.3:3000/api/device/sync"
+#define API_URL "http://192.168.2.66:3000/api/device/sync"
 
 #endif

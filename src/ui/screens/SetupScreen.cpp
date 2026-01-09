@@ -232,7 +232,6 @@ void SetupScreen::drawWiFiScan() {
   TFT_eSPI *tft = _ui->getTft();
   tft->fillScreen(COLOR_BG);
 
-  // Header
   // Header (Small Font 1)
   tft->setTextFont(1);
   tft->setTextSize(1);
@@ -248,15 +247,20 @@ void SetupScreen::drawWiFiScan() {
     tft->setTextColor(COLOR_TEXT, COLOR_BG);
     tft->setTextDatum(MC_DATUM);
     tft->drawString("Scanning...", SCREEN_WIDTH / 2, 120);
+
+    // Perform Scan (Blocking)
     _scanCount = wifiManager.scanNetworks();
-    drawWiFiScan();
-    return;
+
+    // Clear "Scanning..." text area only, don't wipe whole screen (prevents
+    // flicker)
+    tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, COLOR_BG);
   }
 
   // List Networks
   int startY = 50;
   int itemH = 40;
-  for (int i = 0; i < _scanCount && i < 5; i++) {
+  int limit = 4; // Limit to 4 to keep "Manual" visible
+  for (int i = 0; i < _scanCount && i < limit; i++) {
     int y = startY + (i * itemH);
     tft->drawRect(20, y, SCREEN_WIDTH - 40, 30, COLOR_SECONDARY);
     String ssid = wifiManager.getSSID(i);
@@ -271,7 +275,8 @@ void SetupScreen::drawWiFiScan() {
   }
 
   // Custom Manual Entry Option
-  int y = startY + (_scanCount > 5 ? 5 : _scanCount) * itemH;
+  int visibleCount = (_scanCount > limit) ? limit : _scanCount;
+  int y = startY + visibleCount * itemH;
   tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
   tft->setTextDatum(MC_DATUM);
   tft->drawString("Manually Enter SSID", SCREEN_WIDTH / 2, y + 15);
@@ -331,7 +336,8 @@ void SetupScreen::handleWiFiScanTouch(int x, int y) {
   // List Selection
   int startY = 50;
   int itemH = 40;
-  for (int i = 0; i < _scanCount && i < 5; i++) {
+  int limit = 4;
+  for (int i = 0; i < _scanCount && i < limit; i++) {
     int itemY = startY + (i * itemH);
     if (y > itemY && y < itemY + 30) {
       _wifiSSID = wifiManager.getSSID(i);
@@ -342,7 +348,8 @@ void SetupScreen::handleWiFiScanTouch(int x, int y) {
     }
   }
   // Manual Entry
-  int manY = startY + (_scanCount > 5 ? 5 : _scanCount) * itemH;
+  int visibleCount = (_scanCount > limit) ? limit : _scanCount;
+  int manY = startY + visibleCount * itemH;
   if (y > manY && y < manY + 30) {
     _wifiSSID = "";
     _wifiPassword = "";
@@ -413,7 +420,7 @@ void SetupScreen::handleWiFiTouch(int x, int y) {
       // Clear Main Area below Header (30px down)
       tft->fillRect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30, COLOR_BG);
 
-      _ui->drawStatusBar(true);
+      // _ui->drawStatusBar(true); // Removed to prevent overlap
       tft->setTextColor(TFT_WHITE, COLOR_BG);
       tft->setTextDatum(MC_DATUM);
       tft->drawString("CONNECTING...", SCREEN_WIDTH / 2, 120);

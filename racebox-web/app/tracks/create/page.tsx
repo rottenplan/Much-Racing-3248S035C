@@ -76,8 +76,12 @@ export default function CreateTrack() {
       phone,
       postCode,
       city,
-      startLineWidth,
-      startLineBearing,
+      startLine: {
+        lat: trackPoints[0].lat,
+        lng: trackPoints[0].lng,
+        bearing: startLineBearing,
+        width: startLineWidth
+      },
       points: trackPoints,
       createdAt: new Date().toISOString(),
     };

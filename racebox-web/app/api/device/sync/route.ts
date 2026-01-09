@@ -56,6 +56,32 @@ export async function GET(request: Request) {
             );
         }
 
+        // --- UPDATE STATUS FROM QUERY PARAMS ---
+        const { searchParams } = new URL(request.url);
+        const storageUsed = searchParams.get('storage_used');
+        const storageTotal = searchParams.get('storage_total');
+
+        if (storageUsed && storageTotal) {
+            const fs = require('fs');
+            const path = require('path');
+            const statusFilePath = path.join(process.cwd(), 'data', 'status.json');
+
+            // Ensure data dir exists
+            const dataDir = path.join(process.cwd(), 'data');
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+            }
+
+            const statusData = {
+                storage_used: parseInt(storageUsed),
+                storage_total: parseInt(storageTotal),
+                last_sync: new Date().toISOString()
+            };
+
+            fs.writeFileSync(statusFilePath, JSON.stringify(statusData, null, 2));
+            console.log('Device status updated:', statusData);
+        }
+
         // Return user's device settings and track selection
         return NextResponse.json({
             success: true,

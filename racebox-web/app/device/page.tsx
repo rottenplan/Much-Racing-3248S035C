@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { Wifi, Upload, Download, Settings, HardDrive, Cpu, Globe, Gauge, Save } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const countries = [
-  'Argentina', 'Australia', 'Austria', 'Belgium', 'Brazil', 'Canada', 'Chile', 'China', 
-  'Colombia', 'Czech Republic', 'Denmark', 'Finland', 'France', 'Germany', 'Greece', 
+  'Argentina', 'Australia', 'Austria', 'Belgium', 'Brazil', 'Canada', 'Chile', 'China',
+  'Colombia', 'Czech Republic', 'Denmark', 'Finland', 'France', 'Germany', 'Greece',
   'Hong Kong', 'Hungary', 'India', 'Indonesia', 'Ireland', 'Italy', 'Japan', 'Malaysia',
   'Mexico', 'Netherlands', 'New Zealand', 'Norway', 'Philippines', 'Poland', 'Portugal',
   'Russia', 'Singapore', 'South Africa', 'South Korea', 'Spain', 'Sweden', 'Switzerland',
@@ -21,6 +21,24 @@ export default function DevicePage() {
   const [gnss, setGnss] = useState('gps');
   const [contrast, setContrast] = useState(50);
   const [powerSave, setPowerSave] = useState(5);
+
+  // Storage Stats
+  const [storageStats, setStorageStats] = useState({ used: 0, total: 0 });
+
+  useEffect(() => {
+    // Fetch real device status
+    fetch('/api/device/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.storage_used === 'number') {
+          setStorageStats({
+            used: data.storage_used,
+            total: data.storage_total
+          });
+        }
+      })
+      .catch(err => console.error('Failed to fetch stats:', err));
+  }, []);
 
   const toggleCountry = (country: string) => {
     setSelectedCountries(prev =>
@@ -38,9 +56,9 @@ export default function DevicePage() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-12 h-12 relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Much Racing Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Much Racing Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -84,10 +102,15 @@ export default function DevicePage() {
                 <HardDrive className="w-5 h-5 mr-2" />
                 Storage Usage
               </span>
-              <span className="text-white font-semibold">7 MB / 31,992 MB</span>
+              <span className="text-white font-semibold">
+                {storageStats.used} MB / {storageStats.total > 0 ? storageStats.total : '---'} MB
+              </span>
             </div>
             <div className="w-full bg-slate-900 rounded-full h-3">
-              <div className="bg-gradient-to-r from-orange-500 to-red-600 h-3 rounded-full" style={{ width: '0.02%' }}></div>
+              <div
+                className="bg-gradient-to-r from-orange-500 to-red-600 h-3 rounded-full"
+                style={{ width: `${storageStats.total > 0 ? (storageStats.used / storageStats.total) * 100 : 0}%` }}
+              ></div>
             </div>
           </div>
 
@@ -252,7 +275,7 @@ export default function DevicePage() {
             Global Track Database
           </h2>
           <p className="text-slate-400 mb-6">
-            Select countries to load track maps onto your device. 
+            Select countries to load track maps onto your device.
             <span className="text-orange-400"> Note: More countries = longer track detection time.</span>
           </p>
 

@@ -75,10 +75,20 @@ bool SyncManager::downloadAndApplySettings(const char *apiUrl,
                                            const char *authHeader) {
   HTTPClient http;
 
-  Serial.print("Sync: Connecting to ");
-  Serial.println(apiUrl);
+  // Append Status Query Params
+  uint64_t totalBytes = SD.totalBytes();
+  uint64_t usedBytes = SD.usedBytes();
+  // Convert to MB
+  int totalMB = (int)(totalBytes / (1024 * 1024));
+  int usedMB = (int)(usedBytes / (1024 * 1024));
 
-  http.begin(apiUrl);
+  String url = String(apiUrl) + "?storage_used=" + String(usedMB) +
+               "&storage_total=" + String(totalMB);
+
+  Serial.print("Sync: Connecting to ");
+  Serial.println(url);
+
+  http.begin(url);
   http.addHeader("Authorization", authHeader);
 
   int httpCode = http.GET();
