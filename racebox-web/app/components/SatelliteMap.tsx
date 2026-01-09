@@ -89,7 +89,7 @@ export default function SatelliteMap() {
                 )}
                 {!connected && isOnline && (
                     <div className="absolute top-12 left-1/2 transform -translate-x-1/2 z-[9999] bg-orange-600/90 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg backdrop-blur">
-                        📡 Connecting to RaceBox ({ip})...
+                        📡 Connecting to Device ({ip})...
                     </div>
                 )}
 
