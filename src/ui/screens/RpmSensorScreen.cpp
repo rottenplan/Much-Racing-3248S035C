@@ -39,8 +39,10 @@ void RpmSensorScreen::onShow() {
 
   // Setup Interrupt for Inductive Clamp
   // GPIO 35 is Input Only.
-  pinMode(PIN_RPM_INPUT, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+  if (PIN_RPM_INPUT >= 0) {
+    pinMode(PIN_RPM_INPUT, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+  }
 
   // Clear graph history
   for (int i = 0; i < GRAPH_WIDTH; i++) {
@@ -61,7 +63,9 @@ void RpmSensorScreen::update() {
   // 1. Back Button
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
-    detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup
+    if (PIN_RPM_INPUT >= 0) {
+      detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup
+    }
     _ui->switchScreen(SCREEN_MENU);
     return;
   }

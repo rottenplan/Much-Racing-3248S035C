@@ -36,8 +36,10 @@ void SpeedometerScreen::onShow() {
   // SETUP RPM SENSOR
   _rpmPulses = 0;
   _lastRpmCalcTime = millis();
-  pinMode(PIN_RPM_INPUT, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+  if (PIN_RPM_INPUT >= 0) {
+    pinMode(PIN_RPM_INPUT, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+  }
 
   drawDashboard(true);
 }
@@ -46,7 +48,9 @@ void SpeedometerScreen::update() {
   // 1. Tombol Kembali
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
-    detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR
+    if (PIN_RPM_INPUT >= 0) {
+      detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR
+    }
     _ui->switchScreen(SCREEN_MENU);
     return;
   }

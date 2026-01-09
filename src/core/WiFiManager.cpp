@@ -67,7 +67,9 @@ void WiFiManager::update() {
 void WiFiManager::handleRoot() { _server.send(200, "text/html", INDEX_HTML); }
 
 void WiFiManager::handleApiLive() {
+  // Serial.println("API Live: Request Received"); // Debug spam
   if (!_gps) {
+    Serial.println("API Live: Error - No GPS Linked!");
     _server.send(500, "application/json",
                  "{\"error\":\"No GPS Manager Linked\"}");
     return;

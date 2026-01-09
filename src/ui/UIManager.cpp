@@ -22,6 +22,7 @@ extern WiFiManager wifiManager;
 #include "screens/TimeSettingScreen.h"
 #include "screens/TimeSettingScreen.h" // Removed duplicate as per
 // instruction #include "screens/AutoOffScreen.h"
+#include "screens/GnssLogScreen.h"
 #include "screens/RpmSensorScreen.h"
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
@@ -52,6 +53,7 @@ void UIManager::begin() {
   _speedometerScreen = new SpeedometerScreen();
   _gpsStatusScreen = new GpsStatusScreen();
   _synchronizeScreen = new SynchronizeScreen();
+  _gnssLogScreen = new GnssLogScreen();
 
   // Mulai Layar
   _splashScreen->begin(this);
@@ -67,6 +69,7 @@ void UIManager::begin() {
   _speedometerScreen->begin(this);
   _gpsStatusScreen->begin(this);
   _synchronizeScreen->begin(this);
+  _gnssLogScreen->begin(this);
 
   // Initialize Sleep Logic (Standardized with power_save)
   Preferences prefs;
@@ -278,6 +281,10 @@ void UIManager::switchScreen(ScreenType type) {
     _currentScreen = _synchronizeScreen;
     _screenTitle = ""; // Let screen handle title or default
     break;
+  case SCREEN_GNSS_LOG:
+    _currentScreen = _gnssLogScreen;
+    _screenTitle = "GNSS LOG";
+    break;
   }
 
   if (_currentScreen) {
@@ -320,11 +327,38 @@ void UIManager::drawStatusBar(bool force) {
   _tft->setTextSize(FONT_SIZE_STATUS_BAR);
   _tft->setTextColor(COLOR_TEXT, COLOR_BG);
 
-  // --- Bagian GPS ---
+  // --- WiFi Section (Left: x=5) ---
+  int wifiStatus = wifiManager.isConnected() ? 1 : 0;
+  if (force || wifiStatus != _lastWifiStatus) {
+    // Clear WiFi Area (0 to 30)
+    _tft->fillRect(0, 0, 30, 20, COLOR_BG);
+
+    uint16_t color = (wifiStatus == 1) ? TFT_GREEN : TFT_RED;
+    int wx = 12; // Centered at 12
+    int wy = 17;
+
+    // WiFi Icon
+    _tft->fillCircle(wx, wy - 1, 1, color);
+    _tft->drawFastHLine(wx - 1, wy - 4, 3, color);
+    _tft->drawPixel(wx - 2, wy - 3, color);
+    _tft->drawPixel(wx + 2, wy - 3, color);
+    _tft->drawFastHLine(wx - 3, wy - 7, 7, color);
+    _tft->drawPixel(wx - 4, wy - 6, color);
+    _tft->drawPixel(wx + 4, wy - 6, color);
+    _tft->drawPixel(wx - 5, wy - 5, color);
+    _tft->drawPixel(wx + 5, wy - 5, color);
+    _tft->drawFastHLine(wx - 5, wy - 10, 11, color);
+    _tft->drawPixel(wx - 6, wy - 9, color);
+    _tft->drawPixel(wx + 6, wy - 9, color);
+    _tft->drawPixel(wx - 7, wy - 8, color);
+    _tft->drawPixel(wx + 7, wy - 8, color);
+
+    _lastWifiStatus = wifiStatus;
+  }
+
+  // --- GPS Section (Right of WiFi: x=30+) ---
   double hdop = gpsManager.getHDOP();
   bool fix = gpsManager.isFixed();
-
-  // Logika untuk menghitung kekuatan
   int signalStrength = 0;
   if (fix) {
     if (hdop <= 0.8)
@@ -337,19 +371,16 @@ void UIManager::drawStatusBar(bool force) {
       signalStrength = 1;
   }
 
-  // Gambar ulang Ikon GPS hanya jika status berubah (Status perbaikan atau
-  // Kekuatan)
-  if (force || fix != _lastFix || signalStrength != _lastSignalStrength) {
-    // Hapus Area GPS
-    _tft->fillRect(0, 0, 80, 20, COLOR_BG);
+  int sats = gpsManager.getSatellites();
+  static int _lastSats = -1;
+  if (force || fix != _lastFix || signalStrength != _lastSignalStrength ||
+      sats != _lastSats) {
+    _lastSats = sats;
+    // Clear GPS Area (30 to 100)
+    _tft->fillRect(30, 0, 70, 20, COLOR_BG);
 
-    // Gambar Label "GPS"
-    _tft->setTextDatum(ML_DATUM);
-    _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    _tft->setTextSize(1);
-    _tft->drawString("GPS", 5, 10); // Centered at 10
-
-    int barX = 30;
+    // 1. Draw Signal Bars (Left of Text)
+    int barX = 35; // Start bars immediately after WiFi
     int barY = 16;
     int barW = 3;
     int barGap = 2;
@@ -366,75 +397,37 @@ void UIManager::drawStatusBar(bool force) {
         _tft->drawRect(x, y, barW, h, COLOR_TEXT);
       }
     }
+
+    // 2. Draw Label "SAT: XX" (Right of Bars)
+    _tft->setTextDatum(ML_DATUM);
+    _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    _tft->setTextSize(1);
+
+    String satStr = "SAT:" + String(sats);
+    // Bars end approx at 35 + (4*5) = 55
+    _tft->drawString(satStr, 60, 10); // Start text at 60
+
     _lastFix = fix;
     _lastSignalStrength = signalStrength;
   }
 
-  // --- WiFi Section ---
-  int wifiStatus = wifiManager.isConnected() ? 1 : 0;
-  if (force || wifiStatus != _lastWifiStatus) {
-    // Clear WiFi Area (60 to 80)
-    _tft->fillRect(60, 0, 20, 20, COLOR_BG);
-
-    uint16_t color = (wifiStatus == 1) ? TFT_GREEN : TFT_RED;
-    int wx = 70;
-    int wy = 17;
-
-    // WiFi Icon (Refined Pixel Art to match user image)
-    // Bottom Dot
-    _tft->fillCircle(wx, wy - 1, 1, color);
-
-    // Arc 1 (Small)
-    _tft->drawFastHLine(wx - 1, wy - 4, 3, color);
-    _tft->drawPixel(wx - 2, wy - 3, color);
-    _tft->drawPixel(wx + 2, wy - 3, color);
-
-    // Arc 2 (Medium)
-    _tft->drawFastHLine(wx - 3, wy - 7, 7, color);
-    _tft->drawPixel(wx - 4, wy - 6, color);
-    _tft->drawPixel(wx + 4, wy - 6, color);
-    _tft->drawPixel(wx - 5, wy - 5, color);
-    _tft->drawPixel(wx + 5, wy - 5, color);
-
-    // Arc 3 (Large/Top)
-    _tft->drawFastHLine(wx - 5, wy - 10, 11, color);
-    _tft->drawPixel(wx - 6, wy - 9, color);
-    _tft->drawPixel(wx + 6, wy - 9, color);
-    _tft->drawPixel(wx - 7, wy - 8, color);
-    _tft->drawPixel(wx + 7, wy - 8, color);
-
-    _lastWifiStatus = wifiStatus;
-  }
-
   // --- Bagian Waktu / Judul ---
-  // Jika _screenTitle diatur, tampilkan. Jika tidak tampilkan Waktu Manual.
   String centerText;
   if (_screenTitle.length() > 0) {
     centerText = _screenTitle;
   } else {
-    // Manual/GPS Time Format HH:MM
     char buf[16];
-    // Need to access the h/m vars from earlier.
-    // Re-fetching to be safe or define them in broader scope?
-    // They are local to drawStatusBar but wrapped in if blocks? No.
-    // Refetching is cheap.
-
     sprintf(buf, "%02d:%02d", h, m);
     centerText = String(buf);
   }
 
-  if (force || centerText != _lastTimeStr) { // Menggunakan kembali _lastTimeStr
-                                             // untuk cache teks tengah
-    // Hapus Area Waktu / Judul (Tengah)
-    // Diasumsikan lebar maksimal 160px (menyisakan 80px di setiap sisi)
+  if (force || centerText != _lastTimeStr) {
     int areaW = 160;
-
     _tft->setTextPadding(areaW);
-    _tft->setTextDatum(MC_DATUM); // Middle Center
+    _tft->setTextDatum(MC_DATUM);
     _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    _tft->drawString(centerText, SCREEN_WIDTH / 2, 10); // Y=10 Centered
+    _tft->drawString(centerText, SCREEN_WIDTH / 2, 10);
     _tft->setTextPadding(0);
-
     _lastTimeStr = centerText;
   }
 

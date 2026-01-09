@@ -5,26 +5,43 @@
 #include <Preferences.h>
 
 void GPSManager::begin() {
-#if defined(PIN_GPS_RX) && defined(PIN_GPS_TX)
-  // Gunakan Serial2 untuk GPS
-  _gpsSerial = &Serial2;
-  _gpsSerial->begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
-#else
-  // GPS Dinonaktifkan karena konflik pin
-  _gpsSerial = NULL;
-#endif
-
   Preferences prefs;
-  prefs.begin("laptimer", true);
-  _totalDistance = prefs.getDouble("total_trip", 0.0);
+  prefs.begin("laptimer", true); // Read-only first
 
   // Load Config
-  _currentGnssMode = prefs.getInt("gnss_mode", 1); // Default Mode 1
-  _currentDynModel =
-      prefs.getInt("gnss_model", 3);           // Default Auto (User Index 3)
-  _currentSBAS = prefs.getInt("gnss_sbas", 0); // Default EGNOS
-  _projectionEnabled = prefs.getBool("gnss_proj", true); // Default Enabled
-  _utcOffset = prefs.getInt("utc_offset", 0);            // Default UTC+0
+  _rxPin = prefs.getInt("gps_rx_pin", PIN_GPS_RX);
+  _txPin = prefs.getInt("gps_tx_pin", PIN_GPS_TX);
+  _baudRate = prefs.getInt("gps_baud", GPS_BAUD);
+
+  // Load Other Config
+  _totalDistance = prefs.getDouble("total_trip", 0.0);
+  _currentGnssMode = prefs.getInt("gnss_mode", 1);
+  _currentDynModel = prefs.getInt("gnss_model", 3);
+  _currentSBAS = prefs.getInt("gnss_sbas", 0);
+  _projectionEnabled = prefs.getBool("gnss_proj", true);
+  _utcOffset = prefs.getInt("utc_offset", 0);
+
+  prefs.end();
+
+  // Gunakan Serial2 untuk GPS
+  _gpsSerial = &Serial2;
+  // Use loaded pins (will be defaults before prefs load, but better to load
+  // prefs first? Actually prefs load happens after this line in original code.
+  // Let's move Serial initialization AFTER prefs load or use defaults first and
+  // then restart? Safest is to rely on setPins if we want to change it, but for
+  // startup let's just use macros until we move prefs load up.
+
+  // Wait, I can't move prefs load up easily without refactoring.
+  // Instead, let's just initialize with macros, and then rely on the fact that
+  // if we change it, setPins will handle it. BUT user wants it to stick.
+
+  // Correct approach: Move prefs loading of pins before Serial2.begin.
+  // However, local prefs object is created at line 12.
+  // I will just modify begin() structure in next step if needed.
+  // For now, let's keep it using member variables which are initialized to
+  // defaults in header.
+  _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
+
   // Apply Config (if GPS active)
   if (_gpsSerial) {
     delay(100); // Wait for GPS boot
@@ -32,8 +49,6 @@ void GPSManager::begin() {
     setDynamicModel(_currentDynModel);
     setSBASConfig(_currentSBAS);
   }
-
-  prefs.end();
 
   // Initialize SD Card for Redundancy
   SPI.begin(PIN_SD_SCLK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
@@ -58,7 +73,14 @@ void GPSManager::update() {
   if (!_gpsSerial)
     return;
   while (_gpsSerial->available() > 0) {
-    _gps.encode(_gpsSerial->read());
+    uint8_t c = _gpsSerial->read();
+
+    // Invoke debug callback if set
+    if (_dataCallback) {
+      _dataCallback(c);
+    }
+
+    _gps.encode(c);
   }
 
   // --- SYSTEM TIME REDUNDANCY ---
@@ -539,4 +561,57 @@ void GPSManager::setProjection(bool enabled) {
   prefs.begin("laptimer", false);
   prefs.putBool("gnss_proj", enabled);
   prefs.end();
+}
+
+void GPSManager::setPins(int rx, int tx) {
+  if (_rxPin == rx && _txPin == tx)
+    return;
+
+  _rxPin = rx;
+  _txPin = tx;
+
+  // Save to prefs
+  Preferences prefs;
+  prefs.begin("laptimer", false);
+  prefs.putInt("gps_rx_pin", _rxPin);
+  prefs.putInt("gps_tx_pin", _txPin);
+  prefs.end();
+
+  // Restart Serial
+  if (_gpsSerial) {
+    _gpsSerial->end();
+    delay(100);
+    _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
+
+    // Re-apply config as module might have power cycled?
+    // Actually ESP32 UART reset doesn't reset the GPS module itself,
+    // but just in case we need to re-init communication.
+    delay(100);
+    setGnssMode(_currentGnssMode);
+    setDynamicModel(_currentDynModel);
+    setSBASConfig(_currentSBAS);
+  }
+}
+
+void GPSManager::setBaud(int baud) {
+  if (_baudRate == baud)
+    return;
+  _baudRate = baud;
+
+  Preferences prefs;
+  prefs.begin("laptimer", false);
+  prefs.putInt("gps_baud", _baudRate);
+  prefs.end();
+
+  // Restart Serial
+  if (_gpsSerial) {
+    _gpsSerial->end();
+    delay(100);
+    _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
+    delay(100);
+    // Re-apply config
+    setGnssMode(_currentGnssMode);
+    setDynamicModel(_currentDynModel);
+    setSBASConfig(_currentSBAS);
+  }
 }

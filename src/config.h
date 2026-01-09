@@ -37,18 +37,20 @@
 #define PIN_SD_MISO 19
 
 // Peripherals
-#define PIN_RGB_RED 4
-#define PIN_RGB_GREEN 16
-#define PIN_RGB_BLUE 17
-#define PIN_LIGHT_SENSOR 34
-#define PIN_SPEAKER 26
-#define PIN_RPM_INPUT                                                          \
-  35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
+// Peripherals
+//#define PIN_RGB_RED 4
+// #define PIN_RGB_GREEN 16 // Disabled: Used for GPS_TX
+// #define PIN_RGB_BLUE 17  // Disabled: Used for GPS_RX
+// #define PIN_LIGHT_SENSOR 34
+// #define PIN_SPEAKER 26
+#define PIN_RPM_INPUT 35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
 
-// Legacy / Conflicting Pins (Disabled)
-// #define PIN_GPS_RX 16 // CONFLICT with RGB Green
-// #define PIN_GPS_TX 17 // CONFLICT with RGB Blue
-// #define PIN_BATTERY 34 // CONFLICT with Light Sensor
+// GPS / UART
+// Standard Serial Pins (Conflict with USB Debugging!)
+#define PIN_GPS_RX 3
+#define PIN_GPS_TX 1
+#define GPS_BAUD 9600
+#define PIN_BATTERY 34 // CONFLICT with Light Sensor
 #define BATTERY_VOLTAGE_MAX 4.2
 #define BATTERY_VOLTAGE_MIN 3.0
 

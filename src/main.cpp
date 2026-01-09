@@ -24,10 +24,13 @@ SyncManager syncManager;
 // SPIClass touchSpi = SPIClass(HSPI); // Tidak diperlukan untuk I2C
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("Starting RaceBox Clone...");
+  // Serial.begin(115200); // Disabled to allow GPS on Pins 1 & 3
+  // Serial.println("Starting RaceBox Clone...");
 
   // Inisialisasi Pin
+  // Force Backlight OFF immediately to prevent startup glitches
+  pinMode(PIN_TFT_BL, OUTPUT);
+  digitalWrite(PIN_TFT_BL, LOW);
 
   // Inisialisasi UI (TFT)
   tft.init();
@@ -62,6 +65,7 @@ void setup() {
 
   // Bersihkan layar sebelum menyalakan backlight
   tft.fillScreen(TFT_BLACK);
+  delay(100); // Ensure black frame is rendered
 
   // Nyalakan Backlight
   ledcWrite(0, 255);

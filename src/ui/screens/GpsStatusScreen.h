@@ -13,13 +13,18 @@ private:
   UIManager *_ui;
   void drawStatus();
 
-  // Cache for optimized redraw
+  // Trackers
   int _lastSats = -1;
-  double _lastHdop = -1.0;
   int _lastHz = -1;
-  double _lastLat = 0.0;
-  double _lastLng = 0.0;
+  double _lastHdop = -1.0;
+  double _lastLat = 0;
+  double _lastLng = 0;
+  double _lastHdopValue = -1.0;
   bool _lastFixed = false;
+
+  // Double Tap Logic
+  unsigned long _lastTapTime = 0;
+  bool _waitingForDoubleTap = false;
 };
 
 #endif

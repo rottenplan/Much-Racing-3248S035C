@@ -90,6 +90,8 @@ void SettingsScreen::loadSettings() {
 
     // GPS Status Sub-menu REMOVED
     // _settings.push_back({"GPS STATUS", TYPE_ACTION});
+    // _settings.push_back({"GNSS LOG", TYPE_ACTION}); // Moved to GPS Status
+    // Double Tap
     _settings.push_back({"GNSS FINE TUNING", TYPE_ACTION});
 
     // SD Card Test Sub-menu
@@ -226,6 +228,52 @@ void SettingsScreen::loadSettings() {
     sbas.currentOptionIdx = _prefs.getInt("gnss_sbas", 0);
     _settings.push_back(sbas);
 
+    // 6. GNSS RX PIN
+    SettingItem rxPin = {"GNSS RX PIN", TYPE_VALUE, "gps_rx_pin"};
+    // Options: 17, 16, 1, 3
+    rxPin.options = {"17 (Def)", "16", "1 (TX0)", "3 (RX0)"};
+
+    extern GPSManager gpsManager;
+    int curRx = gpsManager.getRxPin();
+    rxPin.currentOptionIdx = 0; // Default 17
+    int validRxCheck[] = {17, 16, 1, 3};
+    for (int i = 0; i < 4; i++) {
+      if (validRxCheck[i] == curRx) {
+        rxPin.currentOptionIdx = i;
+        break;
+      }
+    }
+    _settings.push_back(rxPin);
+
+    // 7. GNSS TX PIN
+    SettingItem txPin = {"GNSS TX PIN", TYPE_VALUE, "gps_tx_pin"};
+    txPin.options = {"17 (Def)", "16", "1 (TX0)", "3 (RX0)"};
+    int curTx = gpsManager.getTxPin();
+    txPin.currentOptionIdx = 0; // Default 17
+    int validTxCheck[] = {17, 16, 1, 3};
+    for (int i = 0; i < 4; i++) {
+      if (validTxCheck[i] == curTx) {
+        txPin.currentOptionIdx = i;
+        break;
+      }
+    }
+    _settings.push_back(txPin);
+
+    // 8. GNSS BAUD RATE
+    SettingItem baud = {"GNSS BAUD RATE", TYPE_VALUE, "gps_baud"};
+    baud.options = {"9600 bps", "19200 bps", "38400 bps", "57600 bps",
+                    "115200 bps"};
+    int curBaud = gpsManager.getBaud();
+    baud.currentOptionIdx = 0; // Default 9600
+    int validBauds[] = {9600, 19200, 38400, 57600, 115200};
+    for (int i = 0; i < 5; i++) {
+      if (validBauds[i] == curBaud) {
+        baud.currentOptionIdx = i;
+        break;
+      }
+    }
+    _settings.push_back(baud);
+
     _prefs.end();
   }
 }
@@ -296,6 +344,35 @@ void SettingsScreen::saveSetting(int idx) {
         gpsManager.setFrequencyLimit(10);
       else
         gpsManager.setGnssMode(_prefs.getInt("gnss_mode", 1)); // Re-apply max
+    }
+
+    if (item.key == "gps_rx_pin" || item.key == "gps_tx_pin") {
+      // Map index to pin value
+      int validRxCheck[] = {17, 16, 1, 3};
+      int validTxCheck[] = {17, 16, 1, 3};
+
+      // Get fresh pin values from other settings if just changing one
+      int newRx = gpsManager.getRxPin();
+      int newTx = gpsManager.getTxPin();
+
+      if (item.key == "gps_rx_pin") {
+        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 4)
+          newRx = validRxCheck[item.currentOptionIdx];
+      }
+      if (item.key == "gps_tx_pin") {
+        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 4)
+          newTx = validTxCheck[item.currentOptionIdx];
+      }
+
+      // Apply new pins
+      gpsManager.setPins(newRx, newTx);
+    }
+
+    if (item.key == "gps_baud") {
+      int validBauds[] = {9600, 19200, 38400, 57600, 115200};
+      if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 5) {
+        gpsManager.setBaud(validBauds[item.currentOptionIdx]);
+      }
     }
 
   } else if (item.type == TYPE_TOGGLE) {

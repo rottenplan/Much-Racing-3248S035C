@@ -20,7 +20,8 @@ enum ScreenType {
   SCREEN_RPM_SENSOR,
   SCREEN_SPEEDOMETER,
   SCREEN_GPS_STATUS,
-  SCREEN_SYNCHRONIZE
+  SCREEN_SYNCHRONIZE,
+  SCREEN_GNSS_LOG
 };
 
 class UserScreen {
@@ -83,6 +84,7 @@ private:
   UserScreen *_speedometerScreen;
   UserScreen *_gpsStatusScreen;
   UserScreen *_synchronizeScreen;
+  UserScreen *_gnssLogScreen;
 
   String _screenTitle; // Added title
 

@@ -50,6 +50,20 @@ public:
   void setUtcOffset(int offset); // Hours
   int getUtcOffset() { return _utcOffset; }
 
+  // Pin Configuration
+  void setPins(int rx, int tx);
+  int getRxPin() { return _rxPin; }
+  int getTxPin() { return _txPin; }
+
+  // Baud Rate Config
+  void setBaud(int baud);
+  int getBaud() { return _baudRate; }
+
+  // Debugging / Logging
+  // Callback signature: void(uint8_t c)
+  typedef std::function<void(uint8_t)> RawDataCallback;
+  void setRawDataCallback(RawDataCallback cb) { _dataCallback = cb; }
+
   // Utilities
   double distanceBetween(double lat1, double long1, double lat2, double long2);
   void getLocalTime(int &h, int &m, int &s, int &d, int &mo, int &y);
@@ -58,6 +72,13 @@ private:
   TinyGPSPlus _gps;
   HardwareSerial *_gpsSerial;
   void sendUBX(const uint8_t *cmd, int len);
+
+  RawDataCallback _dataCallback = nullptr;
+
+  // Pin Config
+  int _rxPin = PIN_GPS_RX; // Default from config.h
+  int _txPin = PIN_GPS_TX;
+  int _baudRate = GPS_BAUD; // Default 9600
 
   double _totalDistance = 0.0;
   double _lastLat = 0.0;

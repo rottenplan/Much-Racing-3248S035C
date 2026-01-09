@@ -28,6 +28,9 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div id="offline" class="offline-warning">No Internet - Map Tiles May Missing</div>
+  <div style="background:#000; padding:5px; text-align:center; font-size:12px; color:#888;">
+    Status: <span id="connection-status" style="color:yellow;">Connecting...</span>
+  </div>
   <div id="map"></div>
   <div id="stats">
     <div class="card">
@@ -49,30 +52,51 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </div>
 
   <script>
-    var map = L.map('map').setView([0, 0], 15);
-    
-    // Satelite View Layer (Esri WorldImagery)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri'
-    }).addTo(map);
-
-    var marker = L.marker([0, 0]).addTo(map);
+    var map = null;
+    var marker = null;
     var firstFix = false;
+
+    // 1. Initialize Map safely (It might fail if CDN is unreachable)
+    if (typeof L !== 'undefined') {
+      try {
+        map = L.map('map').setView([0, 0], 15);
+        
+        // Satelite View Layer
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        marker = L.marker([0, 0]).addTo(map);
+      } catch (e) {
+        console.error("Map Init Failed:", e);
+        document.getElementById('map').innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#888;">Map Unavailable (Offline)</div>';
+      }
+    } else {
+       console.log("Leaflet library not loaded (Offline mode)");
+       document.getElementById('map').innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#888;">Map Unavailable (No Internet for CDN)</div>';
+       document.getElementById('offline').style.display = 'block';
+    }
 
     // Check online status for map tiles
     if (!navigator.onLine) document.getElementById('offline').style.display = 'block';
 
     function updateStats() {
       fetch('/api/live')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+        })
         .then(data => {
+          document.getElementById('connection-status').innerText = "Connected (Live)";
+          document.getElementById('connection-status').style.color = "#04DF00"; // Green
+          
           document.getElementById('speed').innerText = Math.round(data.speed);
           document.getElementById('rpm').innerText = data.rpm;
           document.getElementById('trip').innerText = data.trip.toFixed(0).padStart(4, '0');
           document.getElementById('sats').innerText = data.sats;
 
-          // Map Update
-          if (data.lat != 0 && data.lng != 0) {
+          // Map Update (Only if Map exists)
+          if (map && marker && data.lat != 0 && data.lng != 0) {
             var newLatLng = new L.LatLng(data.lat, data.lng);
             marker.setLatLng(newLatLng);
             
@@ -83,9 +107,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             }
           }
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+            console.error(err);
+            document.getElementById('connection-status').innerText = "Err: " + err.message;
+            document.getElementById('connection-status').style.color = "red";
+        });
     }
 
+    // Start Loop regardless of map status
     setInterval(updateStats, 500); // 2Hz Update
   </script>
 </body>
