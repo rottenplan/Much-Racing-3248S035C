@@ -212,6 +212,11 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextSize(2);
     tft->setTextDatum(MC_DATUM);
     tft->drawString("SPEED", 160, 39 + offTop + 10);
+
+    // Requested Titles "RPM" (Left) and "MAX" (Right)
+    tft->drawString("RPM", 60, 39 + offTop + 10);
+    tft->drawString("MAX", 260, 39 + offTop + 10);
+
     tft->setTextDatum(TL_DATUM);
 
     // --- 2. ANGKA KECEPATAN BESAR ---

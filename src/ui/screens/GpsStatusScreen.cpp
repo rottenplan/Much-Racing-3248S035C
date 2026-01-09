@@ -46,46 +46,63 @@ void GpsStatusScreen::drawStatus() {
   double lat = gpsManager.getLatitude();
   double lng = gpsManager.getLongitude();
 
-  // --- 1. Date/Time (White Text on Black) ---
+  // --- 1. Date/Time (Highlighted in Middle) ---
   int h, m, s, d, mo, y;
   gpsManager.getLocalTime(h, m, s, d, mo, y);
 
-  // We need to update this every second ideally (Use static timer or check
-  // distinct second)
   static unsigned long lastTimeDraw = 0;
   if (millis() - lastTimeDraw > 1000) {
     lastTimeDraw = millis();
 
-    // Clear area (if needed, but text overwrite might work if consistent width)
-    tft->fillRect(0, TOP_OFFSET, 180, 45, TFT_BLACK);
+    // White Box Highlight aligned with Radar (approx Y=105)
+    int yTime = TOP_OFFSET + 80;
 
-    tft->setTextColor(TFT_WHITE, TFT_BLACK);
-    tft->setTextDatum(TL_DATUM);
+    // Prepare Date String to calculate width
     tft->setFreeFont(&Org_01);
     tft->setTextSize(1);
-
     char dateBuf[32];
     sprintf(dateBuf, "%02d/%02d/%04d UTC+07:00", mo, d, y);
-    tft->drawString(dateBuf, 5, TOP_OFFSET + 5);
+    int dateW = tft->textWidth(dateBuf);
 
-    tft->setTextFont(4); // Large Font
-    tft->setTextSize(1);
+    // Check Time Width (Font 4)
+    tft->setTextFont(4);
     char timeBuf[16];
     sprintf(timeBuf, "%02d:%02d:%02d", h, m, s);
-    tft->drawString(timeBuf, 5, TOP_OFFSET + 20);
+    int timeW = tft->textWidth(timeBuf);
+
+    // Calculate Box Width (Max of Date/Time + padding), capped at 170 (Radar
+    // starts at 175)
+    int boxW = (dateW > timeW ? dateW : timeW) + 15;
+    if (boxW > 170)
+      boxW = 170;
+
+    tft->fillRect(0, yTime, boxW, 45, TFT_WHITE);
+
+    tft->setTextColor(TFT_BLACK, TFT_WHITE); // Inverted Text
+    tft->setTextDatum(TL_DATUM);
+
+    // Draw Date
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(1);
+    tft->drawString(dateBuf, 5, yTime + 5);
+
+    // Draw Time
+    tft->setTextFont(4); // Large Font
+    tft->setTextSize(1);
+    tft->drawString(timeBuf, 5, yTime + 20);
   }
 
-  // --- 2. Lat/Lng (White Text on Black) ---
+  // --- 2. Lat/Lng (Moved to Top) ---
   if (abs(lat - _lastLat) > 0.00001 || abs(lng - _lastLng) > 0.00001) {
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->setTextDatum(TL_DATUM);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
 
-    int yLat = TOP_OFFSET + 65;
-    int yLng = TOP_OFFSET + 95;
+    int yLat = TOP_OFFSET + 10;
+    int yLng = TOP_OFFSET + 40;
 
-    // Labels (Simulating the pixel font look)
+    // Labels
     tft->drawString("Lat:", 10, yLat);
     tft->drawString("Lng:", 10, yLng);
 

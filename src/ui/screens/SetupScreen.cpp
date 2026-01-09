@@ -142,7 +142,7 @@ void SetupScreen::drawAccountSetup(bool fullRedraw) {
     tft->drawString("ACCOUNT SETUP", SCREEN_WIDTH / 2, 5);
 
     // Nav Buttons
-    drawButton("SKIP", 5, 2, 45, 20, false);
+    // Skip button removed to enforce registration
     drawButton("NEXT", SCREEN_WIDTH - 55, 2, 50, 20,
                _username.length() > 0 && _password.length() > 0);
   }
@@ -240,7 +240,7 @@ void SetupScreen::drawWiFiScan() {
   tft->drawString("SELECT WIFI NETWORK", SCREEN_WIDTH / 2, 5);
 
   // Nav Buttons
-  drawButton("SKIP", 5, 2, 45, 20, false);
+  // Skip button removed
   drawButton("SCAN", SCREEN_WIDTH - 55, 2, 50, 20, false);
 
   if (_scanCount == 0) {
@@ -321,12 +321,8 @@ void SetupScreen::handleWelcomeTouch(int x, int y) {
 }
 
 void SetupScreen::handleWiFiScanTouch(int x, int y) {
-  // Skip
-  if (y < 40 && x < 60) {
-    _currentStep = STEP_COMPLETE;
-    drawComplete();
-    return;
-  }
+  // Skip logic removed
+
   // Rescan (Top Right)
   if (y < 40 && x > SCREEN_WIDTH - 60) {
     _scanCount = 0;
@@ -512,10 +508,7 @@ void SetupScreen::handleAccountTouch(int x, int y) {
 
   // Nav Buttons
   if (y <= 25) {
-    if (x <= 60) {
-      _username = "";
-      nextStep();
-    }
+    // Skip Logic Removed
     if (x >= SCREEN_WIDTH - 60 && _username.length() > 0)
       nextStep();
   }

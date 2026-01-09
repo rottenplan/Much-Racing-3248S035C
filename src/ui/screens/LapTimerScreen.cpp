@@ -21,8 +21,8 @@ void LapTimerScreen::onShow() {
   _isRecording = false;      // Mulai tidak merekam
   _finishSet = false;
   _lapCount = 0;
-  _state = STATE_TRACK_SELECT; // Mulai di Pilihan Track
-  _raceMode = MODE_BEST;       // Default mode
+  _state = STATE_TRACK_LIST; // Mulai di Pilihan Track
+  _raceMode = MODE_BEST;     // Default mode
   _bestLapTime = 0;
   _lapTimes.clear();
   _listScroll = 0;
@@ -48,8 +48,13 @@ void LapTimerScreen::onShow() {
 
 #include <ArduinoJson.h>
 
+#include <ArduinoJson.h>
+
 void LapTimerScreen::loadTracks() {
   _tracks.clear();
+
+  double curLat = gpsManager.getLatitude();
+  double curLon = gpsManager.getLongitude();
 
   // Load from SD Card if available
   if (SD.exists("/tracks.json")) {
@@ -62,11 +67,19 @@ void LapTimerScreen::loadTracks() {
       if (!error && doc["tracks"].is<JsonArray>()) {
         JsonArray trackArray = doc["tracks"];
         for (JsonVariant t : trackArray) {
+          double tLat = t["lat"].as<double>();
+          double tLon = t["lon"].as<double>();
+
+          // Filter 50km Radius
+          double dist = gpsManager.distanceBetween(curLat, curLon, tLat, tLon);
+          if (dist > 50000)
+            continue;
+
           Track newTrack;
           newTrack.name = t["name"].as<String>();
-          newTrack.lat = t["lat"].as<double>();
-          newTrack.lon = t["lon"].as<double>();
-          // Heading/Width can be added to Track struct later if needed
+          newTrack.lat = tLat;
+          newTrack.lon = tLon;
+          newTrack.isCustom = true; // Loaded from SD
 
           // Configs
           JsonArray configs = t["configs"];
@@ -81,22 +94,42 @@ void LapTimerScreen::loadTracks() {
           _tracks.push_back(newTrack);
         }
         Serial.println("Tracks loaded from SD");
-        return; // Success
-      } else {
-        Serial.print("Failed to parse tracks.json: ");
-        Serial.println(error.c_str());
       }
     }
   }
 
-  // Fallback / Default
+  // Factory Tracks (Hardcoded)
+  // Check dist for them too
   Track sonoma;
-  sonoma.name = "Sonoma";
-  sonoma.lat = 38.1613;
-  sonoma.lon = -122.4561;
+  sonoma.name = "Test Track (Bordeaux)"; // Renamed to match img
+  sonoma.lat = 44.8378;                  // Bordeaux approx
+  sonoma.lon = -0.5792;
+  sonoma.isCustom = false; // Factory
   sonoma.configs.push_back({"Default"});
 
-  _tracks.push_back(sonoma);
+  // Always add test track for DEBUG if no GPS fix or just to see something?
+  // User req: "lists all tracks within a 50 km radius".
+  // If I strictly enforce, I might see nothing in dev.
+  // I will enforce dist check if GPS is fixed.
+  if (gpsManager.isFixed()) {
+    double d =
+        gpsManager.distanceBetween(curLat, curLon, sonoma.lat, sonoma.lon);
+    if (d < 50000)
+      _tracks.push_back(sonoma);
+  } else {
+    // For Debug/Sim without GPS, maybe add it?
+    // User said "If GPS data is unavailable... cannot enter the menu".
+    // So logic in `update` prevents us getting here without GPS.
+    // So here safely assume GPS is fixed.
+    // I'll leave the check enabled.
+    double d =
+        gpsManager.distanceBetween(curLat, curLon, sonoma.lat, sonoma.lon);
+    if (d < 50000)
+      _tracks.push_back(sonoma);
+  }
+
+  // Add a fake "Nearby" one for testing if list is empty?
+  // _tracks.push_back(sonoma); // FORCE ADD FOR UI TESTING (Remove later)
 }
 
 void LapTimerScreen::update() {
@@ -154,13 +187,21 @@ void LapTimerScreen::update() {
 
             // Execute Action
             if (touchedIdx == 0) { // Select Track
-              _selectedTrackIdx = 0;
-              _selectedConfigIdx = -1; // Reset selection
-              _state = STATE_TRACK_SELECT;
-              _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                      SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                      COLOR_BG);
-              drawTrackSelect();
+              if (!gpsManager.isFixed()) {
+                _state = STATE_NO_GPS;
+                _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                        SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                        COLOR_BG);
+                drawNoGPS();
+              } else {
+                // Go to Searching Screen first
+                _state = STATE_SEARCHING;
+                _searchStartTime = millis();
+                _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                        SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                        COLOR_BG);
+                drawSearching();
+              }
             } else if (touchedIdx == 1) { // Race Screen
               _state = STATE_RACING;
               _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
@@ -194,61 +235,196 @@ void LapTimerScreen::update() {
       }
     }
 
-  } else if (_state == STATE_TRACK_SELECT) {
+  } else if (_state == STATE_NO_GPS) {
     if (touched) {
-      // 1. Back Button (< 60x60)
-      if (p.x < 60 && p.y < 60) {
-        if (millis() - _lastTouchTime < 200)
-          return;
-        _lastTouchTime = millis();
+      if (millis() - _lastTouchTime < 200)
+        return;
+      _lastTouchTime = millis();
 
-        if (_selectedConfigIdx == -2) {
-          // Execute Back
+      int btnY = SCREEN_HEIGHT - 60;
+      // Retry (Left) x=20, w=130
+      if (p.y > btnY && p.y < btnY + 40) {
+        if (p.x > 20 && p.x < 150) {
+          // Retry Logic
+          if (gpsManager.isFixed()) {
+            _state = STATE_SEARCHING;
+            _searchStartTime = millis();
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            drawSearching();
+          } else {
+            // Feedback (Redraw to blink)
+            drawNoGPS();
+          }
+        }
+        // Continue (Right) x=170, w=130 -> Back to Menu
+        else if (p.x > 170 && p.x < 300) {
           _state = STATE_MENU;
-          _menuSelectionIdx = -1;
           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                   SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawMenu();
           _ui->drawStatusBar();
-        } else {
-          _selectedConfigIdx = -2;
-          drawTrackSelect();
         }
+      }
+    }
+
+  } else if (_state == STATE_SEARCHING) {
+    // Auto-transition after delay
+    if (millis() - _searchStartTime > 2000) {
+      loadTracks();
+      // If no tracks loaded, maybe stay in searching or show "No Tracks"?
+      // For now, go to List, list handles empty state.
+      _selectedTrackIdx = -1;
+      _state = STATE_TRACK_LIST;
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      drawTrackList();
+    }
+
+  } else if (_state == STATE_TRACK_LIST) {
+    if (touched) {
+      if (millis() - _lastTouchTime < 200)
+        return;
+      _lastTouchTime = millis();
+
+      // 1. Back Arrow (if clicked top left still works, though text changed)
+      // Title is "Nearby Tracks" at x=10. Back behavior?
+      // User didn't specify Back on List, but implied menu access.
+      // Let's keep Back check on left just in case < 60x60
+      if (p.x < 60 && p.y < 60) {
+        _state = STATE_MENU;
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        drawMenu();
+        _ui->drawStatusBar();
         return;
       }
 
-      // 3. Config List Selection
-      int startY = 80;
+      // 2. New Track Button (Top Right)
+      // btnX = SCREEN_WIDTH - 110, Y=22, W=100, H=20
+      if (p.x > SCREEN_WIDTH - 110 && p.y < 50) {
+        // Go to Record Track Screen
+        _state = STATE_RECORD_TRACK;
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        drawRecordTrack();
+        return;
+      }
+
+      // 3. Track Selection (Open Popup)
+      int startY = 60;
       int itemH = 30;
-      if (p.y > startY && p.y < 200) {
-        // Debounce
+      if (p.y > startY) {
+        int idx = (p.y - startY) / itemH;
+        if (idx >= 0 && idx < _tracks.size()) {
+          _selectedTrackIdx = idx;
+          _state = STATE_TRACK_MENU;
+          drawTrackOptionsPopup();
+        }
+      }
+    }
+  } else if (_state == STATE_TRACK_MENU) {
+    if (touched) {
+      if (millis() - _lastTouchTime < 200)
+        return;
+      _lastTouchTime = millis();
+
+      // Popup Coords calculation again
+      int w = 220;
+      int h = 150;
+      int x = (SCREEN_WIDTH - w) / 2;
+      int y = (SCREEN_HEIGHT - h) / 2 + 10;
+
+      // Check if touch inside popup
+      if (p.x > x && p.x < x + w && p.y > y && p.y < y + h) {
+        // Row Check
+        int itemH = 25;
+        int relY = p.y - (y + 10);
+        int idx = relY / itemH;
+
+        if (idx == 0) { // Select
+          Track &t = _tracks[_selectedTrackIdx];
+          _currentTrackName = t.name;
+          _selectedConfigIdx = 0;
+
+          _state = STATE_SUMMARY;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawSummary();
+          _ui->drawStatusBar();
+        } else if (idx == 1) { // Select & Edit
+          // Go to Details Screen
+          _state = STATE_TRACK_DETAILS;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawTrackDetails();
+        } else if (idx == 2) { // Invert
+                               // TODO: Logic
+        } else if (idx == 3) { // Reinit Best Lap
+          if (_selectedTrackIdx >= 0 && _selectedTrackIdx < _tracks.size()) {
+            _tracks[_selectedTrackIdx].bestLap = 0;
+          }
+          // Close Popup
+          _state = STATE_TRACK_LIST;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawTrackList();
+        } else if (idx == 4) { // Remove
+          if (_selectedTrackIdx >= 0 && _selectedTrackIdx < _tracks.size()) {
+            if (_tracks[_selectedTrackIdx].isCustom) {
+              _tracks.erase(_tracks.begin() + _selectedTrackIdx);
+            }
+          }
+          _state = STATE_TRACK_LIST;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawTrackList();
+        }
+      } else {
+        // Click Outside -> Close Popup
+        _state = STATE_TRACK_LIST;
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        drawTrackList();
+      }
+    }
+  } else if (_state == STATE_TRACK_DETAILS) {
+    if (touched) {
+      // Back Button logic in Details screen
+      if (p.x < 60 && p.y < 60) {
         if (millis() - _lastTouchTime < 200)
           return;
         _lastTouchTime = millis();
-
-        int idx = (p.y - startY) / itemH;
-        if (_selectedTrackIdx < _tracks.size()) {
-          Track &t = _tracks[_selectedTrackIdx];
-          if (idx >= 0 && idx < t.configs.size()) {
-            // Double Tap Logic
-            if (idx == _selectedConfigIdx) {
-              // Second Tap: Execute
-              _currentTrackName = t.name;
-              _state = STATE_SUMMARY;
-              _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                      SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                      COLOR_BG);
-              drawSummary();
-              _ui->drawStatusBar();
-            } else {
-              // First Tap: Select/Highlight
-              _selectedConfigIdx = idx;
-              drawTrackSelect();
-            }
-            return;
-          }
-        }
+        // Back from details -> List (not Menu)
+        _state = STATE_TRACK_LIST;
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        drawTrackList();
+        return;
       }
+
+      // Select button in details screen?
+      // Reuse existing logic or simplify since user moved options to Popup
+      // User said "Select & Edit: View...and reposition".
+      // So Details screen likely needs "Start/Finish" edit mode.
+      // For now, I leave the old Details screen logic but only reachable via
+      // "Select & Edit".
+
+      // Let's allow the "left menu" in Details to still function or remove it?
+      // "Select" button there is redundant but harmless.
+      // I'll leave the existing `else if (_state == STATE_TRACK_DETAILS)` block
+      // structure but I need to make sure I didn't overwrite it with my
+      // replacement. Ah, I am replacing `STATE_TRACK_LIST` and
+      // `STATE_TRACK_DETAILS` input logic here.
+
+      // Wait, `STATE_TRACK_DETAILS` logic below needs to be preserved or
+      // re-added. The snippet I'm replacing covers `STATE_TRACK_LIST` and
+      // `STATE_TRACK_DETAILS` (from previous edits).
+
+      // I need to include the `STATE_TRACK_DETAILS` logic in my replacement
+      // content if I'm overwriting it. Yes, I will keep the simple Back logic
+      // for Details for now.
     }
   } else if (_state == STATE_SUMMARY) {
 
@@ -278,10 +454,10 @@ void LapTimerScreen::update() {
       // 2. Restart / New Session (Tap anywhere else?)
       // For now, let's keep it simple: Tap bottom right to go to Track Select?
       if (p.x > 200 && p.y > 200) {
-        _state = STATE_TRACK_SELECT;
+        _state = STATE_TRACK_LIST;
         _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawTrackSelect();
+        drawTrackList();
         _ui->drawStatusBar();
         return;
       }
@@ -424,17 +600,17 @@ void LapTimerScreen::update() {
         // Retry
         _ui->getTft()->fillScreen(TFT_BLACK);
         if (gpsManager.isFixed()) {
-          _state = STATE_TRACK_SELECT;
-          drawTrackSelect();
+          _state = STATE_TRACK_LIST;
+          drawTrackList();
         } else {
           drawNoGPS(); // Redraw (maybe add "Still No Fix" msg)
         }
       } else {
         // Continue Anyway (Manual/Custom)
-        _state = STATE_TRACK_SELECT;
+        _state = STATE_TRACK_LIST;
         _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawTrackSelect();
+        drawTrackList();
       }
     }
   } else {
@@ -590,62 +766,197 @@ void LapTimerScreen::drawMenu() {
   _ui->drawStatusBar();
 }
 
-void LapTimerScreen::drawTrackSelect() {
+void LapTimerScreen::drawSearching() {
+  TFT_eSPI *tft = _ui->getTft();
+  int cx = SCREEN_WIDTH / 2;
+  int cy = SCREEN_HEIGHT / 2 - 20;
+
+  // --- Draw Icon ---
+  tft->setTextColor(TFT_WHITE, COLOR_BG);
+
+  // 1. Map (Trapezoid-like)
+  int mapY = cy + 10;
+  tft->drawLine(cx - 20, mapY, cx + 20, mapY, TFT_WHITE);      // Top
+  tft->drawLine(cx + 20, mapY, cx + 30, mapY + 25, TFT_WHITE); // Right Slope
+  tft->drawLine(cx + 30, mapY + 25, cx - 30, mapY + 25, TFT_WHITE); // Bottom
+  tft->drawLine(cx - 30, mapY + 25, cx - 20, mapY, TFT_WHITE); // Left Slope
+
+  // Dotted Path inside (Mock)
+  for (int i = 0; i < 3; i++) {
+    tft->fillCircle(cx - 15 + (i * 15), mapY + 12, 2, TFT_WHITE);
+  }
+
+  // 2. Pin (Above Map)
+  int pinY = cy - 10;
+  tft->fillCircle(cx, pinY, 8, TFT_WHITE); // Head
+  tft->fillTriangle(cx - 8, pinY, cx + 8, pinY, cx, pinY + 15,
+                    TFT_WHITE);            // Point
+  tft->fillCircle(cx, pinY, 3, TFT_BLACK); // Hole
+
+  // --- Draw Text ---
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01); // Standard font
+  tft->setTextSize(1);
+  tft->drawString("Searching nearby Tracks", cx, cy + 50);
+
+  _ui->drawStatusBar();
+}
+
+void LapTimerScreen::drawTrackList() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // 1. Header (Select Track)
-  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY); // Garis status
+  // Header
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
 
-  tft->setTextDatum(TC_DATUM);
-  tft->setFreeFont(&Org_01); // Use standard font
-  tft->setTextSize(2);       // Slightly larger
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  tft->drawString("Select Track", SCREEN_WIDTH / 2,
-                  25); // Just below status bar
-
-  // Back Arrow
+  // Title "Nearby Tracks" (Left)
   tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01); // Ensure font is set
-  tft->setTextSize(2);       // Ensure size is set
-  tft->drawString("<", 10, 25);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->drawString("Nearby Tracks", 10, 25);
 
-  // Separator
-  tft->drawFastHLine(0, 50, SCREEN_WIDTH, COLOR_TEXT);
-
-  if (_tracks.empty())
-    return;
-
-  Track &t = _tracks[_selectedTrackIdx];
-
-  // 2. Track Name
-  tft->setTextDatum(TC_DATUM);
+  // "New Track" Button (Top Right)
+  // Box: x=200, y=22, w=100, h=25 (Approx)
+  int btnX = SCREEN_WIDTH - 110;
+  int btnY = 22;
+  int btnW = 100;
+  int btnH = 20;
+  tft->drawRoundRect(btnX, btnY, btnW, btnH, 5, TFT_WHITE);
+  tft->setTextDatum(MC_DATUM);
   tft->setTextSize(1);
-  tft->setTextFont(2); // Standard font for name
-  tft->drawString(t.name, SCREEN_WIDTH / 2, 60);
+  tft->drawString("New Track", btnX + btnW / 2, btnY + btnH / 2 + 2);
 
-  // 3. Config List
-  int startY = 80;
+  // List
+  int startY = 60;
   int itemH = 30;
 
   tft->setTextDatum(TL_DATUM);
-  for (int i = 0; i < t.configs.size(); i++) {
-    int y = startY + (i * itemH);
+  tft->setTextSize(1);
 
-    // Highlight selection
-    if (i == _selectedConfigIdx) {
-      tft->fillRoundRect(10, y, SCREEN_WIDTH - 20, itemH, 5, COLOR_HIGHLIGHT);
-      tft->setTextColor(COLOR_BG, COLOR_HIGHLIGHT);
-    } else {
-      tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    }
-
-    // Draw Config Name
-    tft->drawString(t.configs[i].name, 20,
-                    y + 5); // Added slight Y offset for center
+  if (_tracks.empty()) {
+    tft->drawString("No tracks found.", 20, 80);
+    _ui->drawStatusBar();
+    return;
   }
-  _ui->drawStatusBar();
 
-  // 4. Create Custom Track (Bottom) - REMOVED (Moved to Sub-Menu)
+  for (size_t i = 0; i < _tracks.size(); i++) {
+    int y = startY + (i * itemH);
+    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->drawString(_tracks[i].name, 20, y);
+  }
+
+  _ui->drawStatusBar();
+}
+
+void LapTimerScreen::drawTrackOptionsPopup() {
+  TFT_eSPI *tft = _ui->getTft();
+
+  // Popup Dimensions
+  int w = 220;
+  int h = 150;
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = (SCREEN_HEIGHT - h) / 2 + 10;
+
+  // Draw Box (Black with White Border)
+  tft->fillRoundRect(x, y, w, h, 5, TFT_BLACK);
+  tft->drawRoundRect(x, y, w, h, 5, TFT_WHITE);
+
+  // Options
+  const char *options[] = {"Select", "Select & Edit", "Invert",
+                           "Reinit best Lap", "Remove"};
+  int startY = y + 10;
+  int itemH = 25;
+
+  tft->setTextDatum(TL_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(1);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+
+  for (int i = 0; i < 5; i++) {
+    tft->drawString(options[i], x + 15, startY + (i * itemH));
+  }
+}
+
+void LapTimerScreen::drawTrackDetails() {
+  TFT_eSPI *tft = _ui->getTft();
+  if (_selectedTrackIdx < 0 || _selectedTrackIdx >= _tracks.size())
+    return;
+  Track &t = _tracks[_selectedTrackIdx];
+
+  // Header
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+
+  // Back Arrow
+  tft->setTextDatum(TL_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->drawString("<", 10, 25);
+
+  // Menu Options (Left Side List)
+  const char *options[] = {"Select", "Select & Edit", "Invert",
+                           "Reinit best Lap", "Remove"};
+  int menuY = 60; // Moved up slightly
+
+  tft->setTextSize(1);
+  for (int i = 0; i < 5; i++) {
+    if (i == 0) { // Draw cursor box for 'Select'
+      tft->fillRect(5, menuY + (i * 25) - 2, 110, 20, TFT_WHITE);
+      tft->setTextColor(TFT_BLACK, TFT_WHITE);
+    } else {
+      tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    }
+    tft->drawString(options[i], 10, menuY + (i * 25));
+  }
+
+  // --- RIGHT PANEL INFO ---
+  int panelX = 130;
+  int panelY = 50;
+
+  // 1. Map (Left side of Info Panel)
+  // Draw a scaled Mock Map relative to panelX
+  int mapX = panelX;
+  int mapY = panelY + 10;
+
+  tft->drawLine(mapX, mapY, mapX + 40, mapY + 10, TFT_WHITE);
+  tft->drawLine(mapX + 40, mapY + 10, mapX + 30, mapY + 50, TFT_WHITE);
+  tft->drawLine(mapX + 30, mapY + 50, mapX - 10, mapY + 40, TFT_WHITE);
+  tft->drawLine(mapX - 10, mapY + 40, mapX, mapY, TFT_WHITE);
+  // Add a "Start/Finish" dot
+  tft->fillCircle(mapX + 15, mapY + 5, 3, TFT_RED);
+
+  // 2. Info Text (Right side of Info Panel)
+  int infoX = panelX + 55;
+  int infoY = panelY;
+
+  // Track Name Box
+  tft->setTextSize(1);
+  int nameW = tft->textWidth(t.name) + 40; // Extra padding
+  tft->fillRect(infoX, infoY, nameW < 120 ? 120 : nameW, 18,
+                TFT_WHITE);                // White Box
+  tft->setTextColor(TFT_BLACK, TFT_WHITE); // Black Text
+  tft->drawString(t.name, infoX + 5, infoY + 3);
+
+  // Location / Subtitle
+  tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft->drawString("Location: Earth", infoX, infoY + 25);
+
+  // Length
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextSize(2);
+  tft->drawString("555.1m", infoX, infoY + 40);
+
+  // Best Lap Label
+  tft->setTextSize(1);
+  tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft->drawString("Best LAP:", infoX, infoY + 65);
+
+  // Best Lap Time
+  tft->setTextSize(2);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->drawString("01:10.501", infoX, infoY + 80);
+
+  _ui->drawStatusBar();
 }
 
 void LapTimerScreen::drawRecordTrack() {
@@ -780,12 +1091,14 @@ void LapTimerScreen::drawNoGPS() {
   tft->setFreeFont(&Org_01);
   tft->setTextDatum(MC_DATUM);
   tft->setTextSize(2);
-  tft->drawString("NO GPS FIX", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40);
+  tft->drawString("No tracks available", SCREEN_WIDTH / 2,
+                  SCREEN_HEIGHT / 2 - 40);
 
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextSize(1);
-  tft->drawString("Cannot locate nearby tracks.", SCREEN_WIDTH / 2,
-                  SCREEN_HEIGHT / 2);
+  tft->drawString("- check GPS -", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+  tft->drawString("cannot enter the menu", SCREEN_WIDTH / 2,
+                  SCREEN_HEIGHT / 2 + 20);
 
   // Buttons
   int btnY = SCREEN_HEIGHT - 60;

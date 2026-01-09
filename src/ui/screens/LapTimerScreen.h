@@ -23,11 +23,16 @@ struct Track {
   std::vector<TrackConfig> configs;
   double lat;
   double lon;
+  bool isCustom = true;
+  unsigned long bestLap = 0;
 };
 
 enum LapTimerState {
   STATE_MENU,
-  STATE_TRACK_SELECT,
+  STATE_TRACK_LIST,
+  STATE_TRACK_MENU, // Context Popup
+  STATE_TRACK_DETAILS,
+  STATE_SEARCHING,
   STATE_SUMMARY,
   STATE_RACING,
   STATE_RECORD_TRACK,
@@ -49,6 +54,7 @@ private:
   int _menuSelectionIdx = -1;
   unsigned long _lastUpdate;
   unsigned long _lastTouchTime = 0;
+  unsigned long _searchStartTime = 0; // For Searching delay
   bool _isRecording;
 
   // GPS Track Recording
@@ -69,7 +75,10 @@ private:
   void drawRacing();
   void drawLapList(int scrollOffset);
   void drawMenu(); // Sub-menu
-  void drawTrackSelect();
+  void drawTrackList();
+  void drawTrackOptionsPopup();
+  void drawTrackDetails();
+  void drawSearching();   // New Searching Screen
   void drawRecordTrack(); // GPS Track Recording UI
   void drawNoGPS();
 
