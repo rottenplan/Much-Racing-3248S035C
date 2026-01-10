@@ -38,21 +38,23 @@
 
 // Peripherals
 // Peripherals
-//#define PIN_RGB_RED 4
+// #define PIN_RGB_RED 4
 // #define PIN_RGB_GREEN 16 // Disabled: Used for GPS_TX
 // #define PIN_RGB_BLUE 17  // Disabled: Used for GPS_RX
 // #define PIN_LIGHT_SENSOR 34
 // #define PIN_SPEAKER 26
-#define PIN_RPM_INPUT 35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
+#define PIN_RPM_INPUT                                                          \
+  35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
 
 // GPS / UART
 // Standard Serial Pins (Conflict with USB Debugging!)
 #define PIN_GPS_RX 3
 #define PIN_GPS_TX 1
 #define GPS_BAUD 9600
-#define PIN_BATTERY 34 // CONFLICT with Light Sensor
+// #define PIN_LIGHT_SENSOR 34 // Removed: Used for Battery
+#define PIN_BATTERY 34
 #define BATTERY_VOLTAGE_MAX 4.2
-#define BATTERY_VOLTAGE_MIN 3.0
+#define BATTERY_VOLTAGE_MIN 3.0 // Lowered to 3.0V to capture lower range
 
 // ==========================================
 // SYSTEM CONSTANTS
@@ -60,6 +62,7 @@
 // Landscape Mode
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
+#define STATUS_BAR_HEIGHT 20 // Fixed height for status bar
 
 #define SERIAL_DEBUG_BAUD 115200
 

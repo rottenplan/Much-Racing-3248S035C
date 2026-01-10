@@ -41,7 +41,9 @@ void DragMeterScreen::onShow() {
   _highlightValue = "--.--";
 
   TFT_eSPI *tft = _ui->getTft();
-  _ui->getTft()->fillScreen(COLOR_BG);
+  // Clear only content area
+  _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                          SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
   _ui->setTitle("DRAG METER");
   drawDashboardStatic();
 

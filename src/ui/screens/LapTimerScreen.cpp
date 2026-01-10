@@ -597,13 +597,15 @@ void LapTimerScreen::update() {
       // Retry or Continue
       // Retry: Check GPS again
       if (p.x < SCREEN_WIDTH / 2) {
-        // Retry
-        _ui->getTft()->fillScreen(TFT_BLACK);
         if (gpsManager.isFixed()) {
+          loadTracks(); // Refresh tracks with valid GPS
           _state = STATE_TRACK_LIST;
+          // Clear background for Track List
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawTrackList();
         } else {
-          drawNoGPS(); // Redraw (maybe add "Still No Fix" msg)
+          drawNoGPS(); // Redraws content area
         }
       } else {
         // Continue Anyway (Manual/Custom)
@@ -719,7 +721,7 @@ void LapTimerScreen::update() {
     // UI Update (10Hz)
     if (millis() - _lastUpdate > 100) {
       drawRacing();
-      _ui->drawStatusBar();
+      // _ui->drawStatusBar(); // Handled by UIManager
       _lastUpdate = millis();
     }
   }

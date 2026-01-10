@@ -9,7 +9,9 @@ extern GPSManager gpsManager;
 
 void GpsStatusScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(TFT_BLACK); // "Negative UI" = Dark Mode
+  // Clear only content area
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
 
   // Force Status Bar Redraw to ensure no artifacts at top
   _ui->drawStatusBar(true);
@@ -20,8 +22,8 @@ void GpsStatusScreen::onShow() {
   // Initial values reset
   _lastSats = -1;
   _lastHz = -1;
-  _lastLat = 0;
-  _lastLng = 0;
+  _lastLat = -999;
+  _lastLng = -999;
   _lastHdop = -1.0;   // Reset HDOP tracker
   _lastFixed = false; // Force re-draw of radar rings
 

@@ -39,6 +39,7 @@ public:
 
   // Configuration
   void setGnssMode(uint8_t mode);
+  uint8_t getGnssMode();
   void setDynamicModel(uint8_t model); // 0=Portable, 1=Station, 2=Ped...
   void setSBASConfig(uint8_t region);  // 0=EGNOS, 1=WAAS...
   void setProjection(bool enabled);    // Coordinate Projection

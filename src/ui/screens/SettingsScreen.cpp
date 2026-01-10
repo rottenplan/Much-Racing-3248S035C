@@ -128,11 +128,11 @@ void SettingsScreen::loadSettings() {
 
     // Pulses Per Revolution (PPR)
     SettingItem ppr = {"PULSE PER REV", TYPE_VALUE, "rpm_ppr"};
-    ppr.options = {"1.0", "0.5 (1p/2r)", "2.0 (Default)", "3.0 (3p/1r)",
+    ppr.options = {"1.0 (Default)", "0.5 (1p/2r)", "2.0", "3.0 (3p/1r)",
                    "4.0 (4p/1r)"};
-    ppr.currentOptionIdx = _prefs.getInt("rpm_ppr_idx", 2);
+    ppr.currentOptionIdx = _prefs.getInt("rpm_ppr", 0);
     if (ppr.currentOptionIdx < 0 || ppr.currentOptionIdx >= ppr.options.size())
-      ppr.currentOptionIdx = 2;
+      ppr.currentOptionIdx = 0;
 
     _settings.push_back(ppr);
 
@@ -155,8 +155,6 @@ void SettingsScreen::loadSettings() {
     extern GPSManager gpsManager;
     gpsManager.setUtcOffset(utcZone.currentOptionIdx - 12); // Ensure sync
     _settings.push_back(utcZone);
-
-    _settings.push_back({"MANUAL CLOCK ADJUST", TYPE_ACTION});
 
     _settings.push_back({"MANUAL CLOCK ADJUST", TYPE_ACTION});
 
@@ -403,7 +401,9 @@ void SettingsScreen::update() {
     if (n >= 0) {
       _isScanning = false;
       _scanCount = n;
-      _ui->getTft()->fillScreen(COLOR_BG);
+      // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
       drawWiFiList();
       _lastWiFiTouch = millis();
@@ -435,7 +435,9 @@ void SettingsScreen::update() {
       _currentMode = MODE_MAIN;
       _ui->setTitle("SETTINGS");
       loadSettings();
-      _ui->getTft()->fillScreen(COLOR_BG);
+      // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
       _scrollOffset = 0;
       drawList(0, true);
@@ -520,7 +522,9 @@ void SettingsScreen::update() {
         _targetSSID = WiFi.SSID(idx);
         _enteredPass = "";
         _currentMode = MODE_WIFI_PASS;
-        _ui->getTft()->fillScreen(COLOR_BG);
+        // Clear only content area
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
         _ui->drawStatusBar(true);
         drawKeyboard();
         _lastKeyboardTouch = millis(); // Prevent immediate key press
@@ -601,7 +605,9 @@ void SettingsScreen::handleTouch(int idx) {
     if (item.name == "CLOCK SETTING") {
       _currentMode = MODE_CLOCK;
       loadSettings();
-      _ui->getTft()->fillScreen(COLOR_BG);
+      // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
       drawList(0, true);
       return;
@@ -611,14 +617,18 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "ENGINE HOURS") {
       _currentMode = MODE_ENGINE;
       loadSettings();
-      _ui->getTft()->fillScreen(COLOR_BG);
+      // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
       drawList(0, true);
     } else if (item.name == "WIFI SETUP") {
       // Start WiFi scan
       _currentMode = MODE_WIFI;
       TFT_eSPI *tft = _ui->getTft();
-      tft->fillScreen(COLOR_BG);
+      // Clear only content area
+      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
 
       tft->setTextColor(TFT_WHITE, COLOR_BG);
@@ -635,7 +645,9 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "SYNC WITH CLOUD") {
       // Trigger cloud sync
       TFT_eSPI *tft = _ui->getTft();
-      tft->fillScreen(COLOR_BG);
+      // Clear only content area
+      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
 
       tft->setTextColor(TFT_CYAN, COLOR_BG);
@@ -688,13 +700,17 @@ void SettingsScreen::handleTouch(int idx) {
 
       _currentMode = MODE_MAIN;
       loadSettings();
-      tft->fillScreen(COLOR_BG);
+      // Clear only content area
+      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
       drawList(0, true);
     } else if (item.name == "REMOVE ACCOUNT") {
       // Remove account credentials from storage
       TFT_eSPI *tft = _ui->getTft();
-      tft->fillScreen(COLOR_BG);
+      // Clear only content area
+      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
 
       tft->setTextColor(TFT_YELLOW, COLOR_BG);
@@ -734,20 +750,26 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "RPM SETTING") {
       _currentMode = MODE_RPM;
       loadSettings();
-      _ui->getTft()->fillScreen(COLOR_BG);
+      // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true); // Redraw Status Bar
       drawList(0, true);
     } else if (item.name == "GNSS FINE TUNING") {
       _currentMode = MODE_GNSS_CONFIG;
       loadSettings();
-      _ui->getTft()->fillScreen(COLOR_BG);
+      // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);
       drawList(0, true);
     } else if (item.name == "SD CARD TEST") {
       _currentMode = MODE_SD_TEST;
       _ui->setTitle("SD CARD TEST");
       TFT_eSPI *tft = _ui->getTft();
-      tft->fillScreen(COLOR_BG);
+      // Clear only content area
+      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true); // Redraw Status Bar
 
       // Draw "Running..."
@@ -764,7 +786,9 @@ void SettingsScreen::handleTouch(int idx) {
       static_tft = nullptr;
 
       // Redraw with results
-      tft->fillScreen(COLOR_BG);
+      // Clear only content area
+      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true); // Redraw Status Bar
       drawSDTest();
 

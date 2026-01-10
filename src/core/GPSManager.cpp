@@ -328,32 +328,41 @@ void GPSManager::setGnssMode(uint8_t mode) {
   // Visible" change Hz.
 
   // Mapping Mode to Hz Limit
-  int targetRate = 10;
-  switch (mode) {
-  case 0:
-    targetRate = 10;
-    break; // All
-  case 1:
-    targetRate = 16;
-    break; // GPS+GLO+SBAS
-  case 2:
-    targetRate = 10;
-    break; // GPS+GAL+GLO+SBAS
-  case 3:
-    targetRate = 20;
-    break; // GPS+GAL+SBAS
-  case 4:
-    targetRate = 25;
-    break; // GPS+SBAS
-  case 5:
-    targetRate = 25;
-    break; // GPS Only
-  case 6:
-    targetRate = 12;
-    break; // GPS+BEI+SBAS
-  case 7:
-    targetRate = 16;
-    break; // GPS+GLO
+  int targetRate = 1; // Default safer 1Hz for 9600 baud
+
+  // Only allow higher rates if Baud Rate is sufficient (>38400)
+  // 9600 baud can barely handle 10Hz if sentences are short, but with full NMEA
+  // it chokes. Safe limit: 1Hz for 9600.
+  if (_baudRate > 38400) {
+    switch (mode) {
+    case 0:
+      targetRate = 10;
+      break; // All
+    case 1:
+      targetRate = 16;
+      break; // GPS+GLO+SBAS
+    case 2:
+      targetRate = 10;
+      break; // GPS+GAL+GLO+SBAS
+    case 3:
+      targetRate = 20;
+      break; // GPS+GAL+SBAS
+    case 4:
+      targetRate = 25;
+      break; // GPS+SBAS
+    case 5:
+      targetRate = 25;
+      break; // GPS Only
+    case 6:
+      targetRate = 12;
+      break; // GPS+BEI+SBAS
+    case 7:
+      targetRate = 16;
+      break; // GPS+GLO
+    }
+  } else {
+    // For 9600 baud, force 1Hz to be safe.
+    targetRate = 1;
   }
   setFrequencyLimit(targetRate);
   _currentGnssMode = mode;
@@ -368,6 +377,8 @@ void GPSManager::setGnssMode(uint8_t mode) {
   prefs.putInt("gnss_mode", mode);
   prefs.end();
 }
+
+uint8_t GPSManager::getGnssMode() { return _currentGnssMode; }
 
 void GPSManager::setDynamicModel(uint8_t modelIdx) {
   if (!_gpsSerial)

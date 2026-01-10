@@ -379,6 +379,10 @@ void UIManager::drawStatusBar(bool force) {
     // Clear GPS Area (30 to 100)
     _tft->fillRect(30, 0, 70, 20, COLOR_BG);
 
+    // CRITICAL: Reset Font to Standard
+    _tft->setFreeFont(NULL);
+    _tft->setTextFont(1);
+
     // 1. Draw Signal Bars (Left of Text)
     int barX = 35; // Start bars immediately after WiFi
     int barY = 16;
@@ -422,7 +426,7 @@ void UIManager::drawStatusBar(bool force) {
   }
 
   if (force || centerText != _lastTimeStr) {
-    int areaW = 160;
+    int areaW = 120;
     _tft->setTextPadding(areaW);
     _tft->setTextDatum(MC_DATUM);
     _tft->setTextColor(COLOR_TEXT, COLOR_BG);
@@ -432,18 +436,38 @@ void UIManager::drawStatusBar(bool force) {
   }
 
   // --- Bagian Baterai ---
-  // Mock value (ADC value 0-4095)
-  // Misal Voltage divider: 4.2V = 4095 (atau disesuaikan)
-  // Sederhana: 0-100% linear dari 3.0V(0%) - 4.2V(100%)?
-  // Mock: Selalu 100% untuk sekarang atau simulasi fluktuasi
-  int rawBat = 4095;
+  // Read Battery Voltage
+  // Divider Ratio: 2.0 (1M/1M) -> Vbat = Vread * 2
+  // ADC: 12-bit (0-4095) for 0-3.3V (with attenuation)
 
-  if (force || rawBat != _lastBat) {
-    // Hitung Persentase
-    // Anggap 4095 = 100%
-    int pct = (rawBat * 100) / 4096;
-    if (pct > 100)
-      pct = 100;
+  // Note: ADC reading needs calibration, but we'll use a simple approximation
+  // Vread = (analogRead(PIN_BATTERY) / 4095.0) * 3.3;
+  // Vbat = Vread * 2.0;
+
+  // With default attenuation (11dB), max input is ~2.6V (Wait, typically 3.3V
+  // range?) Using standard formula:
+
+  int rawADC = analogRead(PIN_BATTERY);
+
+  // Simple moving average or filtering could be added here
+
+  // ESP32 ADC is non-linear. Approximating:
+  // 3.3V ~ 4095
+  float voltage = (rawADC / 4095.0) * 3.3 * 2.0; // *2 for divider
+
+  // Percentage Calculation (Linear 3.0V - 4.2V)
+  // Max = 4.2, Min = 3.0
+  int pct = 0;
+  if (voltage >= 4.2)
+    pct = 100;
+  else if (voltage <= 3.3)
+    pct = 0;
+  else {
+    pct = (int)((voltage - 3.3) / (4.2 - 3.3) * 100);
+  }
+
+  if (force || abs(pct - _lastBat) > 2) { // Update if changed by > 2%
+    _lastBat = pct;
 
     // Hapus Area Bar + Teks
     // Area Kanan: 60px lebar?
@@ -453,7 +477,10 @@ void UIManager::drawStatusBar(bool force) {
     _tft->setTextDatum(MR_DATUM); // Rata Kanan Tengah
     _tft->setTextSize(1);
     _tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    String pctStr = String(pct) + "%";
+    String pctStr = String(pct) + "% (" + String(voltage, 1) + "V)";
+    // Also debug raw to Serial if possible, but screen is better for user
+    // feedback
+    Serial.printf("Bat: ADC=%d V=%f Pct=%d\n", rawADC, voltage, pct);
     _tft->drawString(pctStr, SCREEN_WIDTH - 32, 10); // Centered at 10
 
     // Gambar Ikon Baterai
@@ -474,7 +501,7 @@ void UIManager::drawStatusBar(bool force) {
     else
       _tft->fillRect(batX + 2, batY + 2, fillW, batH - 4, TFT_RED);
 
-    _lastBat = rawBat;
+    _lastBat = pct;
   }
 
   // --- Indikator Perekaman ---

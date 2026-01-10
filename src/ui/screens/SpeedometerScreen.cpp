@@ -169,7 +169,9 @@ void SpeedometerScreen::drawDashboard(bool force) {
   int offBot = 10; // Geser Bawah (Dikurangi dari 28)
 
   if (force) {
-    tft->fillScreen(COLOR_BG);
+    // Clear only content area
+    tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
 
     // --- 0. INDIKATOR KECIL DI ATAS (Revised: Bigger & Fitted) ---
     // Status Bar assumed ~20px. Header starts at 39+offTop (54px).

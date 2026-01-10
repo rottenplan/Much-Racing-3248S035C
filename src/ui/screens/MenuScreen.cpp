@@ -166,11 +166,11 @@ void MenuScreen::update() {
     }
   }
 
-  static unsigned long lastStatusUpdate = 0;
-  if (millis() - lastStatusUpdate > 1000) {
-    _ui->drawStatusBar();
-    lastStatusUpdate = millis();
-  }
+  // static unsigned long lastStatusUpdate = 0;
+  // if (millis() - lastStatusUpdate > 1000) {
+  //   _ui->drawStatusBar();
+  //   lastStatusUpdate = millis();
+  // }
 }
 
 #include "../fonts/Org_01.h"

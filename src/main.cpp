@@ -73,7 +73,7 @@ void setup() {
   uiManager.setTouch(&touch); // Teruskan objek sentuh ke UI
   uiManager.begin();
 
-  Serial.println("System Ready");
+  // Serial.println("System Ready");
 }
 
 void loop() {

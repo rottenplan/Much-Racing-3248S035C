@@ -141,7 +141,9 @@ void RpmSensorScreen::update() {
 
 void RpmSensorScreen::drawScreen() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
+  // Clear only content area
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
 
   // Back Button
   tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);

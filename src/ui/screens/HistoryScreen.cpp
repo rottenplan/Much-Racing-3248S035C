@@ -25,10 +25,11 @@ void HistoryScreen::update() {
   static unsigned long lastStatusUpdate = 0;
 
   // Status Bar Update
-  if (millis() - lastStatusUpdate > 1000) {
-    _ui->drawStatusBar();
-    lastStatusUpdate = millis();
-  }
+  // Status Bar Update - Handled by UIManager globally
+  // if (millis() - lastStatusUpdate > 1000) {
+  //   _ui->drawStatusBar();
+  //   lastStatusUpdate = millis();
+  // }
 
   UIManager::TouchPoint p = _ui->getTouchPoint();
   bool isTouching = (p.x != -1);
@@ -125,24 +126,32 @@ void HistoryScreen::update() {
           return;
         } else if (_currentMode == MODE_GROUPS) {
           _currentMode = MODE_MENU;
-          _ui->getTft()->fillScreen(COLOR_BG);
+          // Clear only content area
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawMenu();
           return;
         } else if (_currentMode == MODE_LIST) {
           _currentMode = MODE_GROUPS;
           _scrollOffset = 0;
           _selectedIdx = -1;
-          _ui->getTft()->fillScreen(COLOR_BG);
+          // Clear only content area
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawGroups(0);
           return;
         } else if (_currentMode == MODE_OPTIONS) {
           _currentMode = MODE_LIST;
-          _ui->getTft()->fillScreen(COLOR_BG);
+          // Clear only content area
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawList(_scrollOffset);
           return;
         } else if (_currentMode == MODE_VIEW_DATA) {
           _currentMode = MODE_OPTIONS;
-          _ui->getTft()->fillScreen(COLOR_BG);
+          // Clear only content area
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           _selectedIdx = 0;
           drawOptions();
           return;
@@ -165,7 +174,9 @@ void HistoryScreen::update() {
           scanGroups();
           _scrollOffset = 0;
           _selectedIdx = -1;
-          _ui->getTft()->fillScreen(COLOR_BG);
+          // Clear only content area
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawGroups(0);
         }
         // Button 1
@@ -176,7 +187,9 @@ void HistoryScreen::update() {
           scanGroups();
           _scrollOffset = 0;
           _selectedIdx = -1;
-          _ui->getTft()->fillScreen(COLOR_BG);
+          // Clear only content area
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
           drawGroups(0);
         }
 
@@ -191,7 +204,10 @@ void HistoryScreen::update() {
             _currentMode = MODE_LIST;
             _scrollOffset = 0;
             _selectedIdx = -1;
-            _ui->getTft()->fillScreen(COLOR_BG);
+            // Clear only content area
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
             drawList(0);
           }
         }
@@ -227,7 +243,10 @@ void HistoryScreen::update() {
             _lastTapIdx = targetIdx;
             _currentMode = MODE_OPTIONS;
             _selectedIdx = 0;
-            _ui->getTft()->fillScreen(COLOR_BG);
+            // Clear only content area
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
             drawOptions();
           }
         }
@@ -284,13 +303,19 @@ void HistoryScreen::update() {
                 scanGroups();
                 _currentMode = MODE_LIST;
                 _selectedIdx = -1;
-                _ui->getTft()->fillScreen(COLOR_BG);
+                // Clear only content area
+                _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                        SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                        COLOR_BG);
                 drawList(0);
               }
             } else { // NO
               _currentMode = MODE_OPTIONS;
               _selectedIdx = 2;
-              _ui->getTft()->fillScreen(COLOR_BG);
+              // Clear only content area
+              _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                      SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                      COLOR_BG);
               drawOptions();
             }
           }

@@ -20,6 +20,7 @@ private:
   String _buffer = ""; // For assembling lines
 
   void drawLines();
+  void drawCheckboxes();
 };
 
 #endif
