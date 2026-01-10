@@ -109,6 +109,14 @@ private:
   int _sysYear = 2024;
   int _utcOffset = 0;
   unsigned long _lastTick = 0;
+
+  // RPM Logic
+  static volatile unsigned long _rpmPulses;
+  static volatile unsigned long _lastPulseMicros;
+  unsigned long _lastRpmCalcTime = 0;
+
+public:
+  static void IRAM_ATTR onPulse();
 };
 
 #endif

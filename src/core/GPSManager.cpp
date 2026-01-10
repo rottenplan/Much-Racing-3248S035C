@@ -61,11 +61,29 @@ void GPSManager::begin() {
           String s = file.readStringUntil('\n');
           double sdVal = s.toDouble();
           if (sdVal > 0)
-            _totalDistance = sdVal; // Recovered!
-          file.close();
+            file.close();
         }
       }
     }
+  }
+
+  // Initialize RPM Sensor
+  if (PIN_RPM_INPUT >= 0) {
+    pinMode(PIN_RPM_INPUT, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+  }
+}
+
+// Static Member Initialization
+volatile unsigned long GPSManager::_rpmPulses = 0;
+volatile unsigned long GPSManager::_lastPulseMicros = 0;
+
+void IRAM_ATTR GPSManager::onPulse() {
+  unsigned long now = micros();
+  // Debounce: 1ms (1000us) -> Max 60.000 RPM
+  if (now - _lastPulseMicros > 1000) {
+    _rpmPulses++;
+    _lastPulseMicros = now;
   }
 }
 
@@ -140,7 +158,50 @@ void GPSManager::update() {
   if (millis() - _lastRateCheck >= 1000) {
     _currentHz = _updatesCount;
     _updatesCount = 0;
+    _updatesCount = 0;
     _lastRateCheck = millis();
+  }
+
+  // --- RPM CALCULATION ---
+  if (millis() - _lastRpmCalcTime > 100) { // 10Hz Update
+    noInterrupts();
+    unsigned long pulses = _rpmPulses;
+    _rpmPulses = 0;
+    interrupts();
+
+    unsigned long dt = millis() - _lastRpmCalcTime;
+    _lastRpmCalcTime = millis();
+
+    // Load PPR Config
+    Preferences prefs;
+    prefs.begin("laptimer", true);
+    int pprIdx = prefs.getInt("rpm_ppr", 0);
+    prefs.end();
+
+    float ppr = 1.0;
+    switch (pprIdx) {
+    case 0:
+      ppr = 1.0;
+      break;
+    case 1:
+      ppr = 0.5;
+      break;
+    case 2:
+      ppr = 2.0;
+      break;
+    case 3:
+      ppr = 3.0;
+      break;
+    case 4:
+      ppr = 4.0;
+      break;
+    }
+
+    if (dt > 0) {
+      _currentRPM = (unsigned long)((pulses * 60000.0) / (dt * ppr));
+    } else {
+      _currentRPM = 0;
+    }
   }
 
   // Periodic Save (Every 1 minute)

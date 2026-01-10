@@ -8,18 +8,18 @@
 #define COLOR_GREEN 0x07E0
 
 // Initialize static members
-volatile unsigned long RpmSensorScreen::_rpmPulses = 0;
-volatile unsigned long RpmSensorScreen::_lastPulseMicros = 0;
+// volatile unsigned long RpmSensorScreen::_rpmPulses = 0;
+// volatile unsigned long RpmSensorScreen::_lastPulseMicros = 0;
 
-void IRAM_ATTR RpmSensorScreen::onPulse() {
-  unsigned long now = micros();
-  // Debounce: 1ms (1000us) dead time -> Max 60,000 RPM
-  // Filters out high-frequency ringing from spark
-  if (now - _lastPulseMicros > 1000) {
-    _rpmPulses++;
-    _lastPulseMicros = now;
-  }
-}
+// void IRAM_ATTR RpmSensorScreen::onPulse() {
+//   unsigned long now = micros();
+//   // Debounce: 1ms (1000us) dead time -> Max 60,000 RPM
+//   // Filters out high-frequency ringing from spark
+//   // if (now - _lastPulseMicros > 1000) {
+//   //   _rpmPulses++;
+//   //   _lastPulseMicros = now;
+//   // }
+// }
 
 // External reference
 #include "../../core/GPSManager.h"
@@ -33,16 +33,16 @@ void RpmSensorScreen::onShow() {
   _graphIndex = 0;
   _lastUpdate = 0;
 
-  // Initialize Pulse Counter
-  _rpmPulses = 0;
-  _lastRpmCalcTime = millis();
+  // Calculate RPM
+  // _rpmPulses = 0;
+  // _lastRpmCalcTime = millis();
 
   // Setup Interrupt for Inductive Clamp
-  // GPIO 35 is Input Only.
-  if (PIN_RPM_INPUT >= 0) {
-    pinMode(PIN_RPM_INPUT, INPUT);
-    attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
-  }
+  // MOVED TO GLOBAL GPS MANAGER
+  // if (PIN_RPM_INPUT >= 0) {
+  //   pinMode(PIN_RPM_INPUT, INPUT);
+  //   attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+  // }
 
   // Clear graph history
   for (int i = 0; i < GRAPH_WIDTH; i++) {
@@ -63,56 +63,19 @@ void RpmSensorScreen::update() {
   // 1. Back Button
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
-    if (PIN_RPM_INPUT >= 0) {
-      detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup
-    }
+    // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup - NO,
+    // GLOBAL
     _ui->switchScreen(SCREEN_MENU);
     return;
   }
 
-  // 2. Real RPM Calculation (Every 100ms)
+  // 2. Real RPM Calculation (Get from Global)
   unsigned long now = millis();
   if (now - _lastRpmCalcTime > 100) {
-    // safely read and reset pulses
-    noInterrupts();
-    unsigned long pulses = _rpmPulses;
-    _rpmPulses = 0;
-    interrupts();
-
-    unsigned long dt = now - _lastRpmCalcTime;
     _lastRpmCalcTime = now;
 
-    // Get Calibration
-    Preferences prefs;
-    prefs.begin("laptimer", true);
-    int pprIdx = prefs.getInt("rpm_ppr", 0);
-    prefs.end();
-
-    float ppr = 1.0;
-    switch (pprIdx) {
-    case 0:
-      ppr = 1.0;
-      break;
-    case 1:
-      ppr = 0.5;
-      break;
-    case 2:
-      ppr = 2.0;
-      break;
-    case 3:
-      ppr = 3.0;
-      break;
-    case 4:
-      ppr = 4.0;
-      break;
-    }
-
-    // Calculate RPM
-    if (dt > 0) {
-      _currentRpm = (unsigned long)((pulses * 60000.0) / (dt * ppr));
-    } else {
-      _currentRpm = 0;
-    }
+    // Use Global Manager
+    _currentRpm = gpsManager.getRPM();
 
     if (_currentRpm > _maxRpm)
       _maxRpm = _currentRpm;

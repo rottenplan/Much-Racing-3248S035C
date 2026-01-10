@@ -24,12 +24,6 @@ private:
   int _lastGear = -1;
   int _lastBat = -1;
   bool _lastUnits = false; // false = km/h, true = mph
-
-  // RPM Sensor Logic
-  static volatile unsigned long _rpmPulses;
-  static volatile unsigned long _lastPulseMicros;
-  static void IRAM_ATTR onPulse();
-  unsigned long _lastRpmCalcTime;
 };
 
 #endif

@@ -6,19 +6,6 @@
 
 extern GPSManager gpsManager;
 
-// Initialize static members for RPM
-volatile unsigned long SpeedometerScreen::_rpmPulses = 0;
-volatile unsigned long SpeedometerScreen::_lastPulseMicros = 0;
-
-void IRAM_ATTR SpeedometerScreen::onPulse() {
-  unsigned long now = micros();
-  // Debounce: 1ms (1000us) -> Max 60.000 RPM
-  if (now - _lastPulseMicros > 1000) {
-    _rpmPulses++;
-    _lastPulseMicros = now;
-  }
-}
-
 void SpeedometerScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
   tft->fillScreen(COLOR_BG); // Latar belakang gelap
@@ -34,12 +21,7 @@ void SpeedometerScreen::onShow() {
   _lastSats = -1;
 
   // SETUP RPM SENSOR
-  _rpmPulses = 0;
-  _lastRpmCalcTime = millis();
-  if (PIN_RPM_INPUT >= 0) {
-    pinMode(PIN_RPM_INPUT, INPUT);
-    attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
-  }
+  // MOVED TO GPSManager for global access
 
   drawDashboard(true);
 }
@@ -49,7 +31,8 @@ void SpeedometerScreen::update() {
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
     if (PIN_RPM_INPUT >= 0) {
-      detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR
+      // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR -
+      // NO, IT'S GLOBAL NOW
     }
     _ui->switchScreen(SCREEN_MENU);
     return;
@@ -67,51 +50,11 @@ void SpeedometerScreen::update() {
   String timeStr = String(timeBuf);
 
   // 3. HITUNG RPM (Real Time)
-  int rpm = _lastRPM; // Default ke nilai terakhir
-  unsigned long now = millis();
-  if (now - _lastRpmCalcTime > 100) { // Update setiap 100ms
-    noInterrupts();
-    unsigned long pulses = _rpmPulses;
-    _rpmPulses = 0;
-    interrupts();
+  // NOW HANDLED BY GPS MANAGER GLOBALLY
+  int rpm = gpsManager.getRPM();
 
-    unsigned long dt = now - _lastRpmCalcTime;
-    _lastRpmCalcTime = now;
-
-    // Ambil Kalibrasi PPR dari Preferences
-    Preferences prefs;
-    prefs.begin("laptimer", true);
-    int pprIdx = prefs.getInt("rpm_ppr", 0);
-    prefs.end();
-
-    float ppr = 1.0;
-    switch (pprIdx) {
-    case 0:
-      ppr = 1.0;
-      break;
-    case 1:
-      ppr = 0.5;
-      break;
-    case 2:
-      ppr = 2.0;
-      break;
-    case 3:
-      ppr = 3.0;
-      break;
-    case 4:
-      ppr = 4.0;
-      break;
-    }
-
-    if (dt > 0) {
-      rpm = (unsigned long)((pulses * 60000.0) / (dt * ppr));
-    } else {
-      rpm = 0;
-    }
-  }
-
-  // Push RPM to GPSManager for Web API
-  gpsManager.setRPM(rpm);
+  // Push to Web API not needed as GPSManager has it already
+  // gpsManager.setRPM(rpm);
 
   // Placeholder lainnya
   int gear = 0;
