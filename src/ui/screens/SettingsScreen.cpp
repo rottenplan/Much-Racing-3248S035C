@@ -128,8 +128,8 @@ void SettingsScreen::loadSettings() {
 
     // Pulses Per Revolution (PPR)
     SettingItem ppr = {"PULSE PER REV", TYPE_VALUE, "rpm_ppr"};
-    ppr.options = {"1.0 (Default)", "0.5 (1p/2r)", "2.0", "3.0 (3p/1r)",
-                   "4.0 (4p/1r)"};
+    ppr.options = {"1.0 (2T/4T Wasted)", "0.5 (1p/2r)", "2.0 (2T Twin)",
+                   "3.0 (3p/1r)", "4.0 (4p/1r)"};
     ppr.currentOptionIdx = _prefs.getInt("rpm_ppr", 0);
     if (ppr.currentOptionIdx < 0 || ppr.currentOptionIdx >= ppr.options.size())
       ppr.currentOptionIdx = 0;
@@ -320,6 +320,11 @@ void SettingsScreen::saveSetting(int idx) {
         break; // Never
       }
       _ui->setAutoOff(ms);
+    }
+
+    if (item.key == "rpm_ppr") {
+      extern GPSManager gpsManager;
+      gpsManager.setPPRIndex(item.currentOptionIdx);
     }
 
     // GPS Config Handlers

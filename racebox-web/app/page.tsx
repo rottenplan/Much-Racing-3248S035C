@@ -1,110 +1,91 @@
-import Link from 'next/link';
-import { MapPin, Clock, TrendingUp, Wifi } from 'lucide-react';
-import MapWrapper from "./components/MapWrapper";
+"use client";
 
-import Navbar from "./components/Navbar";
+import { Heart, Menu, X } from "lucide-react";
+import Link from "next/link";
+import SessionCard from "./components/SessionCard";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Navigation */}
-      <Navbar />
-
-      <div className="container mx-auto px-6 py-20">
-        <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
-            Track Your Racing
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
-              Performance
-            </span>
-          </h1>
-          <p className="text-xl text-slate-300 mb-8">
-            Professional lap timing and telemetry analysis for karting and racing enthusiasts.
-            Sync your Much Racing device and unlock detailed performance insights.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/tracking" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition flex items-center justify-center gap-2">
-              <Wifi className="w-5 h-5" /> Open Live Satellite
-            </Link>
-            <Link href="/tracks" className="bg-slate-700 hover:bg-slate-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition">
-              Browse Tracks
-            </Link>
-          </div>
+    <main className="min-h-screen pb-20 bg-background text-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white border-b border-gray-100 flex items-center justify-between px-4 h-16">
+        <h1 className="text-xl font-bold text-gray-700">Drag Sessions</h1>
+        <div className="flex gap-4">
+          <Heart className="w-6 h-6 text-primary" />
+          <Menu className="w-6 h-6 text-primary" />
         </div>
+      </header>
 
-        {/* Live Map Preview Section */}
-        <div className="mt-20">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-white">Live Telemetry Preview</h2>
-            <p className="text-slate-400">Real-time data from your Much Racing device.</p>
-          </div>
-          <div className="w-full h-[600px] bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 relative shadow-2xl shadow-orange-500/10">
-            <MapWrapper />
-          </div>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20">
-          <FeatureCard
-            icon={<MapPin className="w-8 h-8" />}
-            title="Track Database"
-            description="Access hundreds of tracks worldwide with GPS-accurate layouts"
-          />
-          <FeatureCard
-            icon={<Clock className="w-8 h-8" />}
-            title="Lap Timing"
-            description="Precise lap times with sector analysis and best lap tracking"
-          />
-          <FeatureCard
-            icon={<TrendingUp className="w-8 h-8" />}
-            title="Performance Analytics"
-            description="Detailed telemetry data with speed, RPM, and GPS visualization"
-          />
-          <FeatureCard
-            icon={<Wifi className="w-8 h-8" />}
-            title="WiFi Sync"
-            description="Seamlessly upload sessions from your Much Racing device"
-          />
-        </div>
-
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-20">
-          <StatCard number="500+" label="Tracks" />
-          <StatCard number="10K+" label="Sessions" />
-          <StatCard number="50K+" label="Laps Recorded" />
-          <StatCard number="48" label="Countries" />
-        </div>
+      {/* Filter Bar */}
+      <div className="px-4 py-3 bg-white">
+        <button className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary text-sm font-medium text-gray-700">
+          Only Mine <X className="w-4 h-4 text-primary" />
+        </button>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-slate-900/50 border-t border-slate-700 mt-20">
-        <div className="container mx-auto px-6 py-8">
-          <div className="text-center text-slate-400">
-            <p>&copy; 2026 Much Racing. Professional Racing Telemetry.</p>
+      {/* Content List */}
+      <div className="p-4 space-y-4">
+
+        {/* Expanded Style Session Group */}
+        <div className="bg-card-bg rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Header of the Group */}
+          <div className="p-4 flex items-center justify-between border-b border-gray-100">
+            <div>
+              <h3 className="text-lg font-bold text-foreground">14.11.2024, 2 Sessions</h3>
+              <div className="text-sm text-gray-600">Best 100-200 kph: 5.45</div>
+            </div>
+            <div className="text-gray-400">^</div>
+          </div>
+
+          {/* Runs Inside */}
+          <div className="p-0">
+            <Link href="/session/1" className="flex items-center justify-between p-3 border-b border-gray-50 bg-white hover:bg-gray-50">
+              <span className="text-red-500 font-bold w-8">03</span>
+              <span className="text-gray-600 text-sm">1 Run</span>
+              <span className="text-primary font-medium">100-200 kph</span>
+              <span className="text-primary font-bold text-lg">5.83 &gt;</span>
+            </Link>
+            <Link href="/session/1" className="flex items-center justify-between p-3 bg-white hover:bg-gray-50">
+              <span className="text-highlight font-bold w-8">02</span>
+              <span className="text-gray-600 text-sm">1 Run</span>
+              <span className="text-highlight font-medium">100-200 kph</span>
+              <span className="text-highlight font-bold text-lg">5.45 &gt;</span>
+            </Link>
           </div>
         </div>
-      </footer>
-    </div>
-  );
-}
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-orange-500 transition">
-      <div className="text-orange-500 mb-4">{icon}</div>
-      <h3 className="text-white text-xl font-semibold mb-2">{title}</h3>
-      <p className="text-slate-400">{description}</p>
-    </div>
-  );
-}
+        {/* Standard Sessions */}
+        <SessionCard
+          date="27.11.2024, 3 Sessions"
+          title="Best 400 m: 15.87"
+          subtitle=""
+          type="drag"
+          href="/session/1"
+        />
 
-function StatCard({ number, label }: { number: string; label: string }) {
-  return (
-    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 text-center">
-      <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600 mb-2">
-        {number}
+        <SessionCard
+          date="25.11.2024, 1 Session"
+          title="Best 100-200 kph: 6.02"
+          subtitle=""
+          type="drag"
+          href="/session/1"
+        />
+
+        <SessionCard
+          date="07.11.2024, 1 Session"
+          title="Best 1/4 mile: 40.32"
+          subtitle=""
+          type="drag"
+        />
+
+        <SessionCard
+          date="25.10.2024, 1 Session"
+          title="Best 100 kph 2 m: 0.06"
+          subtitle=""
+          type="drag"
+        />
+
       </div>
-      <div className="text-slate-400">{label}</div>
-    </div>
+    </main>
   );
 }

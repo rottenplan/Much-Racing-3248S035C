@@ -11,6 +11,22 @@ void HistoryScreen::onShow() {
   _selectedIdx = -1;
   scanHistory(); // Scan everything once
 
+  // Reset Touch State to prevent double-tap issues
+  _wasTouching =
+      true; // Assume true to force a "release" cycle if finger is already up?
+  // No, if we set it to false, and the user is NOT touching, we are good.
+  // If the user IS touching, p.x != -1, so isTouching=true.
+  // Then !wasTouching && isTouching -> Start Logic -> Sets wasTouching=true.
+  // If we set it to false, it works.
+  _wasTouching = false;
+  _touchStartX = -1;
+  _touchStartY = -1;
+  _touchStartTime = 0;
+  _lastTouchY = -1;
+  _lastTouchY = -1;
+  _isDragging = false;
+  _ignoreInitialTouch = true; // Wait for release before accepting touches
+
   TFT_eSPI *tft = _ui->getTft();
   _ui->drawStatusBar();
   drawMenu();
@@ -18,36 +34,38 @@ void HistoryScreen::onShow() {
 
 void HistoryScreen::update() {
   // Global Touch State Tracking
-  static bool wasTouching = false;
-  static int touchStartX = -1;
-  static int touchStartY = -1;
-  static unsigned long touchStartTime = 0;
-  static unsigned long lastStatusUpdate = 0;
+  // Removed static variables to avoid stale state
+  // static bool wasTouching = false; ...
 
-  // Status Bar Update
   // Status Bar Update - Handled by UIManager globally
-  // if (millis() - lastStatusUpdate > 1000) {
-  //   _ui->drawStatusBar();
-  //   lastStatusUpdate = millis();
-  // }
+  // if (millis() - lastStatusUpdate > 1000) { ... }
 
   UIManager::TouchPoint p = _ui->getTouchPoint();
   bool isTouching = (p.x != -1);
 
+  // Anti-Ghosting / Debounce Logic
+  if (_ignoreInitialTouch) {
+    if (!isTouching) {
+      _ignoreInitialTouch = false; // Finger released, ready for input
+    } else {
+      return; // Ignore lingering touch
+    }
+  }
+
   // --- STATE MACHINE: START ---
-  if (isTouching && !wasTouching) {
-    touchStartX = p.x;
-    touchStartY = p.y;
-    touchStartTime = millis();
+  if (isTouching && !_wasTouching) {
+    _touchStartX = p.x;
+    _touchStartY = p.y;
+    _touchStartTime = millis();
     _isDragging = false;
     _lastTouchY = p.y;
-    wasTouching = true;
+    _wasTouching = true;
   }
 
   // --- STATE MACHINE: DRAGGING ---
-  if (isTouching && wasTouching) {
+  if (isTouching && _wasTouching) {
     int dy = p.y - _lastTouchY;
-    if (abs(p.y - touchStartY) > _dragThreshold) {
+    if (abs(p.y - _touchStartY) > _dragThreshold) {
       _isDragging = true;
     }
 
@@ -109,18 +127,17 @@ void HistoryScreen::update() {
   }
 
   // --- STATE MACHINE: RELEASE (TAP) ---
-  if (!isTouching && wasTouching) {
-    wasTouching = false;
+  if (!isTouching && _wasTouching) {
+    _wasTouching = false;
     _lastTouchY = -1;
 
     // Only register tap if short duration and not dragged far
-    if (!_isDragging && (millis() - touchStartTime < 500)) {
-      int tx = touchStartX;
-      int ty = touchStartY;
+    if (!_isDragging && (millis() - _touchStartTime < 500)) {
+      int tx = _touchStartX;
+      int ty = _touchStartY;
 
-      // Global Back Button (Top Left < 60x60)
-      // Check modes that have a back button
-      if (tx < 60 && ty < 60) {
+      // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log style
+      if (tx < 60 && ty > 180) {
         if (_currentMode == MODE_MENU) {
           _ui->switchScreen(SCREEN_MENU);
           return;
@@ -377,7 +394,11 @@ void HistoryScreen::drawMenu() {
   tft->setTextDatum(TL_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  // Removed Top Left "<"
+  // tft->drawString("<", 10, 25);
+
+  // Bottom Left Back Triangle
+  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
@@ -409,7 +430,7 @@ void HistoryScreen::drawMenu() {
 
 void HistoryScreen::drawGroups(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
-  _ui->drawStatusBar();
+  // _ui->drawStatusBar(); // Removed to prevent flicker
 
   // Header
   tft->fillRect(0, 0, SCREEN_WIDTH, 20, TFT_BLACK);
@@ -450,19 +471,27 @@ void HistoryScreen::drawGroups(int scrollOffset) {
 
     tft->drawString(_groups[i], 10, y + 8);
 
+    tft->drawString(_groups[i], 10, y + 8);
+
     count++;
   }
 
-  if (_groups.size() == 0) {
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextColor(TFT_WHITE, TFT_BLACK);
-    tft->drawString("No Groups Found", SCREEN_WIDTH / 2, 80);
+  // Clear any remaining space at the bottom to prevent ghosting
+  int nextY = startY + (count * itemH);
+  if (nextY < SCREEN_HEIGHT) {
+    tft->fillRect(0, nextY, SCREEN_WIDTH, SCREEN_HEIGHT - nextY, TFT_BLACK);
   }
+
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->drawString("No Groups Found", SCREEN_WIDTH / 2, 80);
+
+  // Back Triangle
+  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 }
 
 void HistoryScreen::drawList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
-  _ui->drawStatusBar();
+  // _ui->drawStatusBar(); // Removed to prevent flicker
 
   // Header "My sessions - [Count]"
   // Calculate total in this group
@@ -591,8 +620,19 @@ void HistoryScreen::drawList(int scrollOffset) {
     tft->drawString(dDisp, 45, y + 4, 2);
     tft->drawString(tRaw, 155, y + 4, 2);
 
+    tft->drawString(tRaw, 155, y + 4, 2);
+
     count++;
   }
+
+  // Clear any remaining space at the bottom to prevent ghosting
+  int nextY = startY + (count * itemH);
+  if (nextY < SCREEN_HEIGHT) {
+    tft->fillRect(0, nextY, SCREEN_WIDTH, SCREEN_HEIGHT - nextY, TFT_BLACK);
+  }
+
+  // Back Triangle
+  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 }
 
 void HistoryScreen::scanGroups() {
@@ -656,6 +696,9 @@ void HistoryScreen::drawOptions() {
     tft->setTextFont(2);
     tft->drawString(options[i], SCREEN_WIDTH / 2, y + h / 2);
   }
+
+  // Back Triangle
+  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 }
 
 void HistoryScreen::drawViewData() {
@@ -713,6 +756,9 @@ void HistoryScreen::drawViewData() {
   // Navigation hint
   tft->setTextSize(1);
   tft->drawString("Tap OK for Next", SCREEN_WIDTH / 2, 220);
+
+  // Back Triangle
+  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 }
 
 void HistoryScreen::drawConfirmDelete() {

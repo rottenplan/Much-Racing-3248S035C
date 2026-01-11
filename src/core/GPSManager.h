@@ -49,6 +49,8 @@ public:
   // RPM Configuration
   void setRpmEnabled(bool enabled);
   bool isRpmEnabled() { return _rpmEnabled; }
+  void setPPRIndex(int idx); // 0=1.0, 1=0.5, 2=2.0, 3=3.0, 4=4.0
+  float getPPR() { return _currentPPR; }
 
   // Manual Time & Redundancy
   void setManualTime(int h, int m, int s = 0);
@@ -77,6 +79,7 @@ private:
   TinyGPSPlus _gps;
   HardwareSerial *_gpsSerial;
   void sendUBX(const uint8_t *cmd, int len);
+  void configureGpsBaud(int targetBaud);
 
   RawDataCallback _dataCallback = nullptr;
 
@@ -103,7 +106,9 @@ private:
   uint8_t _currentSBAS = 0;       // Default EGNOS
   bool _projectionEnabled = true; // Default Enabled
   int _targetFreq = 10;
+
   bool _rpmEnabled = true; // Default Enabled
+  float _currentPPR = 1.0; // Default 1.0 (1 pulse per rev)
 
   // Manual Time System
   int _sysHour = 0;

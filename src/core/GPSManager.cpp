@@ -21,28 +21,29 @@ void GPSManager::begin() {
   _currentSBAS = prefs.getInt("gnss_sbas", 0);
   _projectionEnabled = prefs.getBool("gnss_proj", true);
   _utcOffset = prefs.getInt("utc_offset", 0);
+  _utcOffset = prefs.getInt("utc_offset", 0);
   _rpmEnabled = prefs.getBool("rpm_enabled", true); // Default: Enabled
+
+  // Load PPR
+  int pprIdx = prefs.getInt("rpm_ppr", 0);
+  setPPRIndex(pprIdx); // Initialize _currentPPR
 
   prefs.end();
 
   // Gunakan Serial2 untuk GPS
   _gpsSerial = &Serial2;
-  // Use loaded pins (will be defaults before prefs load, but better to load
-  // prefs first? Actually prefs load happens after this line in original code.
-  // Let's move Serial initialization AFTER prefs load or use defaults first and
-  // then restart? Safest is to rely on setPins if we want to change it, but for
-  // startup let's just use macros until we move prefs load up.
 
-  // Wait, I can't move prefs load up easily without refactoring.
-  // Instead, let's just initialize with macros, and then rely on the fact that
-  // if we change it, setPins will handle it. BUT user wants it to stick.
+  // NEGOTIATE BAUD RATE
+  // 1. Start at default 9600 (Standard factory default)
+  _gpsSerial->begin(9600, SERIAL_8N1, _rxPin, _txPin);
+  delay(100);
 
-  // Correct approach: Move prefs loading of pins before Serial2.begin.
-  // However, local prefs object is created at line 12.
-  // I will just modify begin() structure in next step if needed.
-  // For now, let's keep it using member variables which are initialized to
-  // defaults in header.
-  _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
+  // 2. Switch to configured rate if different
+  if (_baudRate != 9600) {
+    configureGpsBaud(_baudRate);
+    delay(250);                            // Give GPS time to switch
+    _gpsSerial->updateBaudRate(_baudRate); // Switch ESP32 UART speed
+  }
 
   // Apply Config (if GPS active)
   if (_gpsSerial) {
@@ -176,33 +177,10 @@ void GPSManager::update() {
       unsigned long dt = millis() - _lastRpmCalcTime;
       _lastRpmCalcTime = millis();
 
-      // Load PPR Config
-      Preferences prefs;
-      prefs.begin("laptimer", true);
-      int pprIdx = prefs.getInt("rpm_ppr", 0);
-      prefs.end();
-
-      float ppr = 1.0;
-      switch (pprIdx) {
-      case 0:
-        ppr = 1.0;
-        break;
-      case 1:
-        ppr = 0.5;
-        break;
-      case 2:
-        ppr = 2.0;
-        break;
-      case 3:
-        ppr = 3.0;
-        break;
-      case 4:
-        ppr = 4.0;
-        break;
-      }
-
       if (dt > 0) {
-        unsigned long rawRpm = (unsigned long)((pulses * 60000.0) / (dt * ppr));
+        // Use cached _currentPPR
+        unsigned long rawRpm =
+            (unsigned long)((pulses * 60000.0) / (dt * _currentPPR));
 
         // NOISE FILTER: Ignore absurdly low RPM (Ghost readings)
         // Real engines don't run stable < 300 RPM.
@@ -626,6 +604,27 @@ void GPSManager::setRpmEnabled(bool enabled) {
   prefs.end();
 }
 
+void GPSManager::setPPRIndex(int idx) {
+  _currentPPR = 1.0;
+  switch (idx) {
+  case 0:
+    _currentPPR = 1.0;
+    break;
+  case 1:
+    _currentPPR = 0.5;
+    break;
+  case 2:
+    _currentPPR = 2.0;
+    break;
+  case 3:
+    _currentPPR = 3.0;
+    break;
+  case 4:
+    _currentPPR = 4.0;
+    break;
+  }
+}
+
 void GPSManager::setFrequencyLimit(int freq) {
   if (!_gpsSerial)
     return;
@@ -704,6 +703,10 @@ void GPSManager::setPins(int rx, int tx) {
 void GPSManager::setBaud(int baud) {
   if (_baudRate == baud)
     return;
+
+  // 1. Command GPS to switch (while still at old baud)
+  configureGpsBaud(baud);
+
   _baudRate = baud;
 
   Preferences prefs;
@@ -711,15 +714,62 @@ void GPSManager::setBaud(int baud) {
   prefs.putInt("gps_baud", _baudRate);
   prefs.end();
 
-  // Restart Serial
+  // 2. Switch ESP32 to new baud
   if (_gpsSerial) {
-    _gpsSerial->end();
-    delay(100);
-    _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
+    delay(200); // Wait for module
+    _gpsSerial->updateBaudRate(_baudRate);
     delay(100);
     // Re-apply config
     setGnssMode(_currentGnssMode);
     setDynamicModel(_currentDynModel);
     setSBASConfig(_currentSBAS);
   }
+}
+
+void GPSManager::configureGpsBaud(int targetBaud) {
+  if (!_gpsSerial)
+    return;
+
+  // UBX-CFG-PRT (0x06 0x00)
+  uint8_t packet[] = {
+      0xB5,
+      0x62,
+      0x06,
+      0x00,
+      0x14,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00, // PortID=1 (UART1)
+      0xD0,
+      0x08,
+      0x00,
+      0x00,                         // Mode (8N1)
+      (uint8_t)(targetBaud & 0xFF), // Baud LSB
+      (uint8_t)((targetBaud >> 8) & 0xFF),
+      (uint8_t)((targetBaud >> 16) & 0xFF),
+      (uint8_t)((targetBaud >> 24) & 0xFF), // Baud MSB
+      0x07,
+      0x00, // In Proto (UBX+NMEA+RTCM)
+      0x03,
+      0x00, // Out Proto (UBX+NMEA)
+      0x00,
+      0x00, // Flags
+      0x00,
+      0x00, // Reserved
+      0x00,
+      0x00 // Checksum
+  };
+
+  // Calc Checksum
+  uint8_t ck_a = 0, ck_b = 0;
+  for (int i = 2; i < 26; i++) {
+    ck_a += packet[i];
+    ck_b += ck_a;
+  }
+  packet[26] = ck_a;
+  packet[27] = ck_b;
+
+  sendUBX(packet, sizeof(packet));
 }

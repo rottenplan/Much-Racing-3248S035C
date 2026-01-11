@@ -57,6 +57,13 @@ private:
   bool _isDragging = false;
   int _dragThreshold = 10;
 
+  // Touch State
+  bool _wasTouching = false;
+  int _touchStartX = -1;
+  int _touchStartY = -1;
+  unsigned long _touchStartTime = 0;
+  bool _ignoreInitialTouch = true;
+
   void drawMenu();
   void drawGroups(int scrollOffset);
   // drawList is already declared above

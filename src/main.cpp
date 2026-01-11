@@ -83,4 +83,5 @@ void loop() {
   wifiManager.update();
   // sessionManager menyimpan otomatis saat buffer flush jika diperlukan, tetapi
   // kita tulis langsung untuk saat ini
+  delay(5);
 }

@@ -93,7 +93,12 @@ void SetupScreen::drawWelcome() {
   tft->setTextDatum(MC_DATUM);
 
   // Title
-  tft->drawString("WELCOME TO", SCREEN_WIDTH / 2, 60);
+  tft->setTextSize(1);
+  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->drawString("WELCOME TO", SCREEN_WIDTH / 2, 75);
+
+  tft->setTextSize(2);
+  tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
   tft->drawString("MUCH RACING", SCREEN_WIDTH / 2, 90);
 
   tft->setTextSize(1);
@@ -163,12 +168,9 @@ void SetupScreen::drawTextField(const char *label, String value, int y,
                                 bool isActive, bool isPassword) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Use Standard Font 1 for cleaner, non-overlapping text
-  tft->setTextFont(1);
+  // Use Org_01 (Tiny Font) for the Label
+  tft->setFreeFont(&Org_01);
   tft->setTextSize(1);
-
-  // Draw Label ABOVE the y line (Bottom-Left Datum)
-  // This ensures label is 22-30px if y=30
   tft->setTextDatum(BL_DATUM);
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
   tft->drawString(label, 10, y);
@@ -178,6 +180,10 @@ void SetupScreen::drawTextField(const char *label, String value, int y,
   uint16_t borderColor = isActive ? COLOR_PRIMARY : COLOR_SECONDARY;
   tft->drawRect(10, y + 2, SCREEN_WIDTH - 20, 25, borderColor);
   tft->fillRect(11, y + 3, SCREEN_WIDTH - 22, 23, TFT_DARKGREY);
+
+  // Switch back to Standard Font 1 for Value
+  tft->setTextFont(1);
+  tft->setTextSize(1);
 
   // Field value
   String displayValue = value;
