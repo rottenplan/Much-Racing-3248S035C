@@ -43,7 +43,8 @@
 // #define PIN_RGB_BLUE 17  // Disabled: Used for GPS_RX
 // #define PIN_LIGHT_SENSOR 34
 // #define PIN_SPEAKER 26
-#define PIN_RPM_INPUT 35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
+#define PIN_RPM_INPUT                                                          \
+  35 // Inductive Sensor Input (Note: Pin 35 is Input Only, No Pullup)
 
 // GPS / UART
 // Standard Serial Pins (Conflict with USB Debugging!)

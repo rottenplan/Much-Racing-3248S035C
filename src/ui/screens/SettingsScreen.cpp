@@ -136,6 +136,13 @@ void SettingsScreen::loadSettings() {
 
     _settings.push_back(ppr);
 
+    // RPM ON/OFF
+    // Use TYPE_TOGGLE
+    extern GPSManager gpsManager;
+    SettingItem rpmOnOff = {"RPM SENSOR", TYPE_TOGGLE, "rpm_enabled"};
+    rpmOnOff.checkState = gpsManager.isRpmEnabled();
+    _settings.push_back(rpmOnOff);
+
     _prefs.end();
   } else if (_currentMode == MODE_CLOCK) {
     _prefs.begin("laptimer", false);
@@ -374,6 +381,20 @@ void SettingsScreen::saveSetting(int idx) {
     }
 
   } else if (item.type == TYPE_TOGGLE) {
+    // Update Pref
+    // Note: putBool is done below
+
+    if (item.key == "rpm_enabled") {
+      extern GPSManager gpsManager;
+      gpsManager.setRpmEnabled(
+          !item.checkState); // Invert? No, item.checkState is the CURRENT state
+                             // *before* toggle?
+      // Wait, let's look at logic below: item.checkState = !item.checkState;
+      // The logic in handleTouch (line 601) toggles it BEFORE calling
+      // saveSetting. So item.checkState is the NEW desired state.
+      gpsManager.setRpmEnabled(item.checkState);
+    }
+
     _prefs.putBool(item.key.c_str(), item.checkState);
   }
   _prefs.end();

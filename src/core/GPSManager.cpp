@@ -18,8 +18,10 @@ void GPSManager::begin() {
   _currentGnssMode = prefs.getInt("gnss_mode", 1);
   _currentDynModel = prefs.getInt("gnss_model", 3);
   _currentSBAS = prefs.getInt("gnss_sbas", 0);
+  _currentSBAS = prefs.getInt("gnss_sbas", 0);
   _projectionEnabled = prefs.getBool("gnss_proj", true);
   _utcOffset = prefs.getInt("utc_offset", 0);
+  _rpmEnabled = prefs.getBool("rpm_enabled", true); // Default: Enabled
 
   prefs.end();
 
@@ -68,7 +70,8 @@ void GPSManager::begin() {
   }
 
   // Initialize RPM Sensor
-  if (PIN_RPM_INPUT >= 0) {
+  // Initialize RPM Sensor
+  if (PIN_RPM_INPUT >= 0 && _rpmEnabled) {
     pinMode(PIN_RPM_INPUT, INPUT);
     attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
   }
@@ -80,8 +83,8 @@ volatile unsigned long GPSManager::_lastPulseMicros = 0;
 
 void IRAM_ATTR GPSManager::onPulse() {
   unsigned long now = micros();
-  // Debounce: 1ms (1000us) -> Max 60.000 RPM
-  if (now - _lastPulseMicros > 1000) {
+  // Debounce: 2ms (2000us) -> Max 30.000 RPM (Reduces noise significantly)
+  if (now - _lastPulseMicros > 2000) {
     _rpmPulses++;
     _lastPulseMicros = now;
   }
@@ -163,45 +166,57 @@ void GPSManager::update() {
   }
 
   // --- RPM CALCULATION ---
-  if (millis() - _lastRpmCalcTime > 100) { // 10Hz Update
-    noInterrupts();
-    unsigned long pulses = _rpmPulses;
-    _rpmPulses = 0;
-    interrupts();
+  if (_rpmEnabled) {
+    if (millis() - _lastRpmCalcTime > 100) { // 10Hz Update
+      noInterrupts();
+      unsigned long pulses = _rpmPulses;
+      _rpmPulses = 0;
+      interrupts();
 
-    unsigned long dt = millis() - _lastRpmCalcTime;
-    _lastRpmCalcTime = millis();
+      unsigned long dt = millis() - _lastRpmCalcTime;
+      _lastRpmCalcTime = millis();
 
-    // Load PPR Config
-    Preferences prefs;
-    prefs.begin("laptimer", true);
-    int pprIdx = prefs.getInt("rpm_ppr", 0);
-    prefs.end();
+      // Load PPR Config
+      Preferences prefs;
+      prefs.begin("laptimer", true);
+      int pprIdx = prefs.getInt("rpm_ppr", 0);
+      prefs.end();
 
-    float ppr = 1.0;
-    switch (pprIdx) {
-    case 0:
-      ppr = 1.0;
-      break;
-    case 1:
-      ppr = 0.5;
-      break;
-    case 2:
-      ppr = 2.0;
-      break;
-    case 3:
-      ppr = 3.0;
-      break;
-    case 4:
-      ppr = 4.0;
-      break;
+      float ppr = 1.0;
+      switch (pprIdx) {
+      case 0:
+        ppr = 1.0;
+        break;
+      case 1:
+        ppr = 0.5;
+        break;
+      case 2:
+        ppr = 2.0;
+        break;
+      case 3:
+        ppr = 3.0;
+        break;
+      case 4:
+        ppr = 4.0;
+        break;
+      }
+
+      if (dt > 0) {
+        unsigned long rawRpm = (unsigned long)((pulses * 60000.0) / (dt * ppr));
+
+        // NOISE FILTER: Ignore absurdly low RPM (Ghost readings)
+        // Real engines don't run stable < 300 RPM.
+        if (rawRpm < 300) {
+          _currentRPM = 0;
+        } else {
+          _currentRPM = rawRpm;
+        }
+      } else {
+        _currentRPM = 0;
+      }
     }
-
-    if (dt > 0) {
-      _currentRPM = (unsigned long)((pulses * 60000.0) / (dt * ppr));
-    } else {
-      _currentRPM = 0;
-    }
+  } else {
+    _currentRPM = 0;
   }
 
   // Periodic Save (Every 1 minute)
@@ -392,8 +407,8 @@ void GPSManager::setGnssMode(uint8_t mode) {
   int targetRate = 1; // Default safer 1Hz for 9600 baud
 
   // Only allow higher rates if Baud Rate is sufficient (>38400)
-  // 9600 baud can barely handle 10Hz if sentences are short, but with full NMEA
-  // it chokes. Safe limit: 1Hz for 9600.
+  // 9600 baud can barely handle 10Hz if sentences are short, but with full
+  // NMEA it chokes. Safe limit: 1Hz for 9600.
   if (_baudRate > 38400) {
     switch (mode) {
     case 0:
@@ -430,8 +445,8 @@ void GPSManager::setGnssMode(uint8_t mode) {
 
   // In a real scenario, we would send UBX-CFG-GNSS here to enable/disable
   // specific constellations. Due to complexity and lack of verification
-  // hardware, we mock the constellation switch but APPLY the Update Rate which
-  // is universally supported on M8/M10.
+  // hardware, we mock the constellation switch but APPLY the Update Rate
+  // which is universally supported on M8/M10.
 
   Preferences prefs;
   prefs.begin("laptimer", false);
@@ -587,6 +602,27 @@ void GPSManager::setSBASConfig(uint8_t regionIndex) {
   Preferences prefs;
   prefs.begin("laptimer", false);
   prefs.putInt("gnss_sbas", regionIndex);
+  prefs.end();
+}
+
+void GPSManager::setRpmEnabled(bool enabled) {
+  _rpmEnabled = enabled;
+
+  if (PIN_RPM_INPUT >= 0) {
+    if (_rpmEnabled) {
+      pinMode(PIN_RPM_INPUT, INPUT);
+      attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
+    } else {
+      detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT));
+      _currentRPM = 0;
+      _rpmPulses = 0;
+    }
+  }
+
+  // Save Preference
+  Preferences prefs;
+  prefs.begin("laptimer", false);
+  prefs.putBool("rpm_enabled", enabled);
   prefs.end();
 }
 

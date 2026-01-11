@@ -46,6 +46,10 @@ public:
   bool isProjectionEnabled() { return _projectionEnabled; }
   void setFrequencyLimit(int freq); // 10 or 25 (max)
 
+  // RPM Configuration
+  void setRpmEnabled(bool enabled);
+  bool isRpmEnabled() { return _rpmEnabled; }
+
   // Manual Time & Redundancy
   void setManualTime(int h, int m, int s = 0);
   void setUtcOffset(int offset); // Hours
@@ -99,6 +103,7 @@ private:
   uint8_t _currentSBAS = 0;       // Default EGNOS
   bool _projectionEnabled = true; // Default Enabled
   int _targetFreq = 10;
+  bool _rpmEnabled = true; // Default Enabled
 
   // Manual Time System
   int _sysHour = 0;
