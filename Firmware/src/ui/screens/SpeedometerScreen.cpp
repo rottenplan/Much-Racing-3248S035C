@@ -30,11 +30,17 @@ void SpeedometerScreen::update() {
   // 1. Tombol Kembali
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
-    if (PIN_RPM_INPUT >= 0) {
-      // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR -
-      // NO, IT'S GLOBAL NOW
+    static unsigned long lastBackTap = 0;
+    if (millis() - lastBackTap < 500) {
+      if (PIN_RPM_INPUT >= 0) {
+        // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR
+        // - NO, IT'S GLOBAL NOW
+      }
+      _ui->switchScreen(SCREEN_MENU);
+      lastBackTap = 0;
+    } else {
+      lastBackTap = millis();
     }
-    _ui->switchScreen(SCREEN_MENU);
     return;
   }
 

@@ -152,7 +152,8 @@ void UIManager::update() {
 
   // Periodically update status bar (at least once per second)
   static unsigned long lastStatusUpdate = 0;
-  if (_currentType != SCREEN_SPLASH && (millis() - lastStatusUpdate >= 1000)) {
+  if (_currentType != SCREEN_SPLASH && _currentType != SCREEN_SETUP &&
+      (millis() - lastStatusUpdate >= 1000)) {
     drawStatusBar();
     lastStatusUpdate = millis();
   }
@@ -293,7 +294,7 @@ void UIManager::switchScreen(ScreenType type) {
 
   // Gambar Bilah Status setelah onShow agar tidak tertimpa oleh fillScreen di
   // layar
-  if (_currentType != SCREEN_SPLASH) {
+  if (_currentType != SCREEN_SPLASH && _currentType != SCREEN_SETUP) {
     drawStatusBar(true); // Force redraw on switch
   }
 }

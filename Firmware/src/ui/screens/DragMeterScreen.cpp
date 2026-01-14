@@ -91,31 +91,37 @@ void DragMeterScreen::update() {
 
       // 1. Tombol Kembali (Top Left)
       if (p.x < 60 && p.y < 60) {
-        if (_state == STATE_MENU) {
-          _ui->switchScreen(SCREEN_MENU);
-        } else if (_state == STATE_DRAG_MODE_MENU) {
-          _state = STATE_MENU;
-          _ui->setTitle("DRAG METER");
-          _selectedDragModeIdx = -1;           // Reset selection
-          _ui->getTft()->fillScreen(COLOR_BG); // Clear entire screen
-          drawMenu();
-        } else if (_state == STATE_PREDICTIVE_MENU) {
-          _state = STATE_MENU;
-          _ui->setTitle("DRAG METER");
-          _selectedPredictiveIdx = -1;
-          _ui->getTft()->fillScreen(COLOR_BG);
-          drawMenu();
-        } else if (_state == STATE_SUMMARY_VIEW) {
-          _state = STATE_MENU;
-          _ui->setTitle("DRAG METER");
-          _ui->getTft()->fillScreen(COLOR_BG);
-          drawMenu();
+        static unsigned long lastBackTap = 0;
+        if (millis() - lastBackTap < 500) {
+          lastBackTap = 0;
+          if (_state == STATE_MENU) {
+            _ui->switchScreen(SCREEN_MENU);
+          } else if (_state == STATE_DRAG_MODE_MENU) {
+            _state = STATE_MENU;
+            _ui->setTitle("DRAG METER");
+            _selectedDragModeIdx = -1;           // Reset selection
+            _ui->getTft()->fillScreen(COLOR_BG); // Clear entire screen
+            drawMenu();
+          } else if (_state == STATE_PREDICTIVE_MENU) {
+            _state = STATE_MENU;
+            _ui->setTitle("DRAG METER");
+            _selectedPredictiveIdx = -1;
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawMenu();
+          } else if (_state == STATE_SUMMARY_VIEW) {
+            _state = STATE_MENU;
+            _ui->setTitle("DRAG METER");
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawMenu();
+          } else {
+            // If in running mode, go back to menu
+            _state = STATE_MENU;
+            _ui->setTitle("DRAG METER");
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawDashboardStatic();
+          }
         } else {
-          // If in running mode, go back to menu
-          _state = STATE_MENU;
-          _ui->setTitle("DRAG METER");
-          _ui->getTft()->fillScreen(COLOR_BG);
-          drawDashboardStatic();
+          lastBackTap = millis();
         }
         return;
       }

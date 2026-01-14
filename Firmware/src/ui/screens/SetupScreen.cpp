@@ -20,6 +20,9 @@ void SetupScreen::onShow() {
   _showPassword = false;
   _scanCount = 0;    // Reset
   _scrollOffset = 0; // Reset
+  _hasScanned = false;
+  _lastWiFiTapIndex = -1;
+  _lastWiFiTapTime = 0;
 
   drawWelcome();
 }
@@ -83,9 +86,8 @@ void SetupScreen::update() {
 
 void SetupScreen::drawWelcome() {
   TFT_eSPI *tft = _ui->getTft();
-  // Clear only content area
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  // Clear entire screen
+  tft->fillScreen(COLOR_BG);
 
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
@@ -251,13 +253,14 @@ void SetupScreen::drawWiFiScan() {
   // Skip button removed
   drawButton("SCAN", SCREEN_WIDTH - 55, 2, 50, 20, false);
 
-  if (_scanCount == 0) {
+  if (!_hasScanned) {
     tft->setTextColor(COLOR_TEXT, COLOR_BG);
     tft->setTextDatum(MC_DATUM);
     tft->drawString("Scanning...", SCREEN_WIDTH / 2, 120);
 
     // Perform Scan (Blocking)
     _scanCount = wifiManager.scanNetworks();
+    _hasScanned = true;
 
     // Clear "Scanning..." text area only, don't wipe whole screen (prevents
     // flicker)
@@ -334,6 +337,7 @@ void SetupScreen::handleWiFiScanTouch(int x, int y) {
   // Rescan (Top Right)
   if (y < 40 && x > SCREEN_WIDTH - 60) {
     _scanCount = 0;
+    _hasScanned = false;
     drawWiFiScan();
     return;
   }
@@ -344,10 +348,21 @@ void SetupScreen::handleWiFiScanTouch(int x, int y) {
   for (int i = 0; i < _scanCount && i < limit; i++) {
     int itemY = startY + (i * itemH);
     if (y > itemY && y < itemY + 30) {
-      _wifiSSID = wifiManager.getSSID(i);
-      _wifiPassword = "";
-      _currentStep = STEP_WIFI;
-      drawWiFiSetup();
+      if (_lastWiFiTapIndex == i && (millis() - _lastWiFiTapTime < 500)) {
+        // Double Tap confirmed!
+        _wifiSSID = wifiManager.getSSID(i);
+        _wifiPassword = "";
+        _currentStep = STEP_WIFI;
+        drawWiFiSetup();
+        _lastWiFiTapIndex = -1;
+      } else {
+        // First Tap - Select/Highlight (Redraw list?)
+        // ideally we should highlight it visually. For now just track it.
+        _lastWiFiTapIndex = i;
+        _lastWiFiTapTime = millis();
+        // Force redraw to show selection (if we implement visual selection
+        // later) drawWiFiScan();
+      }
       return;
     }
   }
@@ -416,8 +431,19 @@ void SetupScreen::handleWiFiTouch(int x, int y) {
   }
   // Nav Buttons (Top)
   if (y <= 25) {
-    if (x <= 60)
-      nextStep();
+    if (x <= 60) {
+      if (millis() - _lastBackTapTime < 500) {
+        _hasScanned = false; // Force rescan
+        _isEditingSSID = false;
+        _isEditingPassword = false;
+        _currentStep = STEP_WIFI_SCAN;
+        drawWiFiScan();
+        _lastBackTapTime = 0;
+      } else {
+        _lastBackTapTime = millis();
+      }
+      return;
+    }
     if (x >= SCREEN_WIDTH - 90 && _wifiSSID.length() > 0) {
       TFT_eSPI *tft = _ui->getTft();
 

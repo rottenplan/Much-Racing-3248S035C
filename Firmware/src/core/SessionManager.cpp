@@ -1,6 +1,8 @@
 #include "SessionManager.h"
 #include <SPI.h>
 
+// Queue item structure (implicitly just char* for now)
+
 void SessionManager::begin() {
   _logging = false;
 
@@ -23,6 +25,13 @@ void SessionManager::begin() {
       SD.mkdir("/sessions");
     }
   }
+
+  // Initialize Logging Queue (Holds 50 pointers)
+  _logQueue = xQueueCreate(50, sizeof(char *));
+
+  // Start Logging Task (Pinned to Core 0 to leave Core 1 for UI/Arduino)
+  xTaskCreatePinnedToCore(loggingTask, "LoggingTask", 4096, this, 1,
+                          &_loggingTaskHandle, 0);
 }
 
 bool SessionManager::startSession() {
@@ -35,7 +44,10 @@ bool SessionManager::startSession() {
   if (_logFile) {
     _logging = true;
     _currentFilename = filename;
-    _logFile.println("Time,Lat,Lon,Speed,Sats"); // Header
+    // _logFile.println("Time,Lat,Lon,Speed,Sats"); // Header - Send via Queue
+    // instead
+    logData("Time,Lat,Lon,Speed,Sats");
+
     Serial.println("Started logging to: " + filename);
     return true;
   }
@@ -43,16 +55,54 @@ bool SessionManager::startSession() {
 }
 
 void SessionManager::stopSession() {
-  if (_logging && _logFile) {
-    _logFile.close();
+  if (_logging) {
+    // Wait a bit for queue to flush?
+    // We can't strictly wait essentially, but let's give it a moment
+    unsigned long startWait = millis();
+    while (uxQueueMessagesWaiting(_logQueue) > 0 &&
+           millis() - startWait < 500) {
+      delay(10);
+    }
+
     _logging = false;
-    Serial.println("Session Stopped");
+
+    // Slight delay to ensure task sees _logging=false or finishes last write
+    delay(50);
+
+    if (_logFile) {
+      _logFile.close();
+      Serial.println("Session Stopped");
+    }
   }
 }
 
 void SessionManager::logData(String dataLine) {
-  if (_logging && _logFile) {
-    _logFile.println(dataLine);
+  if (_logging) {
+    // Alloc string on heap
+    char *msg = strdup(dataLine.c_str());
+    if (msg) {
+      // Send pointer to queue. Do not block if full (drop packet instead of
+      // freeze)
+      if (xQueueSend(_logQueue, &msg, 0) != pdTRUE) {
+        free(msg); // Queue full, discard to prevent leak
+        Serial.println("Log Queue Full!");
+      }
+    }
+  }
+}
+
+void SessionManager::loggingTask(void *parameter) {
+  SessionManager *self = (SessionManager *)parameter;
+  char *msg;
+
+  while (true) {
+    if (xQueueReceive(self->_logQueue, &msg, portMAX_DELAY) == pdTRUE) {
+      if (self->_logging && self->_logFile) {
+        self->_logFile.println(msg);
+        // Optional: Flush every N lines or rely on close()
+      }
+      free(msg); // Important: Free the memory allocated in logData
+    }
   }
 }
 

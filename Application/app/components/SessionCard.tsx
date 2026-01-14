@@ -23,23 +23,23 @@ export default function SessionCard({
     href,
 }: SessionCardProps) {
     const content = (
-        <div className="bg-card-bg p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between mb-3 cursor-pointer hover:bg-gray-50 transition-colors">
+        <div className="bg-card-bg p-4 rounded-xl shadow-sm border border-border-color flex items-center justify-between mb-3 cursor-pointer hover:bg-white/5 transition-colors">
             <div className="flex flex-col gap-1">
-                <span className="text-gray-500 text-sm font-medium">{date}</span>
+                <span className="text-text-secondary text-sm font-medium">{date}</span>
                 <h3 className="text-foreground font-bold text-lg">{title}</h3>
                 {type === "track" ? (
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-4 text-sm text-text-secondary">
                         <span>{subtitle}</span>
                     </div>
                 ) : (
-                    <div className="text-sm text-gray-600">{subtitle}</div>
+                    <div className="text-sm text-text-secondary">{subtitle}</div>
                 )}
             </div>
 
             <div className="flex items-center gap-3">
                 {highlight && (
                     <div className="text-right">
-                        {highlightLabel && <div className="text-xs text-gray-400">{highlightLabel}</div>}
+                        {highlightLabel && <div className="text-xs text-zinc-500">{highlightLabel}</div>}
                         <div className={`text-lg font-bold ${highlightColor === 'green' ? 'text-highlight' :
                             highlightColor === 'red' ? 'text-primary' : 'text-foreground'
                             }`}>
@@ -47,7 +47,7 @@ export default function SessionCard({
                         </div>
                     </div>
                 )}
-                <ChevronRight className="text-gray-300 w-5 h-5" />
+                <ChevronRight className="text-zinc-600 w-5 h-5" />
             </div>
         </div>
     );

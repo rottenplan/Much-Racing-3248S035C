@@ -62,6 +62,7 @@ private:
   int _touchStartX = -1;
   int _touchStartY = -1;
   unsigned long _touchStartTime = 0;
+  unsigned long _lastBackTapTime = 0;
   bool _ignoreInitialTouch = true;
 
   void drawMenu();

@@ -5,6 +5,9 @@
 #include <Arduino.h>
 #include <FS.h>
 #include <SD.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
 
 class SessionManager {
 public:
@@ -43,6 +46,11 @@ private:
 
 public:
   String getCurrentFilename() { return _currentFilename; }
+
+private:
+  QueueHandle_t _logQueue;
+  TaskHandle_t _loggingTaskHandle;
+  static void loggingTask(void *parameter);
 };
 
 #endif

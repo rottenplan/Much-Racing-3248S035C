@@ -39,6 +39,7 @@ private:
   String _wifiPassword;
   int _scanCount = 0;
   int _scrollOffset = 0; // For scrolling scan results
+  bool _hasScanned;
 
   // Input handling
   bool _isEditingUsername;
@@ -50,6 +51,9 @@ private:
   // Touch state
   unsigned long _lastTouchTime;
   int _lastTapY;
+  int _lastWiFiTapIndex = -1;
+  unsigned long _lastWiFiTapTime = 0;
+  unsigned long _lastBackTapTime = 0;
 
   // Drawing methods
   void drawWelcome();

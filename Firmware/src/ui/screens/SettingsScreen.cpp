@@ -100,10 +100,18 @@ void SettingsScreen::loadSettings() {
     // RPM Settings Sub-menu
     _settings.push_back({"RPM SETTING", TYPE_ACTION});
 
-    // Engine Hours
-    _settings.push_back({"ENGINE HOURS", TYPE_ACTION});
+    // WiFi / Cloud Sub-menu
+    _settings.push_back({"WIFI / CLOUD", TYPE_ACTION});
 
-    // WiFi Setup
+  } else if (_currentMode == MODE_WIFI_MENU) {
+    _prefs.begin("laptimer", false);
+
+    // WiFi Hotspot Toggle
+    SettingItem hotspot = {"WIFI HOTSPOT", TYPE_TOGGLE, "wifi_hotspot"};
+    hotspot.checkState = wifiManager.isEnabled();
+    _settings.push_back(hotspot);
+
+    // WiFi Setup (Client Mode)
     _settings.push_back({"WIFI SETUP", TYPE_ACTION});
 
     // Cloud Sync
@@ -111,6 +119,8 @@ void SettingsScreen::loadSettings() {
 
     // Account Management
     _settings.push_back({"REMOVE ACCOUNT", TYPE_ACTION});
+
+    _prefs.end();
 
   } else if (_currentMode == MODE_ENGINE) {
     _prefs.begin("laptimer", false);
@@ -142,6 +152,9 @@ void SettingsScreen::loadSettings() {
     SettingItem rpmOnOff = {"RPM SENSOR", TYPE_TOGGLE, "rpm_enabled"};
     rpmOnOff.checkState = gpsManager.isRpmEnabled();
     _settings.push_back(rpmOnOff);
+
+    // Engine Hours (Moved here)
+    _settings.push_back({"ENGINE HOURS", TYPE_ACTION});
 
     _prefs.end();
   } else if (_currentMode == MODE_CLOCK) {
@@ -400,6 +413,10 @@ void SettingsScreen::saveSetting(int idx) {
       gpsManager.setRpmEnabled(item.checkState);
     }
 
+    if (item.key == "wifi_hotspot") {
+      wifiManager.setEnabled(item.checkState);
+    }
+
     _prefs.putBool(item.key.c_str(), item.checkState);
   }
   _prefs.end();
@@ -442,31 +459,60 @@ void SettingsScreen::update() {
     return;
 
   // Tombol Kembali (Bottom-Left corner, y > 210)
-  if (p.x < 60 && p.y > 210) {
+  if (p.x < 80 && p.y > 210) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
 
-    // Visual Feedback (Selection)
-    if (_selectedIdx != -2) {
-      _selectedIdx = -2;
-      drawList(_scrollOffset, false);
-    }
+    static unsigned long lastBackTap = 0;
+    if (millis() - lastBackTap < 500) {
+      lastBackTap = 0;
+      // Visual Feedback (Selection)
+      if (_selectedIdx != -2) {
+        _selectedIdx = -2;
+        drawList(_scrollOffset, false);
+      }
 
-    // Logic Back
-    if (_currentMode == MODE_MAIN) {
-      _ui->switchScreen(SCREEN_MENU);
+      // Logic Back
+      if (_currentMode == MODE_MAIN) {
+        _ui->switchScreen(SCREEN_MENU);
+        return; // Exit immediately, do not redraw
+      } else if (_currentMode == MODE_WIFI_MENU) {
+        // Return to Main
+        _currentMode = MODE_MAIN;
+        _ui->setTitle("SETTINGS");
+        loadSettings();
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawStatusBar(true);
+        _scrollOffset = 0;
+        _ui->drawStatusBar(true);
+        _scrollOffset = 0;
+        drawList(0, true);
+      } else if (_currentMode == MODE_ENGINE) {
+        // Return to RPM Menu
+        _currentMode = MODE_RPM;
+        _ui->setTitle("RPM SETTINGS");
+        loadSettings();
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawStatusBar(true);
+        _scrollOffset = 0;
+        drawList(0, true);
+      } else {
+        // Return to Main Settings
+        _currentMode = MODE_MAIN;
+        _ui->setTitle("SETTINGS");
+        loadSettings();
+        // Clear only content area
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawStatusBar(true);
+        _scrollOffset = 0;
+        drawList(0, true);
+      }
     } else {
-      // Return to Main Settings
-      _currentMode = MODE_MAIN;
-      _ui->setTitle("SETTINGS");
-      loadSettings();
-      // Clear only content area
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-      _ui->drawStatusBar(true);
-      _scrollOffset = 0;
-      drawList(0, true);
+      lastBackTap = millis();
     }
     return;
   }
@@ -511,7 +557,7 @@ void SettingsScreen::update() {
     // Only handle standard List Touch for list-based modes
     if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM ||
         _currentMode == MODE_CLOCK || _currentMode == MODE_ENGINE ||
-        _currentMode == MODE_GNSS_CONFIG) {
+        _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU) {
       int idx = _scrollOffset + ((p.y - listY) / itemH);
 
       if (idx >= 0 && idx < _settings.size()) {
@@ -644,6 +690,15 @@ void SettingsScreen::handleTouch(int idx) {
       _currentMode = MODE_ENGINE;
       loadSettings();
       // Clear only content area
+      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+    } else if (item.name == "WIFI / CLOUD") {
+      _currentMode = MODE_WIFI_MENU;
+      loadSettings();
       _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                               SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
       _ui->drawStatusBar(true);

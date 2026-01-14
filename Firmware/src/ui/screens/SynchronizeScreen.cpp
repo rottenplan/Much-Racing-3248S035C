@@ -21,7 +21,7 @@ void SynchronizeScreen::onShow() {
 void SynchronizeScreen::update() {
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.y != -1) {
-    if (millis() - _lastTouchTime > 300) { // Debounce
+    if (millis() - _lastTouchTime > 150) { // Reduced debounce for double tap
       _lastTouchTime = millis();
       handleTouch(p.x, p.y);
     }
@@ -105,7 +105,13 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
 void SynchronizeScreen::handleTouch(int x, int y) {
   // Back button area
   if (x < 50 && y < 50) {
-    _ui->switchScreen(SCREEN_MENU);
+    static unsigned long lastBackTap = 0;
+    if (millis() - lastBackTap < 500) {
+      _ui->switchScreen(SCREEN_MENU);
+      lastBackTap = 0;
+    } else {
+      lastBackTap = millis();
+    }
     return;
   }
 

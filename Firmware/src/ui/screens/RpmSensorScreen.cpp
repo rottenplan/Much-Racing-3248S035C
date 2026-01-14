@@ -63,9 +63,15 @@ void RpmSensorScreen::update() {
   // 1. Back Button
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
-    // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup - NO,
-    // GLOBAL
-    _ui->switchScreen(SCREEN_MENU);
+    static unsigned long lastBackTap = 0;
+    if (millis() - lastBackTap < 500) {
+      // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup - NO,
+      // GLOBAL
+      _ui->switchScreen(SCREEN_MENU);
+      lastBackTap = 0;
+    } else {
+      lastBackTap = millis();
+    }
     return;
   }
 

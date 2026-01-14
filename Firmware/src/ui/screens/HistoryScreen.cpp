@@ -22,6 +22,7 @@ void HistoryScreen::onShow() {
   _touchStartX = -1;
   _touchStartY = -1;
   _touchStartTime = 0;
+  _lastBackTapTime = 0;
   _lastTouchY = -1;
   _lastTouchY = -1;
   _isDragging = false;
@@ -138,39 +139,49 @@ void HistoryScreen::update() {
 
       // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log style
       if (tx < 60 && ty > 180) {
-        if (_currentMode == MODE_MENU) {
-          _ui->switchScreen(SCREEN_MENU);
-          return;
-        } else if (_currentMode == MODE_GROUPS) {
-          _currentMode = MODE_MENU;
-          // Clear only content area
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          drawMenu();
-          return;
-        } else if (_currentMode == MODE_LIST) {
-          _currentMode = MODE_GROUPS;
-          _scrollOffset = 0;
-          _selectedIdx = -1;
-          // Clear only content area
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          drawGroups(0);
-          return;
-        } else if (_currentMode == MODE_OPTIONS) {
-          _currentMode = MODE_LIST;
-          // Clear only content area
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          drawList(_scrollOffset);
-          return;
-        } else if (_currentMode == MODE_VIEW_DATA) {
-          _currentMode = MODE_OPTIONS;
-          // Clear only content area
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          _selectedIdx = 0;
-          drawOptions();
+        if (millis() - _lastBackTapTime < 500) {
+          _lastBackTapTime = 0; // Reset
+          if (_currentMode == MODE_MENU) {
+            _ui->switchScreen(SCREEN_MENU);
+            return;
+          } else if (_currentMode == MODE_GROUPS) {
+            _currentMode = MODE_MENU;
+            // Clear only content area
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            drawMenu();
+            return;
+          } else if (_currentMode == MODE_LIST) {
+            _currentMode = MODE_GROUPS;
+            _scrollOffset = 0;
+            _selectedIdx = -1;
+            // Clear only content area
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            drawGroups(0);
+            return;
+          } else if (_currentMode == MODE_OPTIONS) {
+            _currentMode = MODE_LIST;
+            // Clear only content area
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            drawList(_scrollOffset);
+            return;
+          } else if (_currentMode == MODE_VIEW_DATA) {
+            _currentMode = MODE_OPTIONS;
+            // Clear only content area
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            _selectedIdx = 0;
+            drawOptions();
+            return;
+          }
+        } else {
+          _lastBackTapTime = millis();
           return;
         }
         // MODE_CONFIRM_DELETE doesn't have standard back, handled below

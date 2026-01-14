@@ -54,8 +54,11 @@ private:
   int _menuSelectionIdx = -1;
   unsigned long _lastUpdate;
   unsigned long _lastTouchTime = 0;
+  unsigned long _lastModeTapTime = 0;
+  unsigned long _lastBackTapTime = 0;
   unsigned long _searchStartTime = 0; // For Searching delay
   bool _isRecording;
+  bool _needsStaticRedraw;
 
   // GPS Track Recording
   RecordingState _recordingState;

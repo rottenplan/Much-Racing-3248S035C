@@ -12,6 +12,11 @@ WiFiManager::WiFiManager() : _server(80) {
 void WiFiManager::begin() {
   loadCredentials();
 
+  if (!_enabled) {
+    Serial.println("WiFi: Disabled by user settings.");
+    return;
+  }
+
   // ALWAYS Start AP Mode
   startAP();
 
@@ -51,6 +56,9 @@ void WiFiManager::startAP() {
 }
 
 void WiFiManager::update() {
+  if (!_enabled)
+    return;
+
   _server.handleClient(); // Handle Web Requests
 
   if (_isConnecting) {
@@ -153,13 +161,17 @@ void WiFiManager::saveCredentials(String ssid, String pass) {
 }
 
 void WiFiManager::loadCredentials() {
-  if (loadFromSD())
-    return;
-
   _prefs.begin("laptimer", true);
+  _enabled = _prefs.getBool("wifi_enabled", true); // Default to ON
   _ssid = _prefs.getString("wifi_ssid", "");
   _pass = _prefs.getString("wifi_pass", "");
   _prefs.end();
+
+  if (loadFromSD()) {
+    // SD Card Overrides stored SSID/Pass, but not enabled state (unless we add
+    // it there too, but let's keep it simple)
+    return;
+  }
 }
 
 bool WiFiManager::loadFromSD() {
@@ -195,3 +207,22 @@ bool WiFiManager::tryAutoConnect() {
 }
 
 bool WiFiManager::isConnected() { return WiFi.status() == WL_CONNECTED; }
+
+void WiFiManager::setEnabled(bool enabled) {
+  if (_enabled == enabled)
+    return;
+  _enabled = enabled;
+
+  _prefs.begin("laptimer", false);
+  _prefs.putBool("wifi_enabled", _enabled);
+  _prefs.end();
+
+  if (_enabled) {
+    begin(); // Re-run begin to start everything up
+  } else {
+    Serial.println("WiFi: Disabling...");
+    _server.stop();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
+}

@@ -50,6 +50,7 @@ private:
     MODE_RPM,
     MODE_ENGINE,
     MODE_CLOCK,
+    MODE_WIFI_MENU,
     MODE_WIFI,
     MODE_WIFI_PASS
   };

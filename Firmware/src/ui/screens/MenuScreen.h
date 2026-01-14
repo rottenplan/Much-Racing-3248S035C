@@ -12,18 +12,18 @@ public:
 private:
   UIManager *_ui;
   int _selectedIndex;
-  
+
   // Pagination State
-  int _currentPage;
+  int _currentPage = 0;
   int _touchStartY;
-  
+
   static const int ITEMS_PER_PAGE = 4;
   unsigned long _lastTouchTime = 0;
-  
+
   int _lastSelectedIndex;
   int _lastTapIdx;
   unsigned long _lastTapTime;
-  
+
   void drawMenu(bool force = false);
 };
 

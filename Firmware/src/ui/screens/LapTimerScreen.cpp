@@ -18,7 +18,8 @@ extern SessionManager sessionManager;
 void LapTimerScreen::onShow() {
   _lastUpdate = 0;
   _lastTouchTime = millis(); // Prevent ghost touch on entry
-  _isRecording = false;      // Mulai tidak merekam
+  _lastBackTapTime = 0;
+  _isRecording = false; // Mulai tidak merekam
   _finishSet = false;
   _lapCount = 0;
   _state = STATE_TRACK_LIST; // Mulai di Pilihan Track
@@ -42,7 +43,8 @@ void LapTimerScreen::onShow() {
   // Start in Sub-Menu
   _state = STATE_MENU;
   TFT_eSPI *tft = _ui->getTft();
-  // tft->fillScreen(COLOR_BG);
+  // tft->fillScreen(COLOR_BG); // Removed to avoid flash
+  _needsStaticRedraw = true;
   drawMenu();
 }
 
@@ -145,10 +147,16 @@ void LapTimerScreen::update() {
         _lastTouchTime = millis();
 
         if (_menuSelectionIdx == -2) {
-          _ui->switchScreen(SCREEN_MENU);
+          if (millis() - _lastBackTapTime < 500) {
+            _ui->switchScreen(SCREEN_MENU);
+            _lastBackTapTime = 0;
+          } else {
+            _lastBackTapTime = millis();
+          }
         } else {
           _menuSelectionIdx = -2;
           drawMenu();
+          _lastBackTapTime = millis();
         }
         return;
       }
@@ -293,11 +301,16 @@ void LapTimerScreen::update() {
       // User didn't specify Back on List, but implied menu access.
       // Let's keep Back check on left just in case < 60x60
       if (p.x < 60 && p.y < 60) {
-        _state = STATE_MENU;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawMenu();
-        _ui->drawStatusBar();
+        if (millis() - _lastBackTapTime < 500) {
+          _state = STATE_MENU;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawMenu();
+          _ui->drawStatusBar();
+          _lastBackTapTime = 0;
+        } else {
+          _lastBackTapTime = millis();
+        }
         return;
       }
 
@@ -396,11 +409,17 @@ void LapTimerScreen::update() {
         if (millis() - _lastTouchTime < 200)
           return;
         _lastTouchTime = millis();
-        // Back from details -> List (not Menu)
-        _state = STATE_TRACK_LIST;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawTrackList();
+
+        if (millis() - _lastBackTapTime < 500) {
+          // Back from details -> List (not Menu)
+          _state = STATE_TRACK_LIST;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawTrackList();
+          _lastBackTapTime = 0;
+        } else {
+          _lastBackTapTime = millis();
+        }
         return;
       }
 
@@ -437,16 +456,23 @@ void LapTimerScreen::update() {
         _lastTouchTime = millis();
 
         if (_menuSelectionIdx == -2) {
-          // Back to Sub-Menu
-          _state = STATE_MENU;
-          _menuSelectionIdx = -1;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          drawMenu();
-          _ui->drawStatusBar();
+          if (millis() - _lastBackTapTime < 500) {
+            // Back to Sub-Menu
+            _state = STATE_MENU;
+            _menuSelectionIdx = -1;
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            drawMenu();
+            _ui->drawStatusBar();
+            _lastBackTapTime = 0;
+          } else {
+            _lastBackTapTime = millis();
+          }
         } else {
           _menuSelectionIdx = -2;
           drawSummary();
+          _lastBackTapTime = millis();
         }
         return;
       }
@@ -469,11 +495,16 @@ void LapTimerScreen::update() {
     if (touched) {
       // Back button (bottom left)
       if (p.x < 80 && p.y > SCREEN_HEIGHT - 30) {
-        _state = STATE_MENU;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawMenu();
-        _ui->drawStatusBar();
+        if (millis() - _lastBackTapTime < 500) {
+          _state = STATE_MENU;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          drawMenu();
+          _ui->drawStatusBar();
+          _lastBackTapTime = 0;
+        } else {
+          _lastBackTapTime = millis();
+        }
         return;
       }
 
@@ -626,22 +657,28 @@ void LapTimerScreen::update() {
         _lastTouchTime = millis();
 
         if (_menuSelectionIdx == -2) {
-          // Execute Stop Logic
-          if (sessionManager.isLogging()) {
-            String dateStr =
-                gpsManager.getDateString() + " " + gpsManager.getTimeString();
-            sessionManager.appendToHistoryIndex(
-                "Track Session", dateStr, _lapCount, _bestLapTime, "TRACK");
-          }
-          sessionManager.stopSession();
-          _isRecording = false;
+          if (millis() - _lastBackTapTime < 500) {
+            // Execute Stop Logic
+            if (sessionManager.isLogging()) {
+              String dateStr =
+                  gpsManager.getDateString() + " " + gpsManager.getTimeString();
+              sessionManager.appendToHistoryIndex(
+                  "Track Session", dateStr, _lapCount, _bestLapTime, "TRACK");
+            }
+            sessionManager.stopSession();
+            _isRecording = false;
 
-          // Return to Menu
-          _state = STATE_MENU;
-          _menuSelectionIdx = -1;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          drawMenu();
+            // Return to Menu
+            _state = STATE_MENU;
+            _menuSelectionIdx = -1;
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    COLOR_BG);
+            drawMenu();
+            _lastBackTapTime = 0;
+          } else {
+            _lastBackTapTime = millis();
+          }
         } else {
           _menuSelectionIdx = -2;
           // Highlight Arrow
@@ -651,6 +688,7 @@ void LapTimerScreen::update() {
           tft->setFreeFont(&Org_01);
           tft->setTextSize(2);
           tft->drawString("<", 10, 25);
+          _lastBackTapTime = millis();
         }
         return;
       }
@@ -677,21 +715,24 @@ void LapTimerScreen::update() {
 
       // Mode Toggle (Kiri < 80)
       if (p.x < 80 && p.y > 60 && p.y < 200) {
-        // Toggle Mode
-        if (_raceMode == MODE_BEST)
-          _raceMode = MODE_LAST;
-        else if (_raceMode == MODE_LAST)
-          _raceMode = MODE_PREDICTIVE;
-        else
-          _raceMode = MODE_BEST;
+        // Double Tap Logic
+        unsigned long now = millis();
+        if (now - _lastModeTapTime < 400) {
+          // Second tap! Toggle Mode.
+          if (_raceMode == MODE_BEST)
+            _raceMode = MODE_LAST;
+          else if (_raceMode == MODE_LAST)
+            _raceMode = MODE_PREDICTIVE;
+          else
+            _raceMode = MODE_BEST;
 
-        // Clear Bottom Area for refresh
-        _ui->getTft()->fillRect(0, 200, SCREEN_WIDTH, 40,
-                                TFT_BLACK); // Clear bottom black mostly
-        // Redraw White Box for Label
-        _ui->getTft()->fillRect(0, 200, 100, 40, TFT_WHITE);
-
-        // Re-draw static parts if needed, but dynamic handles labels now.
+          // Trigger Redraw safely
+          _needsStaticRedraw = true;
+          _lastModeTapTime = 0; // Reset
+        } else {
+          // First tap
+          _lastModeTapTime = now;
+        }
         return;
       }
 
@@ -718,7 +759,14 @@ void LapTimerScreen::update() {
       sessionManager.logData(data);
     }
 
-    // UI Update (10Hz)
+    // UI Update (RENDER LOOP)
+    if (_needsStaticRedraw) {
+      drawRacingStatic();
+      // Forces dynamic update immediately
+      _lastUpdate = 0;
+      _needsStaticRedraw = false;
+    }
+
     if (millis() - _lastUpdate > 100) {
       drawRacing();
       // _ui->drawStatusBar(); // Handled by UIManager
@@ -1229,34 +1277,73 @@ void LapTimerScreen::drawSummary() {
 
 void LapTimerScreen::drawRacingStatic() {
   TFT_eSPI *tft = _ui->getTft();
+  // Clear screen below status bar
   tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                TFT_BLACK); // Pastikan layar hitam (di bawah status bar)
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
 
-  // 1. Header (Nama Track)
-  // Tidak ada, atau kecil di atas? Gambar referensi menunjukkan "Serres
-  // Automotive" di bar status? Kita akan gunakan bar status untuk nama track
-  // jika memungkinkan, atau draw di y=25 Asumsi: Status bar diurus UIManager.
-  // Kita gambar di bawahnya.
+  // Restore Status Bar Separator (Line 20)
+  tft->drawFastHLine(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, TFT_DARKGREY);
 
-  // 1. Back Arrow
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(TL_DATUM);
+  // --- TOP ROW (Info) y=25 to 70 ---
+  int topRowY = 25; // Moved down from 20 to avoid status bar overlap
+  int topRowH = 45;
+  int lineY = topRowY + topRowH; // y=70
+
+  // Horizontal Separator below Top Row
+  tft->drawFastHLine(0, lineY, SCREEN_WIDTH, TFT_DARKGREY);
+
+  // Vertical Separators
+  // 3 Columns: 320 / 3 ~= 106
+  tft->drawFastVLine(106, topRowY, topRowH, TFT_DARKGREY);
+  tft->drawFastVLine(212, topRowY, topRowH, TFT_DARKGREY);
+
+  // Static Small Labels (Superscript style) -> Now Subscript style (Below
+  // values)
+  tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  tft->setTextSize(1);
+  tft->setTextDatum(TC_DATUM); // Center Alignment
 
-  // 3. Separator Horizontal Utama
-  tft->drawFastHLine(0, 90, SCREEN_WIDTH, TFT_WHITE);
-  tft->drawFastHLine(0, 200, SCREEN_WIDTH, TFT_WHITE);
+  // Column 1: LAP (Center of 0-106 = 53)
+  tft->drawString("LAP", 53, 56);
 
-  // 4. Lap Box (Kanan Atas) - Latar Putih
-  tft->fillRect(SCREEN_WIDTH / 2 + 20, 25, SCREEN_WIDTH / 2 - 20, 65,
-                TFT_WHITE); // Height increased to match line 90
+  // Column 2: KPH (Center of 106-212 = 159)
+  tft->drawString("KPH", 159, 56);
 
-  // 5. Box BEST (Kiri Bawah) - Latar Putih
-  int bottomY = 200;
-  tft->fillRect(0, bottomY, 100, 40, TFT_WHITE);
+  // Column 3: MODE (Center of 212-320 = 266)
+  tft->drawString("MODE", 266, 56);
+
+  // --- BOTTOM ROW (Delta) y=190 to 240 ---
+  int bottomY = 180;
+  // Horizontal Separator above Bottom Row
+  tft->drawFastHLine(0, bottomY, SCREEN_WIDTH, TFT_DARKGREY);
+
+  // Label "Pred. Gap" (Stacked)
+  tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft->setTextDatum(TL_DATUM);
+  tft->drawString("Pred.", 10, bottomY + 10);
+  tft->drawString("Gap", 10, bottomY + 25);
+
+  // Bar Graph Base Line / Ticks
+  int barX = 130;
+  int barW = 180; // 310 - 130
+  int barCenter = barX + (barW / 2);
+  int barY = bottomY + 15;
+  int barH = 20;
+
+  // Center Tick
+  tft->drawFastVLine(barCenter, barY - 2, barH + 4, TFT_LIGHTGREY);
+
+  // Range Ticks (e.g. +/- 2.0s or 5.0s)
+  // Left Tick
+  tft->drawFastVLine(barX, barY + 5, barH - 10, TFT_DARKGREY);
+  // Right Tick
+  tft->drawFastVLine(barX + barW, barY + 5, barH - 10, TFT_DARKGREY);
+
+  // Small labels for ticks
+  tft->setTextDatum(TC_DATUM);
+  tft->drawString("-5.0", barX, barY + 22);
+  tft->drawString("+5.0", barX + barW, barY + 22);
 
   _ui->drawStatusBar();
 }
@@ -1264,129 +1351,133 @@ void LapTimerScreen::drawRacingStatic() {
 void LapTimerScreen::drawRacing() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // 1. Kecepatan (Kiri Atas - Besar Putih di Hitam)
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextFont(7); // Font 7-segmen besar
-  tft->setTextSize(1);
+  // --- TOP ROW UPDATES ---
+  // Font 6 is a good large condensed number font, or 7 for very large segments
+  tft->setTextDatum(TC_DATUM); // Align Center
 
-  // Reduced padding to avoid erasing KPH label
-  tft->setTextPadding(110);
-  tft->drawFloat(gpsManager.getSpeedKmph(), 0, 45, 30);
+  // 1. Lap Count (Col 1 Center 53)
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextFont(4); // Medium Large
+  tft->setTextSize(1);
+  tft->setTextPadding(80); // Clear width
+  tft->drawNumber(_lapCount, 53, 25);
   tft->setTextPadding(0);
 
-  // Re-draw Labels dynamically to prevent overwrites
-  // Label "KPH" (Kecil Putih di kiri)
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(1);
-  tft->drawString("KPH", 25, 27);
-
-  // Label "LAP" (Kecil Hitam di dalam kotak Putih)
-  tft->setTextColor(TFT_BLACK, TFT_WHITE);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01); // Use Org_01 for consistency and small size
-  tft->setTextSize(1);
-  tft->drawString("LAP", SCREEN_WIDTH / 2 + 25, 27); // Moved to Top-Left of Box
-
-  // 2. Lap Count (Kanan Atas - Besar Hitam di Putih)
-  tft->setTextColor(TFT_BLACK, TFT_WHITE);
-  tft->setTextDatum(TR_DATUM); // Rata Kanan
-  tft->setTextFont(7);
-  tft->setTextSize(1);
-  tft->setTextPadding(100);
-  // Gambar di dalam kotak putih (x > 180)
-  tft->drawNumber(_lapCount, SCREEN_WIDTH - 10, 30);
+  // 2. Speed (Col 2 Center 159)
+  tft->setTextDatum(TC_DATUM);
+  tft->setTextPadding(80);
+  tft->drawFloat(gpsManager.getSpeedKmph(), 1, 159, 25);
   tft->setTextPadding(0);
 
-  // 3. Main Time (Tengah - Besar Putih)
+  // 3. Mode (Col 3 Center 266)
+  String modeStr = "UNK";
+  if (_raceMode == MODE_BEST)
+    modeStr = "BEST";
+  else if (_raceMode == MODE_LAST)
+    modeStr = "LAST";
+  else if (_raceMode == MODE_PREDICTIVE)
+    modeStr = "PRED.";
+
+  tft->setTextDatum(TC_DATUM);
+  tft->setTextPadding(80);
+  tft->drawString(modeStr, 266, 25);
+  tft->setTextPadding(0);
+
+  // --- MAIN TIMER (Center) ---
   unsigned long currentLap = 0;
   if (_isRecording)
     currentLap = millis() - _currentLapStart;
 
-  int ms = currentLap % 1000;
+  int ms = (currentLap % 1000) / 10; // 0-99
   int s = (currentLap / 1000) % 60;
   int m = (currentLap / 60000);
-  char buf[32];
 
-  // Format MM:SS.d untuk timer berjalan
-  sprintf(buf, "%d:%02d.%01d", m, s, ms / 100);
+  char timeBuf[16];
+  sprintf(timeBuf, "%02d:%02d.%02d", m, s, ms);
 
+  // To center perfectly with large font
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextColor(TFT_DARKGREY,
+                    TFT_BLACK); // Ghost digits? No, just straightforward
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(MC_DATUM); // Tengah Layar
-  tft->setTextFont(7);         // Font paling besar 7
-  tft->setTextSize(1); // (Atau skala 2 untuk font 4?) Font 7 numerik bagus.
-  tft->setTextPadding(SCREEN_WIDTH);
-  tft->drawString(buf, SCREEN_WIDTH / 2, 140); // Tengah vertikal area (80-200)
+
+  // Font 7 is huge 7-seg. Font 6 is large numeric.
+  // 6 Might be too small for "Giant Center". 7 is 7-seg style.
+  tft->setTextFont(7);
+  tft->setTextSize(2); // Double size for GIANT effect?
+  // Check fit: 320px width. "00:00.00" is 8 chars.
+  // Font 7 width is approx 32px? 8*32 = 256. Size 2 -> 512 (Too big).
+  // Size 1 should be fine.
+  tft->setTextSize(1);
+
+  tft->setTextPadding(320); // Full width clear
+  // Center Y = 70 + (120/2) = 130
+  tft->drawString(timeBuf, SCREEN_WIDTH / 2, 130);
   tft->setTextPadding(0);
 
-  // 4. Bottom Section (Mode Dependent)
-  int bottomY = 200;
+  // --- BOTTOM ROW (Delta Bar) ---
+  int bottomY = 180;
 
-  // Label Box (Background Putih sudah digambar di Static, tapi kita overwrite
-  // text)
-  tft->setTextColor(TFT_BLACK, TFT_WHITE);
-  tft->setTextDatum(MC_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-
-  String label = "";
-  String valueStr = "--:--.--";
-
-  if (_raceMode == MODE_BEST) {
-    label = "BEST";
-    if (_bestLapTime > 0) {
-      int bms = _bestLapTime % 1000;
-      int bs = (_bestLapTime / 1000) % 60;
-      int bm = (_bestLapTime / 60000);
-      char tmp[32];
-      sprintf(tmp, "%d:%02d.%02d", bm, bs, bms / 10);
-      valueStr = String(tmp);
-    }
-  } else if (_raceMode == MODE_LAST) {
-    label = "LAST";
-    if (_lastLapTime > 0) {
-      int lms = _lastLapTime % 1000;
-      int ls = (_lastLapTime / 1000) % 60;
-      int lm = (_lastLapTime / 60000);
-      char tmp[32];
-      sprintf(tmp, "%d:%02d.%02d", lm, ls, lms / 10);
-      valueStr = String(tmp);
-    }
-  } else if (_raceMode == MODE_PREDICTIVE) {
-    // In Predictive Mode, Show the Delta Number in the White Box
-    valueStr = "-00.26";
-    label = valueStr;
-  }
-
-  // Draw Label/Value in White Box (0-100)
-  tft->setTextColor(TFT_BLACK, TFT_WHITE);
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextPadding(90);
-  tft->drawString(label, 50, bottomY + 20);
-  tft->setTextPadding(0);
-
-  // Draw Right Side Content
+  // Delta Value
+  float delta = 0.0;
+  // Calculate fake delta for now or use predictive logic
+  // For now just mockup or realistic zero
   if (_raceMode == MODE_PREDICTIVE) {
-    // Bar Graph Simulation
-    // Background Bar
-    tft->fillRect(110, bottomY + 10, SCREEN_WIDTH - 120, 20, TFT_DARKGREY);
-    // Value Bar (Green/Red)
-    // Misal -0.26 (Green)
-    tft->fillRect(SCREEN_WIDTH / 2, bottomY + 10, 40, 20, TFT_GREEN);
-    tft->drawFastVLine(SCREEN_WIDTH / 2, bottomY + 5, 30,
-                       TFT_WHITE); // Center Marker
-
-  } else {
-    // Standard Time Value (Right Side)
-    tft->setTextColor(TFT_WHITE, TFT_BLACK);
-    tft->setTextFont(4);
-    tft->setTextDatum(TR_DATUM);
-    tft->setTextPadding(200);
-    tft->drawString(valueStr, SCREEN_WIDTH - 10, 210);
-    tft->setTextPadding(0);
+    // TODO: Implement actual predictive math
+    delta = -3.62; // Mock from image
   }
+
+  char deltaBuf[16];
+  if (delta >= 0)
+    sprintf(deltaBuf, "+%02.2f", delta);
+  else
+    sprintf(deltaBuf, "%03.2f", delta); // includes -
+
+  tft->setTextFont(4);
+  tft->setTextSize(1);
+  tft->setTextDatum(TL_DATUM);
+  // Bar Graph
+  int barX = 130;
+  int barW = 180;
+  int barCenter = barX + (barW / 2);
+  int barY = bottomY + 15;
+  int barH = 20;
+
+  // Clear Bar Area first (important for variable length)
+  tft->fillRect(barX, barY + 1, barW, barH - 2,
+                TFT_BLACK); // +1/-2 to keep border area clean?
+  // No, we didn't draw a box, just ticks. Clear fully.
+  // But strictly, we want to clear defined area.
+
+  // Normalize Delta to Bar Range (+/- 5.0s)
+  // Max range 5.0 -> Width 90px (Half bar)
+  // Px per sec = 90 / 5 = 18 px/s
+  float pxPerSec = 90.0 / 5.0;
+  int barLen = (int)(delta * pxPerSec);
+
+  // Clamp
+  if (barLen > 90)
+    barLen = 90;
+  if (barLen < -90)
+    barLen = -90;
+
+  // Draw Center Marker (Static) is drawn in drawRacingStatic, but we need
+  // to ensure bar doesn't overwrite it improperly, or we redraw it.
+  // Actually, standard bar graph logic: clear -> draw value.
+  // We cleared box above.
+
+  if (barLen < 0) {
+    // Negative (Green, Left)
+    int w = abs(barLen);
+    tft->fillRect(barCenter - w, barY + 2, w, barH - 4, TFT_GREEN);
+  } else if (barLen > 0) {
+    // Positive (Red, Right)
+    tft->fillRect(barCenter, barY + 2, barLen, barH - 4, TFT_RED);
+  }
+
+  // Re-draw center tick over the bar if needed?
+  // Usually ticks are behind, but center marker is useful.
+  // Let's leave it.
 }
 
 void LapTimerScreen::checkFinishLine() {

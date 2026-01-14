@@ -102,8 +102,14 @@ void GnssLogScreen::update() {
   if (p.x != -1) {
     if (p.y > 200 && p.x < 60) {
       // Back (Triangle area)
-      gpsManager.setRawDataCallback(nullptr); // Disable callback
-      _ui->switchScreen(SCREEN_GPS_STATUS);
+      static unsigned long lastBackTap = 0;
+      if (millis() - lastBackTap < 500) {
+        gpsManager.setRawDataCallback(nullptr); // Disable callback
+        _ui->switchScreen(SCREEN_GPS_STATUS);
+        lastBackTap = 0;
+      } else {
+        lastBackTap = millis();
+      }
       return;
     }
 

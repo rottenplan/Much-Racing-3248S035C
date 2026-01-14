@@ -14,7 +14,7 @@ void MenuScreen::onShow() {
   _selectedIndex = -1;
   _lastSelectedIndex = -1;
   _lastTouchTime = 0;
-  _currentPage = 0; // Start at Page 0
+  // _currentPage = 0; // Removing reset to remember last page
   _touchStartY = -1;
   _lastTapIdx = -1;
   _lastTapTime = 0;
@@ -59,17 +59,17 @@ void MenuScreen::update() {
       // Debounce Page Switch
       static unsigned long lastPageSwitch = 0;
       if (millis() - lastPageSwitch > 300) {
-        if (deltaY > 0) { // Swipe Up -> Next Page
-          int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
-          if (_currentPage < maxPage) {
-            _currentPage++;
+        if (deltaY > 0) { // Swipe Up -> Prev Page
+          if (_currentPage > 0) {
+            _currentPage--;
             drawMenu(true);
             lastPageSwitch = millis();
             _touchStartY = p.y; // Reset anchor
           }
-        } else { // Swipe Down -> Prev Page
-          if (_currentPage > 0) {
-            _currentPage--;
+        } else { // Swipe Down -> Next Page
+          int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
+          if (_currentPage < maxPage) {
+            _currentPage++;
             drawMenu(true);
             lastPageSwitch = millis();
             _touchStartY = p.y;

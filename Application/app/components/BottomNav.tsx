@@ -9,7 +9,7 @@ export default function BottomNav() {
     // For this prototype we validly link to pages.
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-16 flex items-center justify-around pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 bg-card-bg/80 backdrop-blur-md border-t border-border-color h-16 flex items-center justify-around pb-safe z-50">
             <NavItem icon={<Gauge />} label="DRAG" href="/" />
             <NavItem icon={<Map />} label="TRACK" href="/track" />
             <NavItem icon={<MonitorSmartphone />} label="DEVICES" href="/devices" />
@@ -25,7 +25,7 @@ function NavItem({ icon, label, href }: { icon: React.ReactNode; label: string; 
     const isActive = false; // hardcode for now or use hook
 
     return (
-        <Link href={href} className={`flex flex-col items-center gap-1 ${isActive ? "text-primary" : "text-gray-400"}`}>
+        <Link href={href} className={`flex flex-col items-center gap-1 ${isActive ? "text-primary" : "text-text-secondary"}`}>
             <div className="w-6 h-6">{icon}</div>
             <span className="text-[10px] font-bold tracking-wide">{label}</span>
         </Link>

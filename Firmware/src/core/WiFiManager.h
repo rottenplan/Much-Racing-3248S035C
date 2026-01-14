@@ -32,6 +32,10 @@ public:
   bool isConnected();
   String getSSID() { return _ssid; }
 
+  // Toggle
+  void setEnabled(bool enabled);
+  bool isEnabled() { return _enabled; }
+
 private:
   String _ssid;
   String _pass;
@@ -41,6 +45,8 @@ private:
 
   WebServer _server; // Web Server Object
   GPSManager *_gps = nullptr;
+
+  bool _enabled = true; // Default ON
 
   bool loadFromSD();
   void startAP(); // Start Hotspot

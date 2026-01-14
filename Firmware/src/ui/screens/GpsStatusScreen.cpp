@@ -45,7 +45,7 @@ void GpsStatusScreen::update() {
     // Back Button Area (Bottom Left)
     if (p.x < 60 && p.y > 200) {
       static unsigned long lastBackTap = 0;
-      if (millis() - lastBackTap < 1000) {
+      if (millis() - lastBackTap < 500) {
         _ui->switchScreen(SCREEN_MENU);
         lastBackTap = 0;
       } else {
@@ -203,9 +203,10 @@ void GpsStatusScreen::drawStatus() {
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->setTextDatum(BL_DATUM);
 
-    int yFooter = 190; // Moved up above Back Button
+    int yFooter = 235; // Moved to bottom to avoid Radar and Sat overlap
 
-    tft->fillRect(5, yFooter - 15, 300, 20, TFT_BLACK); // Wider clear
+    // Clear bottom area, avoiding Back button (X < 50)
+    tft->fillRect(60, yFooter - 15, SCREEN_WIDTH - 60, 20, TFT_BLACK);
 
     char footerBuf[64];
     int fixQ = gpsManager.isFixed() ? 3 : 0;
@@ -216,7 +217,7 @@ void GpsStatusScreen::drawStatus() {
     // Show Pins and Baud for debugging
     sprintf(footerBuf, "R:%d T:%d B:%d A:%d HDOP:%.2f", rx, tx, baud, fixQ,
             hdop);
-    tft->drawString(footerBuf, 5, yFooter);
+    tft->drawString(footerBuf, 60, yFooter);
 
     _lastHdop = hdop;
     _lastHz = hz;
