@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
 
     // Define protected routes
-    const protectedRoutes = ['/dashboard', '/tracks', '/sessions', '/device'];
+    const protectedRoutes = ['/dashboard', '/tracks', '/sessions', '/categories', '/device', '/devices', '/setup-device'];
 
     // Check if current path starts with any protected route
     const isProtected = protectedRoutes.some(route => path.startsWith(route));
@@ -24,6 +24,9 @@ export const config = {
         '/dashboard/:path*',
         '/tracks/:path*',
         '/sessions/:path*',
+        '/categories/:path*',
         '/device/:path*',
+        '/devices/:path*',
+        '/setup-device/:path*',
     ],
 };

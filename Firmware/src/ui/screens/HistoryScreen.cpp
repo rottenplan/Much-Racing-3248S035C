@@ -9,27 +9,35 @@ void HistoryScreen::onShow() {
   _scrollOffset = 0;
   _currentMode = MODE_MENU; // Start at Menu
   _selectedIdx = -1;
-  scanHistory(); // Scan everything once
+  scanHistory();
 
-  // Reset Touch State to prevent double-tap issues
-  _wasTouching =
-      true; // Assume true to force a "release" cycle if finger is already up?
-  // No, if we set it to false, and the user is NOT touching, we are good.
-  // If the user IS touching, p.x != -1, so isTouching=true.
-  // Then !wasTouching && isTouching -> Start Logic -> Sets wasTouching=true.
-  // If we set it to false, it works.
+  // Reset Variables
   _wasTouching = false;
   _touchStartX = -1;
   _touchStartY = -1;
   _touchStartTime = 0;
   _lastBackTapTime = 0;
-  _lastTouchY = -1;
-  _lastTouchY = -1;
   _isDragging = false;
-  _ignoreInitialTouch = true; // Wait for release before accepting touches
+  _ignoreInitialTouch = true;
 
   TFT_eSPI *tft = _ui->getTft();
-  _ui->drawStatusBar();
+  // Safe Clear (Keep Status Bar)
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+  _ui->drawStatusBar(true);
+
+  // --- STATIC HEADER ---
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->drawString("HISTORY", SCREEN_WIDTH / 2, 28);
+
+  // Back Button (Blue Triangle) - Bottom Left
+  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+
   drawMenu();
 }
 
@@ -137,54 +145,46 @@ void HistoryScreen::update() {
       int tx = _touchStartX;
       int ty = _touchStartY;
 
+      // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log
+      // style
       // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log style
       if (tx < 60 && ty > 180) {
-        if (millis() - _lastBackTapTime < 500) {
-          _lastBackTapTime = 0; // Reset
-          if (_currentMode == MODE_MENU) {
-            _ui->switchScreen(SCREEN_MENU);
-            return;
-          } else if (_currentMode == MODE_GROUPS) {
-            _currentMode = MODE_MENU;
-            // Clear only content area
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    COLOR_BG);
-            drawMenu();
-            return;
-          } else if (_currentMode == MODE_LIST) {
-            _currentMode = MODE_GROUPS;
-            _scrollOffset = 0;
-            _selectedIdx = -1;
-            // Clear only content area
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    COLOR_BG);
-            drawGroups(0);
-            return;
-          } else if (_currentMode == MODE_OPTIONS) {
-            _currentMode = MODE_LIST;
-            // Clear only content area
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    COLOR_BG);
-            drawList(_scrollOffset);
-            return;
-          } else if (_currentMode == MODE_VIEW_DATA) {
-            _currentMode = MODE_OPTIONS;
-            // Clear only content area
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    COLOR_BG);
-            _selectedIdx = 0;
-            drawOptions();
-            return;
-          }
-        } else {
-          _lastBackTapTime = millis();
+        // Single Tap Logic
+        if (_currentMode == MODE_MENU) {
+          _ui->switchScreen(SCREEN_MENU);
+          return;
+        } else if (_currentMode == MODE_GROUPS) {
+          _currentMode = MODE_MENU;
+          // Clear only content area (Below Header Y=40)
+          _ui->getTft()->fillRect(0, 40, SCREEN_WIDTH, SCREEN_HEIGHT - 40,
+                                  COLOR_BG);
+          drawMenu();
+          return;
+        } else if (_currentMode == MODE_LIST) {
+          _currentMode = MODE_GROUPS;
+          _scrollOffset = 0;
+          _selectedIdx = -1;
+          // Clear only content area
+          _ui->getTft()->fillRect(0, 40, SCREEN_WIDTH, SCREEN_HEIGHT - 40,
+                                  COLOR_BG);
+          drawGroups(0);
+          return;
+        } else if (_currentMode == MODE_OPTIONS) {
+          _currentMode = MODE_LIST;
+          // Clear only content area
+          _ui->getTft()->fillRect(0, 40, SCREEN_WIDTH, SCREEN_HEIGHT - 40,
+                                  COLOR_BG);
+          drawList(_scrollOffset);
+          return;
+        } else if (_currentMode == MODE_VIEW_DATA) {
+          _currentMode = MODE_OPTIONS;
+          // Clear only content area
+          _ui->getTft()->fillRect(0, 40, SCREEN_WIDTH, SCREEN_HEIGHT - 40,
+                                  COLOR_BG);
+          _selectedIdx = 0;
+          drawOptions();
           return;
         }
-        // MODE_CONFIRM_DELETE doesn't have standard back, handled below
       }
 
       // Mode Specific Tap Logic
@@ -289,13 +289,18 @@ void HistoryScreen::update() {
           if (idx == 0) { // View Data
             _currentMode = MODE_VIEW_DATA;
             _viewPage = 0;
-            _ui->getTft()->fillScreen(TFT_BLACK);
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    TFT_BLACK);
             drawViewData();
           } else if (idx == 1) {
             // Sync placeholder
           } else if (idx == 2) { // Delete
             _currentMode = MODE_CONFIRM_DELETE;
             _selectedIdx = 1;
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    TFT_BLACK);
             drawConfirmDelete();
           }
         }
@@ -400,28 +405,18 @@ void HistoryScreen::scanHistory() {
 void HistoryScreen::drawMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Header
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
+  // Clear Content Area (Below Header line Y=20, down to footer Y=210)
+  tft->fillRect(0, 50, SCREEN_WIDTH, 160, TFT_BLACK);
+
+  tft->setTextDatum(MC_DATUM);
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  // Removed Top Left "<"
-  // tft->drawString("<", 10, 25);
+  tft->setTextSize(1);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
 
-  // Bottom Left Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
-
-  tft->setTextDatum(TC_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("HISTORY MENU", SCREEN_WIDTH / 2, 40);
-
-  tft->drawFastHLine(0, 60, SCREEN_WIDTH, COLOR_SECONDARY);
-
-  // Buttons
-  int startY = 80;
-  int btnHeight = 40;
-  int gap = 20;
+  // Menu Options (Drag / Lap)
+  int startY = 60;
+  int btnHeight = 45;
+  int gap = 15;
   int btnWidth = 240;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -429,34 +424,27 @@ void HistoryScreen::drawMenu() {
 
   for (int i = 0; i < 2; i++) {
     int y = startY + i * (btnHeight + gap);
-
-    uint16_t btnColor = (i == _selectedIdx) ? TFT_RED : TFT_DARKGREY;
-
-    tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
-    tft->setTextColor(TFT_WHITE, btnColor);
-    tft->setTextDatum(MC_DATUM);
-    tft->drawString(items[i], SCREEN_WIDTH / 2, y + btnHeight / 2 + 2);
+    // Draw Button
+    tft->drawRect(x, y, btnWidth, btnHeight, TFT_DARKGREY);
+    tft->drawString(items[i], SCREEN_WIDTH / 2, y + (btnHeight / 2));
   }
 }
 
 void HistoryScreen::drawGroups(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
-  // _ui->drawStatusBar(); // Removed to prevent flicker
 
-  // Header
-  tft->fillRect(0, 0, SCREEN_WIDTH, 20, TFT_BLACK);
+  // Clear Content Area (Below Header)
+  // Clear Content Area (Below Header)
+  tft->fillRect(0, 40, SCREEN_WIDTH, 170, TFT_BLACK);
 
-  // Custom Header Bar "My sessions"
-  tft->fillRect(0, 20, SCREEN_WIDTH, 25, TFT_BLACK);
-  tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
+  // Sub-Header "- SESSIONS -"
+  tft->setTextColor(TFT_SILVER, TFT_BLACK);
+  tft->setTextDatum(MC_DATUM);
+  tft->setFreeFont(NULL);
+  tft->setTextSize(1);
+  tft->drawString("- SESSIONS -", SCREEN_WIDTH / 2, 50);
 
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(MC_DATUM); // Centered
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(1); // Standard
-  tft->drawString("My sessions", SCREEN_WIDTH / 2, 32);
-
-  int startY = 50;
+  int startY = 70;
   int itemH = 30;
   int count = 0;
   int skip = 0;
@@ -493,18 +481,15 @@ void HistoryScreen::drawGroups(int scrollOffset) {
     tft->fillRect(0, nextY, SCREEN_WIDTH, SCREEN_HEIGHT - nextY, TFT_BLACK);
   }
 
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->drawString("No Groups Found", SCREEN_WIDTH / 2, 80);
-
-  // Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  if (_groups.empty()) {
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->drawString("No Groups Found", SCREEN_WIDTH / 2, 120);
+  }
 }
 
 void HistoryScreen::drawList(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
-  // _ui->drawStatusBar(); // Removed to prevent flicker
 
-  // Header "My sessions - [Count]"
   // Calculate total in this group
   int totalInGroup = 0;
   for (const auto &h : _historyList) {
@@ -515,22 +500,19 @@ void HistoryScreen::drawList(int scrollOffset) {
     }
   }
 
-  tft->fillRect(0, 20, SCREEN_WIDTH, 25, TFT_BLACK);
-  tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
+  // Clear Content Area
+  tft->fillRect(0, 40, SCREEN_WIDTH, 170, TFT_BLACK);
 
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  // Sub-Header
+  tft->setTextColor(TFT_SILVER, TFT_BLACK);
   tft->setTextDatum(MC_DATUM);
-  tft->setFreeFont(&Org_01);
+  tft->setFreeFont(NULL);
   tft->setTextSize(1);
-  tft->drawString("My sessions - " + String(totalInGroup), SCREEN_WIDTH / 2,
-                  32);
+  String sub = "Total: " + String(totalInGroup);
+  tft->drawString(sub, SCREEN_WIDTH / 2, 50);
 
-  int startY = 50;
-  int itemH =
-      20; // 30->20 tighter list? Image 2 has 6 items active. 320/20 = 16 lines?
-  // Image 2 has 6 items taking up most of screen. 6*30 = 180 + 50 = 230. 240
-  // height.
-  itemH = 25; // Good balance
+  int startY = 70; // Lowered to Y=70
+  int itemH = 25;
 
   int count = 0;
   int skip = 0;
@@ -674,7 +656,7 @@ void HistoryScreen::scanGroups() {
 
 void HistoryScreen::drawOptions() {
   TFT_eSPI *tft = _ui->getTft();
-  _ui->drawStatusBar();
+  // _ui->drawStatusBar();
 
   // Header
   tft->drawFastHLine(0, 20, SCREEN_WIDTH, TFT_WHITE);
@@ -714,8 +696,10 @@ void HistoryScreen::drawOptions() {
 
 void HistoryScreen::drawViewData() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(TFT_BLACK);
-  _ui->drawStatusBar();
+  // Clear only content area
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+  // _ui->drawStatusBar(); // Removed to prevent flicker
 
   // Page Header
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
@@ -749,9 +733,9 @@ void HistoryScreen::drawViewData() {
   // Note: _lastTapIdx here needs to track the ACTUAL selected session index
   // from LIST mode. We should store the selected session index in a separate
   // variable if _lastTapIdx is transient using tap logic. Let's assume
-  // _selectedIdx in MODE_LIST pointed to the filtered index, we need to map it.
-  // However, HistoryScreen::update currently maps visible index to actual list
-  // index. We'll fix this in update() by storing `_activeSessionIdx`.
+  // _selectedIdx in MODE_LIST pointed to the filtered index, we need to map
+  // it. However, HistoryScreen::update currently maps visible index to actual
+  // list index. We'll fix this in update() by storing `_activeSessionIdx`.
 
   // Placeholder Content
   tft->setTextDatum(MC_DATUM);
@@ -774,8 +758,10 @@ void HistoryScreen::drawViewData() {
 
 void HistoryScreen::drawConfirmDelete() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(TFT_BLACK);
-  _ui->drawStatusBar();
+  // Clear only content area - MOVED TO CALLER to prevent flicker on update
+  // tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+  //               SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+  // _ui->drawStatusBar(); // Removed to prevent flicker
 
   tft->setTextColor(TFT_RED, TFT_BLACK);
   tft->setTextDatum(MC_DATUM);

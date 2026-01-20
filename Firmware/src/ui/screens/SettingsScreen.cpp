@@ -207,10 +207,11 @@ void SettingsScreen::loadSettings() {
     proj.currentOptionIdx = projState ? 1 : 0;
     _settings.push_back(proj);
 
-    // 3. Frequency
-    SettingItem freq = {"FREQUENCY", TYPE_VALUE, "gnss_freq_limit"};
-    freq.options = {"Max Possible", "Force 10Hz"};
-    freq.currentOptionIdx = _prefs.getInt("gnss_freq_limit", 0);
+    // 3. Frequency Limit
+    SettingItem freq = {"FREQUENCY LIMIT", TYPE_VALUE, "gnss_freq_limit"};
+    freq.options = {"1 Hz", "2 Hz", "5 Hz", "10 Hz", "18 Hz"};
+    freq.currentOptionIdx =
+        _prefs.getInt("gnss_freq_limit", 2); // Default 5Hz (Index 2)
     _settings.push_back(freq);
 
     // 4. Dynamic Model
@@ -362,11 +363,25 @@ void SettingsScreen::saveSetting(int idx) {
       gpsManager.setSBASConfig(item.currentOptionIdx);
     }
     if (item.key == "gnss_freq_limit") {
-      // Recalculate based on current mode but cap at 10Hz if selected
-      if (item.currentOptionIdx == 1)
-        gpsManager.setFrequencyLimit(10);
-      else
-        gpsManager.setGnssMode(_prefs.getInt("gnss_mode", 1)); // Re-apply max
+      int freq = 5;
+      switch (item.currentOptionIdx) {
+      case 0:
+        freq = 1;
+        break;
+      case 1:
+        freq = 2;
+        break;
+      case 2:
+        freq = 5;
+        break;
+      case 3:
+        freq = 10;
+        break;
+      case 4:
+        freq = 18;
+        break;
+      }
+      gpsManager.setFrequencyLimit(freq);
     }
 
     if (item.key == "gps_rx_pin" || item.key == "gps_tx_pin") {

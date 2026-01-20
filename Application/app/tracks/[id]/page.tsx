@@ -79,129 +79,121 @@ export default function TrackDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Navigation */}
-      <nav className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-12 h-12 relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Much Racing Logo" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <span className="text-white text-2xl font-bold">Much Racing</span>
-            </Link>
-            <div className="hidden md:flex space-x-6">
-              <Link href="/dashboard" className="text-slate-300 hover:text-white transition">Dashboard</Link>
-              <Link href="/tracks" className="text-white font-semibold">Tracks</Link>
-              <Link href="/sessions" className="text-slate-300 hover:text-white transition">Sessions</Link>
-              <Link href="/device" className="text-slate-300 hover:text-white transition">Device</Link>
-            </div>
+    <div className="min-h-screen bg-background text-foreground pb-24">
+      {/* Navigation - replaced by BottomNav mostly, but keeping header for detail */}
+      <header className="carbon-bg backdrop-blur-md border-b border-border-color sticky top-0 z-20">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/tracks" className="p-2 -ml-2 hover:bg-white/5 rounded-full transition">
+            <ArrowLeft className="w-6 h-6 text-foreground" />
+          </Link>
+          <div className="text-center">
+            <h1 className="text-lg font-racing tracking-wide truncate max-w-[200px]">{track.name}</h1>
           </div>
+          <div className="w-10"></div> {/* Spacer */}
         </div>
-      </nav>
+      </header>
 
       {/* Content */}
-      <div className="container mx-auto px-6 py-12">
-        {/* Back Button */}
-        <Link href="/tracks" className="inline-flex items-center text-slate-300 hover:text-white transition mb-6">
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Tracks
-        </Link>
+      <div className="container mx-auto px-4 py-6 space-y-6">
 
-        {/* Track Header */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 mb-8">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-6">
+        {/* Track Header Card */}
+        <div className="carbon-bg border border-border-color rounded-xl p-6 relative overflow-hidden">
+          {/* Background decorative element */}
+          <div className="absolute top-0 right-0 p-10 opacity-5">
+            <MapPin className="w-64 h-64 text-primary" />
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-6 relative z-10">
             <div>
               <div className="flex items-center space-x-3 mb-2">
-                <h1 className="text-4xl font-bold text-white">{track.name}</h1>
-                <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-lg text-sm">
+                <h2 className="text-2xl font-racing text-white">{track.name}</h2>
+                <span className="bg-primary/20 text-primary text-xs px-2 py-1 rounded font-bold">
                   {track.type}
                 </span>
               </div>
-              <p className="text-slate-400 text-lg flex items-center">
-                <MapPin className="w-5 h-5 mr-2" />
+              <p className="text-text-secondary text-sm flex items-center">
+                <MapPin className="w-4 h-4 mr-1" />
                 {track.city}, {track.country}
               </p>
             </div>
-            <div className="mt-4 md:mt-0">
-              <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
+            <div className="mt-4 md:mt-0 text-right">
+              <div className="text-3xl font-data font-bold text-highlight">
                 {track.bestLap}
               </div>
-              <div className="text-slate-400 text-center">Best Lap Time</div>
+              <div className="text-text-secondary text-xs uppercase tracking-wider">Best Lap Time</div>
             </div>
           </div>
 
-          <p className="text-slate-300 mb-6">{track.description}</p>
+          <p className="text-foreground/80 text-sm mb-6 relative z-10 max-w-2xl">{track.description}</p>
 
           {/* Track Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatBox label="Length" value={`${track.length}m`} />
-            <StatBox label="Turns" value={track.turns.toString()} />
-            <StatBox label="Sectors" value={track.sectors.toString()} />
-            <StatBox label="Sessions" value={track.sessions.toString()} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+            <StatBox label="LENGTH" value={`${track.length}m`} />
+            <StatBox label="TURNS" value={track.turns.toString()} />
+            <StatBox label="SECTORS" value={track.sectors.toString()} />
+            <StatBox label="SESSIONS" value={track.sessions.toString()} />
           </div>
         </div>
 
         {/* Map Section */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-4">Track Map</h2>
-          
+        <div className="carbon-bg border border-border-color rounded-xl p-6">
+          <h2 className="text-xl font-racing text-white mb-4 flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" />
+            TRACK MAP
+          </h2>
+
           {/* Map Placeholder */}
-          <div className="h-96 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg flex items-center justify-center border border-slate-600">
-            <div className="text-center">
-              <MapPin className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-              <p className="text-slate-400">Interactive map will be displayed here</p>
-              <p className="text-slate-500 text-sm mt-2">
-                Coordinates: {track.coordinates.lat}, {track.coordinates.lng}
+          <div className="h-64 bg-background-secondary rounded-lg flex items-center justify-center border border-border-color relative overflow-hidden">
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+            <div className="text-center relative z-10">
+              <MapPin className="w-12 h-12 text-highlight mx-auto mb-2 opacity-80" />
+              <p className="text-text-secondary text-sm">Interactive map visualization</p>
+              <p className="text-text-secondary text-[10px] mt-1 font-data">
+                {track.coordinates.lat}, {track.coordinates.lng}
               </p>
             </div>
           </div>
         </div>
 
         {/* Leaderboard */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Best Lap Times</h2>
-            <span className="text-slate-400 flex items-center">
-              <Users className="w-5 h-5 mr-2" />
+        <div className="carbon-bg border border-border-color rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-border-color flex items-center justify-between">
+            <h2 className="text-xl font-racing text-white">LEADERBOARD</h2>
+            <span className="text-text-secondary text-xs flex items-center bg-background-secondary px-2 py-1 rounded">
+              <Users className="w-3 h-3 mr-1" />
               {leaderboard.length} drivers
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left text-slate-400 font-semibold py-3 px-4">Rank</th>
-                  <th className="text-left text-slate-400 font-semibold py-3 px-4">Driver</th>
-                  <th className="text-left text-slate-400 font-semibold py-3 px-4">Lap Time</th>
-                  <th className="text-left text-slate-400 font-semibold py-3 px-4">Date</th>
-                  <th className="text-left text-slate-400 font-semibold py-3 px-4">Kart</th>
+            <table className="w-full text-sm">
+              <thead className="bg-background-secondary">
+                <tr>
+                  <th className="text-left text-text-secondary font-racing text-xs py-3 px-4">#</th>
+                  <th className="text-left text-text-secondary font-racing text-xs py-3 px-4">DRIVER</th>
+                  <th className="text-left text-text-secondary font-racing text-xs py-3 px-4">TIME</th>
+                  <th className="text-left text-text-secondary font-racing text-xs py-3 px-4">DATE</th>
+                  <th className="text-left text-text-secondary font-racing text-xs py-3 px-4">VEHICLE</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border-color">
                 {leaderboard.map((entry) => (
-                  <tr key={entry.rank} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
-                    <td className="py-4 px-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                        entry.rank === 1 ? 'bg-yellow-500/20 text-yellow-400' :
-                        entry.rank === 2 ? 'bg-slate-400/20 text-slate-300' :
-                        entry.rank === 3 ? 'bg-orange-700/20 text-orange-400' :
-                        'bg-slate-700 text-slate-400'
-                      }`}>
+                  <tr key={entry.rank} className="hover:bg-card-bg transition">
+                    <td className="py-3 px-4">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${entry.rank === 1 ? 'bg-highlight text-white' :
+                          entry.rank === 2 ? 'bg-zinc-400 text-black' :
+                            entry.rank === 3 ? 'bg-orange-700 text-white' :
+                              'bg-background-secondary text-text-secondary'
+                        }`}>
                         {entry.rank}
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-white font-semibold">{entry.driver}</td>
-                    <td className="py-4 px-4">
-                      <span className="text-orange-400 font-mono font-semibold">{entry.lapTime}</span>
+                    <td className="py-3 px-4 text-foreground font-medium">{entry.driver}</td>
+                    <td className="py-3 px-4">
+                      <span className="text-highlight font-data font-bold">{entry.lapTime}</span>
                     </td>
-                    <td className="py-4 px-4 text-slate-300">{entry.date}</td>
-                    <td className="py-4 px-4 text-slate-400">{entry.kart}</td>
+                    <td className="py-3 px-4 text-text-secondary text-xs">{entry.date}</td>
+                    <td className="py-3 px-4 text-text-secondary text-xs">{entry.kart}</td>
                   </tr>
                 ))}
               </tbody>
@@ -215,9 +207,9 @@ export default function TrackDetailPage() {
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-      <div className="text-slate-500 text-sm mb-1">{label}</div>
-      <div className="text-white text-2xl font-bold">{value}</div>
+    <div className="bg-background-secondary border border-border-color rounded-lg p-3 text-center">
+      <div className="text-text-secondary text-[10px] font-racing mb-1">{label}</div>
+      <div className="text-foreground text-lg font-data font-bold">{value}</div>
     </div>
   );
 }

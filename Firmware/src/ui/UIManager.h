@@ -51,6 +51,9 @@ public:
   void checkSleep();
   void updateInteraction();
 
+  // UI Helper
+  void showToast(String message, int duration = 2000);
+
   // Touch Handling
   void setTouch(TAMC_GT911 *touch) { _touch = touch; }
   TAMC_GT911 *getTouch() { return _touch; }

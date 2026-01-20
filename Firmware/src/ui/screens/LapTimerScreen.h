@@ -24,6 +24,7 @@ struct Track {
   double lat;
   double lon;
   bool isCustom = true;
+  String pathFile; // Path to CSV file containing track points
   unsigned long bestLap = 0;
 };
 
@@ -81,8 +82,9 @@ private:
   void drawTrackList();
   void drawTrackOptionsPopup();
   void drawTrackDetails();
-  void drawSearching();   // New Searching Screen
-  void drawRecordTrack(); // GPS Track Recording UI
+  void drawSearching();         // New Searching Screen
+  void drawRecordTrackStatic(); // Static part of Record UI
+  void drawRecordTrack();       // Dynamic part of Record UI
   void drawNoGPS();
 
   // Lap Data
@@ -95,14 +97,37 @@ private:
   std::vector<unsigned long> _lapTimes; // Store lap times in ms
   int _listScroll;                      // Scroll offset for list
 
+  // Finish Line Detection State
+  bool _finishLineInside;
+  unsigned long _lastFinishCross;
+
   // Track Data
   std::vector<Track> _tracks;
   int _selectedTrackIdx;
   int _selectedConfigIdx;
-  String _currentTrackName; // Store selected track name
-  void loadTracks();        // Load dummy tracks
+  String _currentTrackName;             // Store selected track name
+  void loadTracks();                    // Load dummy tracks
+  void loadTrackPath(String filename);  // Load track path from CSV
+  void saveTrackToGPX(String filename); // New helper
 
   void checkFinishLine();
+
+  // Race Screen Helpers
+  unsigned long _maxRpmSession = 0;
+  void drawTrackMap(int x, int y, int w, int h);
+  void drawRPMBar(int rpm, int maxRpm); // NEW: RPM Bar
+
+  // Flicker Reduction Tracking
+  float _lastSpeed = -1.0;
+  int _lastSats = -1;
+  int _lastRpmRender = -1;
+  unsigned long _lastMaxRpmRender = 0;
+  int _lastLapCountRender = -1;
+  bool _lastRecordGpsFixed = false;
+  int _lastRecordSats = -1;
+  RecordingState _lastRecordedStateRender = (RecordingState)-1;
+  long _lastLastLapTimeRender = -1;
+  long _lastBestLapTimeRender = -1;
 };
 
 #endif

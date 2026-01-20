@@ -1,5 +1,6 @@
 #include "UIManager.h"
 #include "../../config.h"
+#include "../core/GPSManager.h"
 #include "../core/WiFiManager.h"
 #include "fonts/Org_01.h"
 #include <Preferences.h>
@@ -223,6 +224,12 @@ extern GPSManager gpsManager;
 extern SessionManager sessionManager;
 
 void UIManager::switchScreen(ScreenType type) {
+  // Global Cleanup: Ensure no GPS log callbacks persist across screens
+  gpsManager.setRawDataCallback(nullptr);
+
+  if (_currentScreen) {
+    // Optional: _currentScreen->onHide(); if we had it
+  }
   // Tambahkan penundaan 1 detik untuk transisi yang mulus (kecuali dari Splash)
   // Tidak ada penundaan untuk peralihan instan
 
@@ -552,4 +559,23 @@ void UIManager::wakeUp() {
   _isScreenOff = false;
   _lastInteractionTime = millis();
   ledcWrite(0, _currentBrightness);
+}
+
+void UIManager::showToast(String message, int duration) {
+  int w = 200;
+  int h = 40;
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = SCREEN_HEIGHT - 60;
+
+  // Draw Toast Background
+  _tft->fillRoundRect(x, y, w, h, 8, TFT_WHITE);
+  _tft->drawRoundRect(x, y, w, h, 8, TFT_BLACK);
+
+  // Draw Text
+  _tft->setTextColor(TFT_BLACK, TFT_WHITE);
+  _tft->setTextSize(1);
+  _tft->setTextDatum(MC_DATUM);
+  _tft->drawString(message, SCREEN_WIDTH / 2, y + h / 2);
+
+  delay(duration);
 }

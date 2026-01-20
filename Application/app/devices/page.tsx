@@ -9,9 +9,11 @@ import {
   Signal,
   Gauge,
   Map as MapIcon,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+
 
 const MOCK_DEVICES = [
   { id: '2230300032', name: '2230300032', model: 'R01', vehicle: 'No Default Vehicle' },
@@ -39,16 +41,16 @@ export default function DevicePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-24">
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between z-20 relative bg-background">
-        <button onClick={toggleList}>
-          <ChevronDown className={`w-8 h-8 text-primary transition-transform ${isListOpen ? 'rotate-180' : ''}`} />
+      {/* Header with Carbon Fiber */}
+      <div className="carbon-bg p-4 flex items-center justify-between z-20 relative border-b border-border-color">
+        <button onClick={toggleList} className="hover:scale-110 transition-transform">
+          <ChevronDown className={`w-8 h-8 text-primary transition-transform duration-300 ${isListOpen ? 'rotate-180' : ''}`} />
         </button>
         <div className="text-center cursor-pointer" onClick={toggleList}>
-          <h1 className="text-xl font-bold">{currentDevice.name}</h1>
-          <p className="text-text-secondary text-sm">{currentDevice.vehicle}</p>
+          <h1 className="text-xl font-racing tracking-wide">{currentDevice.name}</h1>
+          <p className="text-text-secondary text-sm font-medium">{currentDevice.vehicle}</p>
         </div>
-        <button className="p-2">
+        <button className="p-2 hover:scale-110 transition-transform">
           <Edit2 className="w-6 h-6 text-primary" />
         </button>
       </div>
@@ -56,13 +58,13 @@ export default function DevicePage() {
       {isListOpen ? (
         // Device List View
         <div className="animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className="bg-card-bg py-2 px-4 text-center font-medium text-text-secondary border-b border-border-color">
-            Choose device
+          <div className="carbon-bg py-3 px-4 text-center font-racing text-sm text-text-secondary border-b border-border-color">
+            CHOOSE DEVICE
           </div>
 
-          <button className="w-full bg-background p-4 flex items-center justify-between border-b border-border-color">
-            <span className="font-bold text-foreground">Add New Device</span>
-            <ChevronRight className="w-5 h-5 text-text-secondary" />
+          <button className="w-full bg-background-secondary p-4 flex items-center justify-between border-b border-border-color hover:bg-primary/10 transition-colors group">
+            <span className="font-racing text-foreground group-hover:text-primary transition-colors">ADD NEW DEVICE</span>
+            <ChevronRight className="w-5 h-5 text-primary group-hover:translate-x-1 transition-transform" />
           </button>
 
           <div className="bg-background">
@@ -70,9 +72,9 @@ export default function DevicePage() {
               <button
                 key={device.id}
                 onClick={() => selectDevice(device)}
-                className={`w-full p-4 text-center font-bold text-lg border-b border-border-color transition-colors ${currentDevice.id === device.id
-                  ? 'bg-primary text-white'
-                  : 'text-text-secondary hover:bg-card-bg'
+                className={`w-full p-4 text-center font-data text-base border-b border-border-color transition-all ${currentDevice.id === device.id
+                  ? 'bg-primary text-white shadow-[0_0_20px_rgba(220,38,38,0.3)]'
+                  : 'text-text-secondary hover:bg-card-bg hover:text-foreground'
                   }`}
               >
                 {device.name}
@@ -85,56 +87,69 @@ export default function DevicePage() {
         <div className="px-4 space-y-6 animate-in fade-in zoom-in-95 duration-200">
           {/* Info Strip */}
           <div className="flex items-center justify-between py-4 border-b border-border-color border-t mt-2">
-            <span className="text-lg font-medium text-text-secondary">S/N: {currentDevice.id}</span>
-            <span className="text-lg font-medium text-text-secondary">Model: {currentDevice.model}</span>
+            <span className="text-sm font-data text-text-secondary">S/N: <span className="text-foreground">{currentDevice.id}</span></span>
+            <span className="text-sm font-data text-text-secondary">Model: <span className="text-foreground">{currentDevice.model}</span></span>
           </div>
 
-          {/* Status Card */}
-          <div className="bg-card-bg rounded-xl p-6 shadow-sm border border-border-color">
-            <div className="flex items-start justify-between mb-4">
-              <span className="text-highlight font-bold text-lg">Connected</span>
+          {/* Status Card - Premium Design */}
+          <div className="carbon-bg rounded-xl p-6 shadow-lg border border-border-color relative overflow-hidden">
+            {/* Glow Effect */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-highlight/10 rounded-full blur-3xl"></div>
+
+            <div className="flex items-start justify-between mb-4 relative z-10">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-highlight animate-pulse" />
+                <span className="text-highlight font-racing text-lg drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]">CONNECTED</span>
+              </div>
 
               <div className="flex items-center gap-3 text-text-secondary">
                 <Battery className="w-6 h-6 text-highlight" />
-                <MapPin className="w-5 h-5" />
-                <Signal className="w-5 h-5" />
+                <MapPin className="w-5 h-5 text-foreground" />
+                <Signal className="w-5 h-5 text-foreground" />
               </div>
             </div>
 
-            <div className="text-right text-text-secondary font-mono">
-              0.619 m / 15 sat
+            <div className="text-right text-text-secondary font-data text-sm relative z-10">
+              <span className="text-foreground font-bold">0.619 m</span> / <span className="text-highlight font-bold">15 sat</span>
             </div>
           </div>
 
-          {/* Action Cards */}
+          {/* Action Cards - Enhanced Grid */}
           <div className="grid grid-cols-2 gap-4">
-            <Link href="/drag" className="bg-card-bg p-4 rounded-xl border border-border-color hover:bg-white/5 transition-colors text-left h-32 flex flex-col justify-between group">
-              <div className="flex justify-between items-start w-full">
-                <Gauge className="w-8 h-8 text-foreground group-hover:text-primary transition-colors" />
-              </div>
-              <span className="font-bold text-lg leading-tight">New Drag Session</span>
+            <Link
+              href="/drag"
+              className="carbon-bg p-6 rounded-xl border border-border-color hover:border-primary/50 hover:shadow-lg transition-all text-left h-36 flex flex-col justify-between group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <Gauge className="w-10 h-10 text-primary group-hover:scale-110 transition-transform relative z-10" />
+              <span className="font-racing text-base leading-tight relative z-10 group-hover:text-primary transition-colors">NEW DRAG SESSION</span>
             </Link>
 
-            <button className="bg-card-bg p-4 rounded-xl border border-border-color hover:bg-white/5 transition-colors text-left h-32 flex flex-col justify-between group">
-              <div className="flex justify-between items-start w-full">
-                <div className="flex-1"></div>
-                <MapIcon className="w-8 h-8 text-foreground group-hover:text-primary transition-colors" />
-              </div>
-              <span className="font-bold text-lg leading-tight">New Track Session</span>
-            </button>
+            <Link
+              href="/track"
+              className="carbon-bg p-6 rounded-xl border border-border-color hover:border-primary/50 hover:shadow-lg transition-all text-left h-36 flex flex-col justify-between group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <MapIcon className="w-10 h-10 text-primary group-hover:scale-110 transition-transform relative z-10" />
+              <span className="font-racing text-base leading-tight relative z-10 group-hover:text-primary transition-colors">NEW TRACK SESSION</span>
+            </Link>
           </div>
 
-          {/* Footer Buttons */}
+          {/* Footer Buttons - Refined */}
           <div className="space-y-3 pt-4">
-            <Link href="/devices/settings" className="block w-full py-4 text-center rounded-full border border-border-color bg-card-bg font-bold text-foreground hover:bg-white/5 transition-colors">
-              Settings
+            <Link
+              href="/devices/settings"
+              className="block w-full py-4 text-center rounded-xl border border-border-color carbon-bg font-racing text-foreground hover:border-primary/50 hover:text-primary transition-all"
+            >
+              SETTINGS
             </Link>
-            <button className="w-full py-4 text-center rounded-full border border-border-color bg-card-bg font-bold text-foreground hover:bg-white/5 transition-colors">
-              Disconnect
+            <button className="w-full py-4 text-center rounded-xl border border-primary/30 bg-primary/10 font-racing text-primary hover:bg-primary/20 transition-colors">
+              DISCONNECT
             </button>
           </div>
         </div>
       )}
+
     </div>
   );
 }

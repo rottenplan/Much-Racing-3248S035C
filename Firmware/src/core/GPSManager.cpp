@@ -48,6 +48,13 @@ void GPSManager::begin() {
   // Apply Config (if GPS active)
   if (_gpsSerial) {
     delay(100); // Wait for GPS boot
+
+    // Optimize: Set 5Hz update rate (More stable signal)
+    setFrequencyLimit(5);
+
+    // Optimize: Disable unnecessary NMEA sentences
+    disableUnnecessarySentences();
+
     setGnssMode(_currentGnssMode);
     setDynamicModel(_currentDynModel);
     setSBASConfig(_currentSBAS);
@@ -253,10 +260,44 @@ double GPSManager::getLatitude() { return _gps.location.lat(); }
 double GPSManager::getLongitude() { return _gps.location.lng(); }
 
 float GPSManager::getSpeedKmph() {
+  // Priority 1: Use GPS speed if valid (no minimum threshold for sensitivity)
   if (_gps.speed.isValid()) {
-    return _gps.speed.kmph();
+    _calculatedSpeed = _gps.speed.kmph();
+    return _calculatedSpeed;
   }
-  return 0.0;
+
+  // Priority 2: Calculate speed from position changes
+  if (_gps.location.isValid() && _gps.location.isUpdated()) {
+    double lat = _gps.location.lat();
+    double lon = _gps.location.lng();
+    unsigned long now = millis();
+
+    if (_hasLastSpeedPos && (now - _lastSpeedTime) > 0) {
+      // Calculate distance traveled
+      double dist = distanceBetween(_lastSpeedLat, _lastSpeedLon, lat, lon);
+
+      // Calculate time elapsed (in hours)
+      double timeHours = (now - _lastSpeedTime) / 3600000.0;
+
+      // Speed = Distance / Time (km/h)
+      // Ultra-sensitive: accept any movement > 1cm (0.01m)
+      if (timeHours > 0 && dist > 0.01 && dist < 1000) {
+        float newSpeed = (dist / 1000.0) / timeHours;
+
+        // Smooth the speed (60% new, 40% old) to reduce jitter
+        _calculatedSpeed = (_calculatedSpeed * 0.4) + (newSpeed * 0.6);
+      }
+    }
+
+    // Update last position for next calculation
+    _lastSpeedLat = lat;
+    _lastSpeedLon = lon;
+    _lastSpeedTime = now;
+    _hasLastSpeedPos = true;
+  }
+
+  // Return calculated speed (or 0 if no data yet)
+  return _calculatedSpeed;
 }
 
 float GPSManager::getTotalTrip() {
@@ -355,6 +396,20 @@ double GPSManager::getHDOP() {
   return 99.9; // Tidak ada perbaikan/buruk
 }
 
+double GPSManager::getAltitude() {
+  if (_gps.altitude.isValid()) {
+    return _gps.altitude.meters();
+  }
+  return 0.0;
+}
+
+double GPSManager::getHeading() {
+  if (_gps.course.isValid()) {
+    return _gps.course.deg();
+  }
+  return 0.0;
+}
+
 int GPSManager::getUpdateRate() { return _currentHz; }
 
 double GPSManager::distanceBetween(double lat1, double long1, double lat2,
@@ -390,29 +445,29 @@ void GPSManager::setGnssMode(uint8_t mode) {
   if (_baudRate > 38400) {
     switch (mode) {
     case 0:
-      targetRate = 10;
+      targetRate = 5;
       break; // All
     case 1:
-      targetRate = 16;
-      break; // GPS+GLO+SBAS
+      targetRate = 5;
+      break; // GPS+GLO+SBAS (Was 16)
     case 2:
-      targetRate = 10;
+      targetRate = 5;
       break; // GPS+GAL+GLO+SBAS
     case 3:
-      targetRate = 20;
-      break; // GPS+GAL+SBAS
+      targetRate = 5;
+      break; // GPS+GAL+SBAS (Was 20)
     case 4:
-      targetRate = 25;
-      break; // GPS+SBAS
+      targetRate = 5;
+      break; // GPS+SBAS (Was 25)
     case 5:
-      targetRate = 25;
-      break; // GPS Only
+      targetRate = 5;
+      break; // GPS Only (Was 25)
     case 6:
-      targetRate = 12;
-      break; // GPS+BEI+SBAS
+      targetRate = 5;
+      break; // GPS+BEI+SBAS (Was 12)
     case 7:
-      targetRate = 16;
-      break; // GPS+GLO
+      targetRate = 5;
+      break; // GPS+GLO (Was 16)
     }
   } else {
     // For 9600 baud, force 1Hz to be safe.
@@ -772,4 +827,37 @@ void GPSManager::configureGpsBaud(int targetBaud) {
   packet[27] = ck_b;
 
   sendUBX(packet, sizeof(packet));
+}
+
+void GPSManager::disableUnnecessarySentences() {
+  if (!_gpsSerial)
+    return;
+
+  // Disable GSA (DOP and active satellites) - Not critical for racing
+  uint8_t disableGSA[] = {
+      0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x02, // NMEA-GxGSA
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // Disable on all ports
+      0x01, 0x31                                      // Checksum
+  };
+  sendUBX(disableGSA, sizeof(disableGSA));
+  delay(50);
+
+  // Disable GSV (Satellites in view) - Not critical, uses lots of bandwidth
+  uint8_t disableGSV[] = {
+      0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x03, // NMEA-GxGSV
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x38  // Checksum
+  };
+  sendUBX(disableGSV, sizeof(disableGSV));
+  delay(50);
+
+  // Disable GLL (Geographic position) - Redundant with RMC
+  uint8_t disableGLL[] = {
+      0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x01, // NMEA-GxGLL
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A  // Checksum
+  };
+  sendUBX(disableGLL, sizeof(disableGLL));
+  delay(50);
+
+  // Keep enabled: GGA (Position), RMC (Recommended minimum), VTG (Track/Speed)
+  // These are essential for racing/tracking
 }

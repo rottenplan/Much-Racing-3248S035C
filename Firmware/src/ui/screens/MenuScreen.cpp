@@ -3,6 +3,8 @@
 
 // extern GPSManager gpsManager; // If needed
 
+#include "../fonts/Org_01.h"
+
 #include <stdlib.h>
 
 #define MENU_ITEMS 8
@@ -18,6 +20,19 @@ void MenuScreen::onShow() {
   _touchStartY = -1;
   _lastTapIdx = -1;
   _lastTapTime = 0;
+  _lastTapTime = 0;
+
+  // Draw Static Layout (Background & Title)
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillRect(0, 21, SCREEN_WIDTH, SCREEN_HEIGHT - 21, COLOR_BG);
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(FONT_SIZE_MENU_TITLE);
+  tft->setTextColor(COLOR_ACCENT);
+  tft->drawString("MAIN MENU", SCREEN_WIDTH / 2, 45);
+
   drawMenu(true);
 }
 
@@ -58,7 +73,7 @@ void MenuScreen::update() {
     if (abs(deltaY) > 40) { // Significant Swipe
       // Debounce Page Switch
       static unsigned long lastPageSwitch = 0;
-      if (millis() - lastPageSwitch > 300) {
+      if (millis() - lastPageSwitch > 150) {
         if (deltaY > 0) { // Swipe Up -> Prev Page
           if (_currentPage > 0) {
             _currentPage--;
@@ -86,7 +101,7 @@ void MenuScreen::update() {
 
       // Toggle Button Area (Y > 210)
       if (p.y > 210) {
-        if (millis() - lastPageSwitch > 300) {
+        if (millis() - lastPageSwitch > 150) {
           if (_currentPage < maxPage) {
             _currentPage++; // Go Down/Next
           } else if (_currentPage > 0) {
@@ -115,7 +130,7 @@ void MenuScreen::update() {
       if (localIndex != -1) {
         int actualIndex = (_currentPage * ITEMS_PER_PAGE) + localIndex;
         if (actualIndex < MENU_ITEMS) {
-          if (millis() - _lastTouchTime > 200) { // Debounce
+          if (millis() - _lastTouchTime > 120) { // Debounce
             // Check Double Tap
             if (_lastTapIdx == actualIndex && (millis() - _lastTapTime < 500)) {
               enter = true;
@@ -173,20 +188,12 @@ void MenuScreen::update() {
   // }
 }
 
-#include "../fonts/Org_01.h"
-
 void MenuScreen::drawMenu(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
   if (force) {
-    tft->fillRect(0, 21, SCREEN_WIDTH, SCREEN_HEIGHT - 21, COLOR_BG);
-    tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
-
-    tft->setTextDatum(TC_DATUM);
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(FONT_SIZE_MENU_TITLE);
-    tft->setTextColor(COLOR_ACCENT);
-    tft->drawString("MAIN MENU", SCREEN_WIDTH / 2, 45);
+    // Clear only the LIST area (below title) to prevent flicker
+    tft->fillRect(0, 65, SCREEN_WIDTH, SCREEN_HEIGHT - 65, COLOR_BG);
   }
 
   tft->setTextSize(FONT_SIZE_MENU_ITEM);

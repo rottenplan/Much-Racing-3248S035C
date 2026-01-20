@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { MapPin } from "lucide-react";
 
-// Fix Leaflet Default Icon
+// Fix Leaflet Icons
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -14,43 +15,62 @@ L.Icon.Default.mergeOptions({
     shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
 
-function MapBounds({ points }: { points: [number, number][] }) {
-    const map = useMap();
-    useEffect(() => {
-        if (points.length > 0) {
-            const bounds = L.latLngBounds(points);
-            map.fitBounds(bounds, { padding: [50, 50] });
-        }
-    }, [points, map]);
-    return null;
+interface SessionMapProps {
+    points: { lat: number; lng: number }[];
+    startPoint?: { lat: number; lng: number };
 }
 
-export default function SessionMap({ points }: { points: { lat: number; lng: number }[] }) {
-    const polylinePoints = points.map(p => [p.lat, p.lng] as [number, number]);
-    const startPoint = polylinePoints[0];
-    const endPoint = polylinePoints[polylinePoints.length - 1];
+// Sentul Circuit Approx Coords (Placeholder default)
+const SENTUL_COORDS: [number, number] = [-6.535, 106.858];
 
-    // Calculate center
-    const center = startPoint || [0, 0];
+export default function SessionMap({ points, startPoint }: SessionMapProps) {
+    const [center, setCenter] = useState<[number, number]>(SENTUL_COORDS);
+
+    useEffect(() => {
+        if (points && points.length > 0) {
+            // Calculate center of the bounds
+            const lats = points.map(p => p.lat);
+            const lngs = points.map(p => p.lng);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+            const minLng = Math.min(...lngs);
+            const maxLng = Math.max(...lngs);
+
+            setCenter([(minLat + maxLat) / 2, (minLng + maxLng) / 2]);
+        }
+    }, [points]);
+
+    const polylinePositions = points.map(p => [p.lat, p.lng] as [number, number]);
 
     return (
-        <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }}>
-            <TileLayer
-                attribution='Tiles &copy; Esri'
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            />
-            {polylinePoints.length > 0 && (
-                <>
-                    <Polyline positions={polylinePoints} color="orange" weight={4} />
-                    <Marker position={startPoint}>
-                        <Popup>Start</Popup>
+        <div className="w-full h-full rounded-xl overflow-hidden relative z-0">
+            <MapContainer center={center} zoom={16} style={{ height: "100%", width: "100%" }}>
+                {/* Google Satellite */}
+                <TileLayer
+                    attribution='&copy; Google Maps'
+                    url="https://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}"
+                    maxZoom={20}
+                />
+
+                {/* Racing Line */}
+                <Polyline
+                    positions={polylinePositions}
+                    pathOptions={{ color: '#ef4444', weight: 4, opacity: 0.8 }}
+                />
+
+                {/* Start/Finish Marker */}
+                {points.length > 0 && (
+                    <Marker position={[points[0].lat, points[0].lng]}>
+                        <Popup>Start/Finish</Popup>
                     </Marker>
-                    <Marker position={endPoint}>
-                        <Popup>Finish</Popup>
-                    </Marker>
-                    <MapBounds points={polylinePoints} />
-                </>
-            )}
-        </MapContainer>
+                )}
+            </MapContainer>
+
+            {/* Map Overlay Label */}
+            <div className="absolute top-4 left-4 z-[400] bg-black/50 backdrop-blur px-3 py-1 rounded-full text-xs font-racing border border-white/10 flex items-center gap-2">
+                <MapPin className="w-3 h-3 text-primary" />
+                SESSION TRAJECTORY
+            </div>
+        </div>
     );
 }

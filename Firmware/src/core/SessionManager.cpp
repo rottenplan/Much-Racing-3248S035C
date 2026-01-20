@@ -44,9 +44,9 @@ bool SessionManager::startSession() {
   if (_logFile) {
     _logging = true;
     _currentFilename = filename;
-    // _logFile.println("Time,Lat,Lon,Speed,Sats"); // Header - Send via Queue
-    // instead
-    logData("Time,Lat,Lon,Speed,Sats");
+    // _logFile.println("Time,Lat,Lon,Speed,Sats,Alt,Heading"); // Header - Send
+    // via Queue instead
+    logData("Time,Lat,Lon,Speed,Sats,Alt,Heading");
 
     Serial.println("Started logging to: " + filename);
     return true;

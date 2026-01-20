@@ -35,6 +35,8 @@ public:
   int getRawHour();
   int getRawMinute();
   double getHDOP();
+  double getAltitude();
+  double getHeading();
   int getUpdateRate();
 
   // Configuration
@@ -80,6 +82,7 @@ private:
   HardwareSerial *_gpsSerial;
   void sendUBX(const uint8_t *cmd, int len);
   void configureGpsBaud(int targetBaud);
+  void disableUnnecessarySentences(); // Optimize GPS bandwidth
 
   RawDataCallback _dataCallback = nullptr;
 
@@ -94,6 +97,13 @@ private:
   bool _hasLastPos = false;
   unsigned long _lastSaveTime = 0;
   int _currentRPM = 0;
+
+  // Speed Calculation
+  float _calculatedSpeed = 0.0;
+  double _lastSpeedLat = 0.0;
+  double _lastSpeedLon = 0.0;
+  unsigned long _lastSpeedTime = 0;
+  bool _hasLastSpeedPos = false;
 
   // Hz Calculation
   int _updatesCount = 0;

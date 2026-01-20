@@ -377,3 +377,132 @@ bool SyncManager::downloadTracks(const char *apiUrl, const char *authHeader) {
   http.end();
   return success;
 }
+bool SyncManager::uploadGPXTracks(const char *apiUrl, const char *username,
+                                  const char *password) {
+  if (WiFi.status() != WL_CONNECTED)
+    return false;
+
+  String authHeader = makeBasicAuthHeader(username, password);
+
+  // Construct Upload URL (Assumption: /api/tracks/upload)
+  String url = String(apiUrl);
+  int idx = url.indexOf("/api/device/sync");
+  if (idx > 0) {
+    url = url.substring(0, idx) + "/api/tracks/upload";
+  } else {
+    // Fallback or just append if base url is different
+    // Assuming apiUrl was the sync endpoint, usually
+    // "https://domain.com/api/device/sync" We want
+    // "https://domain.com/api/tracks/upload"
+    Serial.println("Sync: Invalid API URL format for track upload");
+    return false;
+  }
+
+  Serial.println("Sync: Scanning for GPX tracks in /tracks/...");
+
+  if (!SD.exists("/tracks")) {
+    Serial.println("Sync: /tracks directory not found.");
+    return true; // Nothing to upload, technically success
+  }
+
+  File root = SD.open("/tracks");
+  if (!root || !root.isDirectory()) {
+    Serial.println("Sync: Failed to open /tracks directory.");
+    return false;
+  }
+
+  bool allSuccess = true;
+  File file = root.openNextFile();
+
+  while (file) {
+    String filename = String(file.name());
+
+    // Only process .gpx files (skip hidden files or others)
+    if (!file.isDirectory() && filename.endsWith(".gpx")) {
+      Serial.print("Sync: Found track: ");
+      Serial.println(filename);
+
+      // Read File Content
+      String gpxData = "";
+      while (file.available()) {
+        gpxData += (char)file.read();
+      }
+
+      // Prepare Upload
+      HTTPClient http;
+      http.begin(url);
+      http.addHeader("Authorization", authHeader);
+      http.addHeader("Content-Type", "application/json");
+
+      JsonDocument doc;
+      doc["filename"] = filename;
+      doc["gpx_data"] = gpxData; // Sending raw XML in JSON string
+
+      String jsonPayload;
+      serializeJson(doc, jsonPayload);
+
+      Serial.println("Sync: Uploading...");
+      int httpCode = http.POST(jsonPayload);
+      http.end();
+
+      if (httpCode == HTTP_CODE_OK || httpCode == 201) {
+        Serial.println("Sync: Upload success!");
+
+        // Move to /uploaded_tracks/
+        if (!SD.exists("/uploaded_tracks")) {
+          SD.mkdir("/uploaded_tracks");
+        }
+
+        // Rename (Move)
+        // Note: SD.rename requires full paths
+        String oldPath = "/tracks/" + filename;
+        String newPath = "/uploaded_tracks/" + filename;
+
+        // Close file before renaming? (It was read fully, but object persists)
+        // file object is invalid after openNextFile loop usually, but here we
+        // still have it Need to close current file handle? 'file' is a wrapper
+        // around the directory entry iterator in some SD libs. But we read from
+        // it. Let's make sure we don't hold a lock. file.close() is implicit or
+        // we can just ignore since we read to end? Actually, standard SD lib:
+        // file needs to be closed? But the loop uses 'file =
+        // root.openNextFile()'. We should probably rely on the fact we read it
+        // all. Wait! We can't rename an open file. But 'file' is the handle. We
+        // must close it first. BUT openNextFile returns an open file object. We
+        // need to close 'file' before renaming. However, the loop depends on
+        // 'file'. Actually typical pattern: File f = root.openNextFile();
+        // ... work ...
+        // f.close();
+
+        // The issue: openNextFile updates the internal pointer of 'root'.
+        // So closing 'file' is fine.
+      } else {
+        Serial.print("Sync: Upload failed. Code: ");
+        Serial.println(httpCode);
+        allSuccess = false;
+      }
+
+      // We must close the file to release the handle, especially before
+      // renaming
+      file.close();
+
+      if (httpCode == HTTP_CODE_OK || httpCode == 201) {
+        // Rename now that it's closed
+        String oldPath = "/tracks/" + filename;
+        String newPath = "/uploaded_tracks/" + filename;
+        if (SD.rename(oldPath, newPath)) {
+          Serial.println("Sync: Moved to " + newPath);
+        } else {
+          Serial.println("Sync: Failed to move file!");
+        }
+      }
+
+    } else {
+      file.close(); // Not a gpx, close and move on
+    }
+
+    file = root.openNextFile();
+  }
+
+  root.close();
+  return allSuccess;
+}

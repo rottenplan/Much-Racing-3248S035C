@@ -15,7 +15,26 @@ void SynchronizeScreen::onShow() {
   _isSyncing = false;
   _lastSyncSuccess = false;
   _lastTouchTime = 0;
-  drawScreen();
+
+  // Static Draw (Background & Header)
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+
+  // Header using standard font
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  tft->setTextDatum(TC_DATUM);
+  tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, 35);
+
+  // Back Arrow
+  tft->setTextSize(2);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  tft->drawString("<", 10, 25);
+
+  drawScreen(true);
 }
 
 void SynchronizeScreen::update() {
@@ -31,30 +50,12 @@ void SynchronizeScreen::update() {
 void SynchronizeScreen::drawScreen(bool fullRedraw) {
   TFT_eSPI *tft = _ui->getTft();
 
-  if (fullRedraw) {
-    // Clear only content area
-    tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  // Clear dynamic area (below header)
+  // Header ends approx y=40. Start clearing at 50.
+  tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, COLOR_BG);
 
-    // Header using standard font
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(2);
-    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG); // Highlighted title
-    tft->setTextDatum(TC_DATUM);
-    tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, 35); // Lowered position
-
-    // Back Arrow
-    tft->setTextSize(2);
-    tft->setTextDatum(TL_DATUM);
-    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-    tft->drawString("<", 10, 25);
-  } else {
-    // Clear dynamic area (below header)
-    // Header ends approx y=40. Start clearing at 50.
-    tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, COLOR_BG);
-    // Reset font for partial redraw if needed (though we set it below)
-    tft->setFreeFont(&Org_01);
-  }
+  // Ensure font is set
+  tft->setFreeFont(&Org_01);
 
   // Status Area
   tft->setTextSize(1);
@@ -168,18 +169,25 @@ void SynchronizeScreen::performSync() {
   bool uploadSuccess =
       syncManager.uploadSessions(API_URL, username.c_str(), password.c_str());
 
-  if (settingsSuccess && uploadSuccess) {
+  // 5. Perform GPX Track Upload
+  _statusMessage = "UPLOADING TRACKS...";
+  drawScreen(false);
+  bool gpxSuccess =
+      syncManager.uploadGPXTracks(API_URL, username.c_str(), password.c_str());
+
+  if (settingsSuccess && uploadSuccess && gpxSuccess) {
     _statusMessage = "SYNC COMPLETE";
     _detailMessage = "All Data Updated";
     _lastSyncSuccess = true;
-  } else if (settingsSuccess) {
+  } else if (settingsSuccess && (uploadSuccess || gpxSuccess)) {
     _statusMessage = "PARTIAL SYNC";
-    _detailMessage = "Settings OK, Upload Fail";
+    _detailMessage = "Upload Incomplete";
+    _lastSyncSuccess = true;
+  } else if (settingsSuccess) {
+    _statusMessage = "SETTINGS SYNCED";
+    _detailMessage = "Upload Failed";
     _lastSyncSuccess = true;
   } else {
-    _statusMessage = "SYNC FAILED";
-    _detailMessage = "Check internet/creds";
-    _lastSyncSuccess = false;
   }
 
   _isSyncing = false;

@@ -18,6 +18,8 @@ public:
                     const char *password);
   bool uploadSessions(const char *apiUrl, const char *username,
                       const char *password);
+  bool uploadGPXTracks(const char *apiUrl, const char *username,
+                       const char *password);
 
   // Status checks
   bool isFirstSyncDone();

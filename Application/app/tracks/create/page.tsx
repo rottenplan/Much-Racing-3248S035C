@@ -42,68 +42,28 @@ export default function CreateTrack() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col font-sans">
-      {/* Top Header Bar */}
-      <header className="bg-[#2d2d2d] h-12 flex items-center px-4 border-b border-[#3d3d3d] justify-between relative z-50">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+      {/* Editor Header */}
+      <header className="carbon-bg h-14 flex items-center px-4 border-b border-border-color justify-between relative z-50">
         <div className="flex items-center gap-4">
-          <div className="w-8 h-8 relative">
-            <img src="/logo.png" alt="Much Racing" className="w-full h-full object-contain" />
-          </div>
+          <Link href="/tracks" className="text-text-secondary hover:text-foreground transition">
+            <ChevronLeft className="w-6 h-6" />
+          </Link>
           <div className="flex items-center gap-2 text-sm">
-            <MapPin size={16} className="text-white" />
-            <span className="font-semibold">{trackName} - {trackLocation}</span>
+            <MapPin size={16} className="text-primary" />
+            <span className="font-semibold font-racing tracking-wide">{trackName}</span>
+            <span className="text-text-secondary text-xs">- {trackLocation}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-6 mr-4">
-          <Link href="/dashboard" className="text-xs text-gray-400 hover:text-white font-medium">Dashboard</Link>
-          <Link href="/tracks" className="text-xs text-white font-bold border-b-2 border-red-500 pb-3 mt-3">Tracks</Link>
-          <Link href="/sessions" className="text-xs text-gray-400 hover:text-white font-medium">Sessions</Link>
-          <Link href="/device" className="text-xs text-gray-400 hover:text-white font-medium">Device</Link>
-        </div>
-
-        <div className="relative">
-          <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-4 text-xs text-gray-400 hover:text-white focus:outline-none"
-          >
-            <span>Muchdas</span>
-            <div className="w-6 h-6 rounded-full bg-yellow-500 overflow-hidden">
-              <img src="https://ui-avatars.com/api/?name=Muchdas&background=random" alt="User" />
-            </div>
+        <div className="flex items-center gap-3">
+          <button className="bg-background-secondary hover:bg-card-bg text-foreground border border-border-color px-3 py-1.5 rounded text-xs font-racing transition flex items-center gap-2">
+            <Save className="w-3 h-3" />
+            SAVE DRAFT
           </button>
-
-          {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-[#2d2d2d] border border-[#3d3d3d] rounded-md shadow-lg py-1 z-[1000]">
-              <ul className="list-none m-0 p-0">
-                <li>
-                  <Link href="/dashboard" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-[#3d3d3d] hover:text-white transition-colors">
-                    <BarChart2 size={16} />
-                    <span>Dashboard</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/device" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-[#3d3d3d] hover:text-white transition-colors">
-                    <Smartphone size={16} />
-                    <span>My Device</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/account" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-[#3d3d3d] hover:text-white transition-colors">
-                    <Info size={16} />
-                    <span>My account</span>
-                  </Link>
-                </li>
-                <li className="border-t border-[#3d3d3d] my-1"></li>
-                <li>
-                  <Link href="/login" className="flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-[#3d3d3d] hover:text-red-300 transition-colors">
-                    <LogOut size={16} />
-                    <span>Disconnect</span>
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          )}
+          <button className="bg-primary hover:bg-primary-hover text-white px-3 py-1.5 rounded text-xs font-racing transition shadow-md">
+            PUBLISH TRACK
+          </button>
         </div>
       </header>
 

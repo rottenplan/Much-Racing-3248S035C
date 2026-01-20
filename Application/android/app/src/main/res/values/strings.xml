@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">RaceBox</string>
-    <string name="title_activity_main">RaceBox</string>
-    <string name="package_name">com.muchracing.app</string>
-    <string name="custom_url_scheme">com.muchracing.app</string>
-</resources>

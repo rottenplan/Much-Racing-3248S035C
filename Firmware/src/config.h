@@ -50,7 +50,7 @@
 // Standard Serial Pins (Conflict with USB Debugging!)
 #define PIN_GPS_RX 3
 #define PIN_GPS_TX 1
-#define GPS_BAUD 9600
+#define GPS_BAUD 115200 // Increased from 9600 for faster GPS lock
 // #define PIN_LIGHT_SENSOR 34 // Removed: Used for Battery
 #define PIN_BATTERY 34
 #define BATTERY_VOLTAGE_MAX 4.2

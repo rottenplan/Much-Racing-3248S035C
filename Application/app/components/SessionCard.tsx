@@ -23,10 +23,10 @@ export default function SessionCard({
     href,
 }: SessionCardProps) {
     const content = (
-        <div className="bg-card-bg p-4 rounded-xl shadow-sm border border-border-color flex items-center justify-between mb-3 cursor-pointer hover:bg-white/5 transition-colors">
+        <div className="carbon-bg p-4 rounded-xl shadow-md border border-border-color flex items-center justify-between mb-3 cursor-pointer hover:border-primary/50 hover:shadow-lg transition-all group">
             <div className="flex flex-col gap-1">
-                <span className="text-text-secondary text-sm font-medium">{date}</span>
-                <h3 className="text-foreground font-bold text-lg">{title}</h3>
+                <span className="text-text-secondary text-xs font-medium uppercase tracking-wide">{date}</span>
+                <h3 className="text-foreground font-racing text-base group-hover:text-primary transition-colors">{title}</h3>
                 {type === "track" ? (
                     <div className="flex items-center gap-4 text-sm text-text-secondary">
                         <span>{subtitle}</span>
@@ -39,15 +39,15 @@ export default function SessionCard({
             <div className="flex items-center gap-3">
                 {highlight && (
                     <div className="text-right">
-                        {highlightLabel && <div className="text-xs text-zinc-500">{highlightLabel}</div>}
-                        <div className={`text-lg font-bold ${highlightColor === 'green' ? 'text-highlight' :
-                            highlightColor === 'red' ? 'text-primary' : 'text-foreground'
+                        {highlightLabel && <div className="text-xs text-text-secondary font-medium">{highlightLabel}</div>}
+                        <div className={`text-xl font-data font-bold ${highlightColor === 'green' ? 'text-highlight' :
+                                highlightColor === 'red' ? 'text-primary' : 'text-foreground'
                             }`}>
                             {highlight}
                         </div>
                     </div>
                 )}
-                <ChevronRight className="text-zinc-600 w-5 h-5" />
+                <ChevronRight className="text-primary w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </div>
         </div>
     );

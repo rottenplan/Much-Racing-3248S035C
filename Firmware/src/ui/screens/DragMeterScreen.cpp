@@ -460,10 +460,12 @@ void DragMeterScreen::updateDisciplines() {
 
   // LOG DATA
   if (_runState == RUN_RUNNING && sessionManager.isLogging()) {
-    // Time,Lat,Lon,Speed,Sats
+    // Time,Lat,Lon,Speed,Sats,Alt,Heading
     String data = String(millis()) + "," + String(gpsManager.getLatitude(), 6) +
                   "," + String(gpsManager.getLongitude(), 6) + "," +
-                  String(speed, 2) + "," + String(gpsManager.getSatellites());
+                  String(speed, 2) + "," + String(gpsManager.getSatellites()) +
+                  "," + String(gpsManager.getAltitude(), 2) + "," +
+                  String(gpsManager.getHeading(), 2);
     sessionManager.logData(data);
   }
 

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Wifi, Upload, Download, Settings, HardDrive, Cpu, Globe, Gauge, Save } from 'lucide-react';
+import { Wifi, Upload, Download, Settings, HardDrive, Cpu, Globe, Gauge, Save, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
 
 const countries = [
   'Argentina', 'Australia', 'Austria', 'Belgium', 'Brazil', 'Canada', 'Chile', 'China',
@@ -49,105 +50,79 @@ export default function DevicePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Navigation */}
-      <nav className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-12 h-12 relative">
-                <img
-                  src="/logo.png"
-                  alt="Much Racing Logo"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <span className="text-white text-2xl font-bold">Much Racing</span>
-            </Link>
-            <div className="hidden md:flex space-x-6">
-              <Link href="/dashboard" className="text-slate-300 hover:text-white transition">Dashboard</Link>
-              <Link href="/tracks" className="text-slate-300 hover:text-white transition">Tracks</Link>
-              <Link href="/sessions" className="text-slate-300 hover:text-white transition">Sessions</Link>
-              <Link href="/device" className="text-white font-semibold">Device</Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background text-foreground pb-24">
+
 
       {/* Content */}
-      <div className="container mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">My Device</h1>
-          <p className="text-slate-400">Configure your Much Racing device settings</p>
-        </div>
+      <div className="container mx-auto px-4 py-6 space-y-6">
 
         {/* Device Status */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="carbon-bg border border-border-color rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">MuchRacing_e05a1b</h2>
-              <p className="text-slate-400">MAC: E0:5A:1B:A2:74:44</p>
-              <p className="text-slate-400">Firmware: v2.1.0</p>
+              <h2 className="text-xl font-racing text-foreground mb-1">MuchRacing_e05a1b</h2>
+              <p className="text-text-secondary text-xs font-data">MAC: E0:5A:1B:A2:74:44</p>
+              <p className="text-text-secondary text-xs font-data">Firmware: v2.1.0</p>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-green-400 font-semibold">Connected</span>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-highlight rounded-full animate-pulse"></div>
+              <span className="text-highlight font-racing text-sm">CONNECTED</span>
             </div>
           </div>
 
           {/* Storage */}
-          <div className="mb-6">
+          <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400 flex items-center">
-                <HardDrive className="w-5 h-5 mr-2" />
+              <span className="text-text-secondary flex items-center gap-2 text-sm">
+                <HardDrive className="w-4 h-4" />
                 Storage Usage
               </span>
-              <span className="text-white font-semibold">
+              <span className="text-foreground font-data text-sm font-bold">
                 {storageStats.used} MB / {storageStats.total > 0 ? storageStats.total : '---'} MB
               </span>
             </div>
-            <div className="w-full bg-slate-900 rounded-full h-3">
+            <div className="w-full bg-background-secondary rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-orange-500 to-red-600 h-3 rounded-full"
+                className="bg-gradient-to-r from-primary to-highlight h-2 rounded-full transition-all"
                 style={{ width: `${storageStats.total > 0 ? (storageStats.used / storageStats.total) * 100 : 0}%` }}
               ></div>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-              <Wifi className="w-8 h-8 text-orange-500 mb-2" />
-              <div className="text-slate-400 text-sm mb-1">WiFi Status</div>
-              <div className="text-white font-semibold">Connected</div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-background-secondary border border-border-color rounded-lg p-3">
+              <Wifi className="w-6 h-6 text-primary mb-2" />
+              <div className="text-text-secondary text-xs mb-1">WiFi Status</div>
+              <div className="text-foreground font-racing text-sm">CONNECTED</div>
             </div>
-            <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-              <Upload className="w-8 h-8 text-blue-500 mb-2" />
-              <div className="text-slate-400 text-sm mb-1">Last Sync</div>
-              <div className="text-white font-semibold">2 hours ago</div>
+            <div className="bg-background-secondary border border-border-color rounded-lg p-3">
+              <Upload className="w-6 h-6 text-highlight mb-2" />
+              <div className="text-text-secondary text-xs mb-1">Last Sync</div>
+              <div className="text-foreground font-data text-sm">2 hours ago</div>
             </div>
-            <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-              <Download className="w-8 h-8 text-green-500 mb-2" />
-              <div className="text-slate-400 text-sm mb-1">Sessions</div>
-              <div className="text-white font-semibold">24 synced</div>
+            <div className="bg-background-secondary border border-border-color rounded-lg p-3">
+              <Download className="w-6 h-6 text-highlight mb-2" />
+              <div className="text-text-secondary text-xs mb-1">Sessions</div>
+              <div className="text-foreground font-data text-sm">24 synced</div>
             </div>
           </div>
         </div>
 
         {/* Device Settings */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-            <Settings className="w-6 h-6 mr-2" />
-            Device Settings
+        <div className="carbon-bg border border-border-color rounded-xl p-6">
+          <h2 className="text-lg font-racing text-foreground mb-4 flex items-center gap-2">
+            <Settings className="w-5 h-5 text-primary" />
+            DEVICE SETTINGS
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-4">
             {/* Units */}
             <div>
-              <label className="text-slate-400 text-sm mb-2 block">Speed Units</label>
+              <label className="text-text-secondary text-xs mb-2 block">Speed Units</label>
               <select
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+                className="w-full bg-background-secondary border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
               >
                 <option value="kmh">Km/h</option>
                 <option value="mph">Mph</option>
@@ -156,11 +131,11 @@ export default function DevicePage() {
 
             {/* Temperature */}
             <div>
-              <label className="text-slate-400 text-sm mb-2 block">Temperature Units</label>
+              <label className="text-text-secondary text-xs mb-2 block">Temperature Units</label>
               <select
                 value={temperature}
                 onChange={(e) => setTemperature(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+                className="w-full bg-background-secondary border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
               >
                 <option value="celsius">Celsius</option>
                 <option value="fahrenheit">Fahrenheit</option>
@@ -169,11 +144,11 @@ export default function DevicePage() {
 
             {/* GNSS */}
             <div>
-              <label className="text-slate-400 text-sm mb-2 block">GNSS Mode</label>
+              <label className="text-text-secondary text-xs mb-2 block">GNSS Mode</label>
               <select
                 value={gnss}
                 onChange={(e) => setGnss(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+                className="w-full bg-background-secondary border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
               >
                 <option value="gps">GPS</option>
                 <option value="gps_glonass">GPS + GLONASS</option>
@@ -184,24 +159,24 @@ export default function DevicePage() {
 
             {/* Contrast */}
             <div>
-              <label className="text-slate-400 text-sm mb-2 block">Screen Contrast: {contrast}%</label>
+              <label className="text-text-secondary text-xs mb-2 block">Screen Contrast: {contrast}%</label>
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={contrast}
                 onChange={(e) => setContrast(Number(e.target.value))}
-                className="w-full"
+                className="w-full accent-primary"
               />
             </div>
 
             {/* Power Save */}
-            <div>
-              <label className="text-slate-400 text-sm mb-2 block">Power Save (minutes)</label>
+            <div className="md:col-span-2">
+              <label className="text-text-secondary text-xs mb-2 block">Power Save (minutes)</label>
               <select
                 value={powerSave}
                 onChange={(e) => setPowerSave(Number(e.target.value))}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+                className="w-full bg-background-secondary border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
               >
                 <option value={1}>1 minute</option>
                 <option value={5}>5 minutes</option>
@@ -212,25 +187,25 @@ export default function DevicePage() {
             </div>
           </div>
 
-          <button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg transition flex items-center">
-            <Save className="w-4 h-4 mr-2" />
-            Save Settings
+          <button className="mt-4 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg transition flex items-center gap-2 font-racing text-sm">
+            <Save className="w-4 h-4" />
+            SAVE SETTINGS
           </button>
         </div>
 
         {/* Engine Management */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-            <Cpu className="w-6 h-6 mr-2" />
-            Engine Management
+        <div className="carbon-bg border border-border-color rounded-xl p-6">
+          <h2 className="text-lg font-racing text-foreground mb-4 flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-primary" />
+            ENGINE MANAGEMENT
           </h2>
 
           <div className="mb-4">
-            <label className="text-slate-400 text-sm mb-2 block">Active Engine</label>
+            <label className="text-text-secondary text-xs mb-2 block">Active Engine</label>
             <select
               value={activeEngine}
               onChange={(e) => setActiveEngine(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+              className="w-full bg-background-secondary border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
             >
               <option value="1">Engine 1</option>
               <option value="2">Engine 2</option>
@@ -238,28 +213,28 @@ export default function DevicePage() {
             </select>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[1, 2, 3].map((engineNum) => (
-              <div key={engineNum} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-                <div className="grid md:grid-cols-2 gap-4">
+              <div key={engineNum} className="bg-background-secondary border border-border-color rounded-lg p-3">
+                <div className="grid md:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-slate-400 text-sm mb-2 block">Engine {engineNum} Name</label>
+                    <label className="text-text-secondary text-xs mb-1 block">Engine {engineNum} Name</label>
                     <input
                       type="text"
                       defaultValue={engineNum === 1 ? 'Much Racing' : `Engine ${engineNum}`}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+                      className="w-full bg-background border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-slate-400 text-sm mb-2 block flex items-center">
-                      <Gauge className="w-4 h-4 mr-1" />
+                    <label className="text-text-secondary text-xs mb-1 block flex items-center gap-1">
+                      <Gauge className="w-3 h-3" />
                       Engine Hours
                     </label>
                     <input
                       type="number"
                       defaultValue={engineNum === 1 ? '24.5' : '0.0'}
                       step="0.1"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+                      className="w-full bg-background border border-border-color rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm font-data"
                     />
                   </div>
                 </div>
@@ -269,47 +244,48 @@ export default function DevicePage() {
         </div>
 
         {/* Track Database Selection */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-8">
-          <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
-            <Globe className="w-6 h-6 mr-2" />
-            Global Track Database
+        <div className="carbon-bg border border-border-color rounded-xl p-6">
+          <h2 className="text-lg font-racing text-foreground mb-2 flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary" />
+            GLOBAL TRACK DATABASE
           </h2>
-          <p className="text-slate-400 mb-6">
+          <p className="text-text-secondary mb-4 text-xs">
             Select countries to load track maps onto your device.
-            <span className="text-orange-400"> Note: More countries = longer track detection time.</span>
+            <span className="text-primary"> Note: More countries = longer track detection time.</span>
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
             {countries.map((country) => (
-              <label key={country} className="flex items-center space-x-2 cursor-pointer hover:bg-slate-700/30 p-2 rounded transition">
+              <label key={country} className="flex items-center gap-2 cursor-pointer hover:bg-card-bg p-2 rounded transition">
                 <input
                   type="checkbox"
                   checked={selectedCountries.includes(country)}
                   onChange={() => toggleCountry(country)}
-                  className="w-4 h-4 text-orange-500 bg-slate-900 border-slate-700 rounded focus:ring-orange-500"
+                  className="w-3 h-3 text-primary bg-background-secondary border-border-color rounded focus:ring-primary accent-primary"
                 />
-                <span className="text-slate-300 text-sm">{country}</span>
+                <span className="text-foreground text-xs">{country}</span>
               </label>
             ))}
           </div>
 
-          <div className="mt-6 p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
-            <div className="text-slate-400 text-sm mb-2">Selected Countries: {selectedCountries.length}</div>
+          <div className="p-3 bg-background-secondary border border-border-color rounded-lg mb-4">
+            <div className="text-text-secondary text-xs mb-2">Selected Countries: {selectedCountries.length}</div>
             <div className="flex flex-wrap gap-2">
               {selectedCountries.map((country) => (
-                <span key={country} className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-lg text-sm">
+                <span key={country} className="bg-primary/20 text-primary px-2 py-1 rounded-lg text-xs font-medium">
                   {country}
                 </span>
               ))}
             </div>
           </div>
 
-          <button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg transition flex items-center">
-            <Save className="w-4 h-4 mr-2" />
-            Save Track Selection
+          <button className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg transition flex items-center gap-2 font-racing text-sm">
+            <Save className="w-4 h-4" />
+            SAVE TRACK SELECTION
           </button>
         </div>
       </div>
+
     </div>
   );
 }
