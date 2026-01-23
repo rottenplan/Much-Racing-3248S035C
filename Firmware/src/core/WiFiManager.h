@@ -52,6 +52,9 @@ private:
   void startAP(); // Start Hotspot
   void handleRoot();
   void handleApiLive();
+  void handleUpdateGet();
+  void handleUpdatePost();
+  void handleUpdateUpload();
 };
 
 #endif

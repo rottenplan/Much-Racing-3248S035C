@@ -1,6 +1,7 @@
 #include "WiFiManager.h"
 #include "web_static.h"
 #include <ArduinoJson.h>
+#include <Update.h>
 
 WiFiManager::WiFiManager() : _server(80) {
   _ssid = "";
@@ -18,15 +19,22 @@ void WiFiManager::begin() {
   }
 
   // ALWAYS Start AP Mode
+  WiFi.mode(WIFI_AP_STA);
   startAP();
-
-  // Enable CORS
-  _server.enableCORS(true);
 
   // Start Web Server
   _server.on("/", HTTP_GET, std::bind(&WiFiManager::handleRoot, this));
   _server.on("/api/live", HTTP_GET,
              std::bind(&WiFiManager::handleApiLive, this));
+
+  // OTA Update Routes
+  _server.on("/update", HTTP_GET,
+             std::bind(&WiFiManager::handleUpdateGet, this));
+  _server.on(
+      "/update", HTTP_POST,
+      [this]() { _server.sendHeader("Connection", "close"); },
+      [this]() { handleUpdateUpload(); });
+
   _server.begin();
   Serial.println("Web Server Started on Port 80");
 
@@ -72,7 +80,10 @@ void WiFiManager::update() {
   }
 }
 
-void WiFiManager::handleRoot() { _server.send(200, "text/html", INDEX_HTML); }
+void WiFiManager::handleRoot() {
+  _server.sendHeader("Access-Control-Allow-Origin", "*");
+  _server.send(200, "text/html", INDEX_HTML);
+}
 
 void WiFiManager::handleApiLive() {
   // Serial.println("API Live: Request Received"); // Debug spam
@@ -94,6 +105,35 @@ void WiFiManager::handleApiLive() {
   String json;
   serializeJson(doc, json);
   _server.send(200, "application/json", json);
+}
+
+void WiFiManager::handleUpdateGet() {
+  _server.send(200, "text/html", UPDATE_HTML);
+}
+
+void WiFiManager::handleUpdateUpload() {
+  HTTPUpload &upload = _server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    Serial.printf("Update: %s\n", upload.filename.c_str());
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // start with max available size
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    /* flashing firmware to ESP*/
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) { // true to set the size to the current progress
+      Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      _server.send(200, "text/plain", "Update Success! Rebooting...");
+      delay(1000);
+      ESP.restart();
+    } else {
+      Update.printError(Serial);
+      _server.send(500, "text/plain", "Update Failed");
+    }
+  }
 }
 
 bool WiFiManager::connect(const char *ssid, const char *pass) {

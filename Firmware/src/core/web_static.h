@@ -121,4 +121,61 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+const char UPDATE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firmware Update</title>
+  <style>
+    body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
+    .container { background: #222; padding: 30px; border-radius: 12px; border: 1px solid #04DF00; display: inline-block; max-width: 400px; width: 100%; }
+    input[type=file] { background: #333; padding: 10px; border-radius: 5px; width: 100%; margin-bottom: 20px; }
+    button { background: #04DF00; color: #000; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; }
+    #prg { margin-top: 20px; background: #333; height: 20px; border-radius: 10px; overflow: hidden; display: none; }
+    #bar { background: #04DF00; height: 100%; width: 0%; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>MuchUpdate</h2>
+    <p>Select firmware file (.bin)</p>
+    <form id="upload_form" enctype="multipart/form-data" method="post">
+      <input type="file" name="update" accept=".bin">
+      <button type="submit">Upload & Update</button>
+    </form>
+    <div id="prg"><div id="bar"></div></div>
+    <p id="status"></p>
+  </div>
+  <script>
+    var form = document.getElementById('upload_form');
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      var data = new FormData(form);
+      var req = new XMLHttpRequest();
+      req.open('POST', '/update');
+      
+      document.getElementById('prg').style.display = 'block';
+      document.getElementById('status').innerText = "Uploading...";
+      
+      req.upload.addEventListener('progress', p => {
+        var pc = (p.loaded / p.total) * 100;
+        document.getElementById('bar').style.width = pc + '%';
+      });
+      
+      req.onload = () => {
+        if (req.status == 200) {
+          document.getElementById('status').innerText = "Update Success! Rebooting...";
+          setTimeout(() => { window.location.href = '/'; }, 5000);
+        } else {
+          document.getElementById('status').innerText = "Error: " + req.responseText;
+        }
+      };
+      req.send(data);
+    });
+  </script>
+</body>
+</html>
+)rawliteral";
+
 #endif
