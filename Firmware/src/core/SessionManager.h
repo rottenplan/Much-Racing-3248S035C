@@ -8,6 +8,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#include <vector>
 
 class SessionManager {
 public:
@@ -37,6 +38,18 @@ public:
   };
 
   SDTestResult runFullTest(void (*progressCallback)(int, String) = NULL);
+
+  struct SessionAnalysis {
+    unsigned long totalTime;
+    float totalDistance; // km
+    float maxSpeed;      // km/h
+    float avgSpeed;      // km/h
+    int validLaps;
+    std::vector<unsigned long> lapTimes;
+    unsigned long bestLap;
+  };
+
+  SessionAnalysis analyzeSession(String filename);
 
 private:
   bool _logging;

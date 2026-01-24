@@ -111,8 +111,8 @@ void RpmSensorScreen::update() {
 void RpmSensorScreen::drawScreen() {
   TFT_eSPI *tft = _ui->getTft();
   // Clear only content area
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                            SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
 
   // Back Button
   tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
@@ -121,109 +121,108 @@ void RpmSensorScreen::drawScreen() {
   tft->setTextSize(2);
   tft->drawString("<", 10, 25);
 
-  // --- INFO BOX (Resized for Font 4) ---
-  int boxY = 25;
-  int boxH = 60; // Increased to 60 (30px per row)
-  int lblW = 80;
+  // --- INFO CARDS ---
+  int cardY = 30;
+  int cardH = 60;
+  int cardW = (SCREEN_WIDTH - 25) / 2;
 
-  // Border
-  tft->drawRect(10, boxY, SCREEN_WIDTH - 20, boxH, COLOR_TEXT);
-  tft->drawFastHLine(10, boxY + 30, SCREEN_WIDTH - 20,
-                     COLOR_TEXT); // Split at 30
-  tft->drawFastVLine(10 + lblW, boxY, boxH, COLOR_TEXT);
+  // MAX RPM Card (Left)
+  tft->fillRoundRect(10, cardY, cardW, cardH, 8, 0x18E3); // Charcoal
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->setTextSize(1);
+  tft->setTextDatum(TL_DATUM);
+  tft->drawString("MAX RPM", 20, cardY + 5);
 
-  // Labels (White BG, Black Text)
-  // Row 1: Y+1 to Y+29
-  // Row 2: Y+31 to Y+59
-  tft->fillRect(11, boxY + 1, lblW, 29, COLOR_TEXT);
-  tft->fillRect(11, boxY + 31, lblW, 28, COLOR_TEXT);
-
-  tft->setTextColor(COLOR_BG);
-  tft->setTextSize(2);
-  tft->setTextDatum(ML_DATUM);
-  // Centered in 30px heights
-  tft->drawString("MAX", 20, boxY + 15);
-  tft->drawString("LVL", 20, boxY + 45);
+  // CURRENT RPM Card (Right)
+  tft->fillRoundRect(15 + cardW, cardY, cardW, cardH, 8, 0x10A2); // Slate
+  tft->setTextColor(TFT_SILVER, 0x10A2);
+  tft->drawString("CURRENT", 25 + cardW, cardY + 5);
 
   // --- GRAPH AREA ---
   drawGraphGrid();
 
   // --- BOTTOM BAR ---
-  tft->drawRect(10, 215, SCREEN_WIDTH - 20, 18, COLOR_TEXT);
+  // Background container
+  tft->fillRoundRect(10, 215, SCREEN_WIDTH - 20, 18, 4, 0x18E3);
 }
 
 void RpmSensorScreen::updateValues() {
   TFT_eSPI *tft = _ui->getTft();
 
+  // Card Calculations (Mirror drawScreen)
+  int cardY = 30;
+  int cardH = 60;
+  int cardW = (SCREEN_WIDTH - 25) / 2;
+
   // Use Font 4 (LCD/Digital style, 26px)
   tft->setTextFont(4);
   tft->setTextSize(1);
-  tft->setTextDatum(MR_DATUM);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextDatum(MC_DATUM);
 
-  int valX = 10 + 80;
-  int w = SCREEN_WIDTH - 20 - 80 - 2; // ~218px
-  int boxY = 25;
-
-  // Padding to erase previous text without flicker
-  tft->setTextPadding(w - 10);
-
+  // MAX Value
   char buf[10];
-
-  // MAX
-  // Row 1 center: boxY + 15
   sprintf(buf, "%05d", _maxRpm);
-  // Draw string automatically clears background due to Padding + TextColor
-  tft->drawString(buf, SCREEN_WIDTH - 20, boxY + 15);
+  tft->setTextColor(TFT_ORANGE, 0x18E3);
+  // Manual clear or just overwrite with background color text (Charcoal)
+  // Font 4 is monospaced-ish but padding helps
+  tft->setTextPadding(cardW - 10);
+  tft->drawString(buf, 10 + cardW / 2, cardY + 35);
 
-  // LVL
-  // Row 2 center: boxY + 45
+  // CURRENT Value
   sprintf(buf, "%05d", _currentRpm);
-  tft->drawString(buf, SCREEN_WIDTH - 20, boxY + 45);
+  tft->setTextColor(TFT_CYAN, 0x10A2);
+  tft->setTextPadding(cardW - 10);
+  tft->drawString(buf, 15 + cardW + cardW / 2, cardY + 35);
 
   tft->setTextPadding(0); // Reset padding
 
   // Update Bottom Bar
-  int barW = map(_currentLvl, 0, 100, 0, SCREEN_WIDTH - 24);
+  int barMaxWidth = SCREEN_WIDTH - 24;
+  int barW = map(_currentLvl, 0, 100, 0, barMaxWidth);
   if (barW < 0)
     barW = 0;
+  if (barW > barMaxWidth)
+    barW = barMaxWidth;
 
   int barY = 217;
   int barH = 14;
+  int barX = 12;
 
-  // Clear remaining Part
-  tft->fillRect(12 + barW, barY, (SCREEN_WIDTH - 24) - barW, barH, COLOR_BG);
-  // Draw Bar
-  tft->fillRect(12, barY, barW, barH, COLOR_GREEN);
+  // Draw Bar (Fill Green for active, Charcoal for empty)
+  if (barW > 0)
+    tft->fillRect(barX, barY, barW, barH, COLOR_GREEN);
+  if (barW < barMaxWidth)
+    tft->fillRect(barX + barW, barY, barMaxWidth - barW, barH, 0x18E3);
 }
 
 void RpmSensorScreen::drawGraphGrid() {
   TFT_eSPI *tft = _ui->getTft();
-  // Adjusted Position: boxY(25)+boxH(60)+Gap(10) = 95
-  int gY = 95;
+  int gY = 100;          // Moved down slightly
   int gH = GRAPH_HEIGHT; // 115
+  int gW = GRAPH_WIDTH;  // 280?
 
-  // Box
-  tft->drawRect(10, gY, SCREEN_WIDTH - 20, gH, COLOR_TEXT);
-
-  // Grid - Dyno Style
-  // Vertical Grid (every 74px ~ 25%)
-  // Note: On-Screen Grid (Static) - optional if sprite covers it?
-  // Sprite covers INSIDE (1px border). So we don't strictly need to draw inner
-  // grid here if sprite is always pushed. But effectively this draws the Frame.
+  // Draw Graph Container Frame
+  tft->drawRoundRect(10, gY, SCREEN_WIDTH - 20, gH, 4, TFT_DARKGREY);
 
   // Axis Labels
   tft->setTextFont(1);
   tft->setTextSize(1);
-  tft->setTextColor(TFT_LIGHTGREY);
+  tft->setTextColor(TFT_SILVER);
 
-  // Left (RPM)
+  // Left (RPM) - Inside frame? Or Outside? Sprite covers inside.
+  // Sprite is pushed to (11, 96)?
+  // Let's adjust sprite pos in drawGraphLine to match gY + 1
+  // Labels outside
+  // We can't really draw outside comfortably with 280 width (Screen 320). 20px
+  // margins.
+
+  // Left Axis
   tft->setTextDatum(MR_DATUM);
   tft->drawString("12k", 8, gY);
   tft->drawString("6k", 8, gY + gH / 2);
   tft->drawString("0", 8, gY + gH);
 
-  // Right (Speed)
+  // Right Axis (Speed)
   tft->setTextDatum(ML_DATUM);
   tft->drawString(String(MAX_SPEED_SCALE), SCREEN_WIDTH - 8, gY);
   tft->drawString(String(MAX_SPEED_SCALE / 2), SCREEN_WIDTH - 8, gY + gH / 2);
@@ -291,6 +290,7 @@ void RpmSensorScreen::drawGraphLine() {
   }
 
   // 4. Push Sprite to Screen
-  // BoxRect: (10, 95). Inner: (11, 96).
-  _graphSprite->pushSprite(11, 96);
+  // GraphY = 100. Border 10->SCREEN-10.
+  // Inner Rect Start = 11, 101.
+  _graphSprite->pushSprite(11, 101);
 }

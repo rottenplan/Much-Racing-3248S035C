@@ -6,6 +6,7 @@
 #include "../components/KeyboardComponent.h"
 #include <Arduino.h>
 #include <Preferences.h>
+
 #include <WiFi.h>
 #include <vector>
 
@@ -52,7 +53,10 @@ private:
     MODE_CLOCK,
     MODE_WIFI_MENU,
     MODE_WIFI,
-    MODE_WIFI_PASS
+    MODE_WIFI_PASS,
+    MODE_UTILITY,
+    MODE_GRAPHIC_TEST,
+    MODE_ABOUT
   };
   ScreenMode _currentMode;
   SessionManager::SDTestResult _sdResult;
@@ -90,7 +94,28 @@ private:
   void drawList(int scrollOffset, bool force = false);
   void drawHeader(String title, uint16_t backColor = COLOR_HIGHLIGHT);
   void drawGPSStatus(bool force = false);
+
   void drawSDTest();
+  void drawAbout();
+
+  void startGraphicTest();
+  void updateGraphicTest();
+  void endGraphicTest();
+
+  // Benchmark Helpers
+  void runBenchmark();
+  unsigned long testFillScreen();
+  unsigned long testText();
+  unsigned long testLines(uint16_t color);
+  unsigned long testFastLines(uint16_t color1, uint16_t color2);
+  unsigned long testRects(uint16_t color);
+  unsigned long testFilledRects(uint16_t color1, uint16_t color2);
+  unsigned long testFilledCircles(uint8_t radius, uint16_t color);
+  unsigned long testCircles(uint8_t radius, uint16_t color);
+  unsigned long testTriangles();
+  unsigned long testFilledTriangles();
+  unsigned long testRoundRects();
+  unsigned long testFilledRoundRects();
 
   // WiFi Draw Functions
   void drawWiFiList(bool force = false);

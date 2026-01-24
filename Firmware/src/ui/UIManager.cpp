@@ -37,6 +37,7 @@ UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _lastBat = -1;
   _lastLogging = false;
   _lastWifiStatus = -1;
+  _isDarkMode = true; // Default Dark
 }
 
 void UIManager::begin() {
@@ -113,6 +114,12 @@ void UIManager::begin() {
   // g_manualHour = prefs.getInt("m_hour", 12);
   // g_manualMinute = prefs.getInt("m_min", 0);
   // g_utcOffset = prefs.getInt("utc_offset_idx", 12) - 12;
+  // Theme load - Forced Dark Mode per user request
+  prefs.begin("laptimer", true);
+  // _isDarkMode = prefs.getBool("dark_mode", true);
+  _isDarkMode = true; // Always Dark
+  prefs.end();
+
   // prefs.end();
   // g_lastTimeUpdate = millis();
 }
@@ -235,7 +242,7 @@ void UIManager::switchScreen(ScreenType type) {
 
   _currentType = type;
 
-  _tft->fillScreen(COLOR_BG);
+  _tft->fillScreen(getBackgroundColor());
 
   switch (type) {
   case SCREEN_SPLASH:
@@ -328,18 +335,20 @@ void UIManager::drawStatusBar(bool force) {
 
   // Gambar garis pemisah (aman untuk digambar ulang, cepat)
   if (force) {
-    _tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+    // Explicitly CLEAR the entire status bar area to prevent overlap/artifacts
+    _tft->fillRect(0, 0, SCREEN_WIDTH, 20, getBackgroundColor());
+    _tft->drawFastHLine(0, 20, SCREEN_WIDTH, getSecondaryColor());
   }
 
   _tft->setFreeFont(&Org_01);
   _tft->setTextSize(FONT_SIZE_STATUS_BAR);
-  _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  _tft->setTextColor(getTextColor(), getBackgroundColor());
 
   // --- WiFi Section (Left: x=5) ---
   int wifiStatus = wifiManager.isConnected() ? 1 : 0;
   if (force || wifiStatus != _lastWifiStatus) {
     // Clear WiFi Area (0 to 30)
-    _tft->fillRect(0, 0, 30, 20, COLOR_BG);
+    _tft->fillRect(0, 0, 30, 20, getBackgroundColor());
 
     uint16_t color = (wifiStatus == 1) ? TFT_GREEN : TFT_RED;
     int wx = 12; // Centered at 12
@@ -385,7 +394,7 @@ void UIManager::drawStatusBar(bool force) {
       sats != _lastSats) {
     _lastSats = sats;
     // Clear GPS Area (30 to 100)
-    _tft->fillRect(30, 0, 70, 20, COLOR_BG);
+    _tft->fillRect(30, 0, 70, 20, getBackgroundColor());
 
     // CRITICAL: Reset Font to Standard
     _tft->setFreeFont(NULL);
@@ -406,13 +415,13 @@ void UIManager::drawStatusBar(bool force) {
         uint16_t color = fix ? TFT_GREEN : TFT_RED;
         _tft->fillRect(x, y, barW, h, color);
       } else {
-        _tft->drawRect(x, y, barW, h, COLOR_TEXT);
+        _tft->drawRect(x, y, barW, h, getTextColor());
       }
     }
 
     // 2. Draw Label "SAT: XX" (Right of Bars)
     _tft->setTextDatum(ML_DATUM);
-    _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    _tft->setTextColor(getTextColor(), getBackgroundColor());
     _tft->setTextSize(1);
 
     String satStr = "SAT:" + String(sats);
@@ -437,58 +446,56 @@ void UIManager::drawStatusBar(bool force) {
     int areaW = 120;
     _tft->setTextPadding(areaW);
     _tft->setTextDatum(MC_DATUM);
-    _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    _tft->setTextColor(getTextColor(), getBackgroundColor());
     _tft->drawString(centerText, SCREEN_WIDTH / 2, 10);
     _tft->setTextPadding(0);
     _lastTimeStr = centerText;
   }
 
   // --- Bagian Baterai ---
-  // Read Battery Voltage
-  // Divider Ratio: 2.0 (1M/1M) -> Vbat = Vread * 2
-  // ADC: 12-bit (0-4095) for 0-3.3V (with attenuation)
+  // Read Battery Voltage every 5 seconds to prevent slowing down loop
+  static unsigned long lastBatRead = 0;
+  static int lastPct = -1;
+  static float lastVolts = 0;
 
-  // Note: ADC reading needs calibration, but we'll use a simple approximation
-  // Vread = (analogRead(PIN_BATTERY) / 4095.0) * 3.3;
-  // Vbat = Vread * 2.0;
+  if (millis() - lastBatRead > 5000 || lastPct == -1) {
+    lastBatRead = millis();
+    int rawADC = analogRead(PIN_BATTERY);
+    // 3.3V ~ 4095
+    lastVolts = (rawADC / 4095.0) * 3.3 * 2.0; // *2 for divider
 
-  // With default attenuation (11dB), max input is ~2.6V (Wait, typically 3.3V
-  // range?) Using standard formula:
+    // Percentage Calculation (Linear 3.0V - 4.2V)
+    if (lastVolts >= 4.2)
+      lastPct = 100;
+    else if (lastVolts <= 3.0)
+      lastPct = 0;
+    else {
+      lastPct = (int)((lastVolts - 3.0) / (4.2 - 3.0) * 100);
+    }
+  }
 
-  int rawADC = analogRead(PIN_BATTERY);
-
-  // Simple moving average or filtering could be added here
-
-  // ESP32 ADC is non-linear. Approximating:
-  // 3.3V ~ 4095
-  float voltage = (rawADC / 4095.0) * 3.3 * 2.0; // *2 for divider
+  int pct = lastPct;
+  float voltage = lastVolts;
 
   // Percentage Calculation (Linear 3.0V - 4.2V)
   // Max = 4.2, Min = 3.0
-  int pct = 0;
-  if (voltage >= 4.2)
-    pct = 100;
-  else if (voltage <= 3.3)
-    pct = 0;
-  else {
-    pct = (int)((voltage - 3.3) / (4.2 - 3.3) * 100);
-  }
+  // (Logic moved above)
 
   if (force || abs(pct - _lastBat) > 2) { // Update if changed by > 2%
     _lastBat = pct;
 
     // Hapus Area Bar + Teks
     // Area Kanan: 60px lebar?
-    _tft->fillRect(SCREEN_WIDTH - 60, 0, 60, 20, COLOR_BG);
+    _tft->fillRect(SCREEN_WIDTH - 60, 0, 60, 20, getBackgroundColor());
 
     // Gambar Teks Persentase
     _tft->setTextDatum(MR_DATUM); // Rata Kanan Tengah
     _tft->setTextSize(1);
-    _tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    _tft->setTextColor(getTextColor(), getBackgroundColor());
     String pctStr = String(pct) + "% (" + String(voltage, 1) + "V)";
     // Also debug raw to Serial if possible, but screen is better for user
     // feedback
-    Serial.printf("Bat: ADC=%d V=%f Pct=%d\n", rawADC, voltage, pct);
+    Serial.printf("Bat: V=%f Pct=%d\n", voltage, pct);
     _tft->drawString(pctStr, SCREEN_WIDTH - 32, 10); // Centered at 10
 
     // Gambar Ikon Baterai
@@ -497,8 +504,8 @@ void UIManager::drawStatusBar(bool force) {
     int batW = 20;
     int batH = 10;
 
-    _tft->drawRect(batX, batY, batW, batH, COLOR_TEXT);
-    _tft->fillRect(batX + batW, batY + 2, 2, 6, COLOR_TEXT);
+    _tft->drawRect(batX, batY, batW, batH, getTextColor());
+    _tft->fillRect(batX + batW, batY + 2, 2, 6, getTextColor());
 
     // Isi Level
     int innerW = batW - 4;
@@ -517,7 +524,7 @@ void UIManager::drawStatusBar(bool force) {
   if (force || isLogging != _lastLogging) {
     // Hapus Area Titik
     int dotX = (SCREEN_WIDTH / 2) + 40;
-    _tft->fillRect(dotX - 5, 0, 10, 20, COLOR_BG);
+    _tft->fillRect(dotX - 5, 0, 10, 20, getBackgroundColor());
 
     if (isLogging) {
       _tft->fillCircle(dotX, 10, 3, TFT_RED);
@@ -562,20 +569,58 @@ void UIManager::wakeUp() {
 }
 
 void UIManager::showToast(String message, int duration) {
-  int w = 200;
-  int h = 40;
+  int w = 180; // Smaller width
+  int h = 40;  // Smaller height
   int x = (SCREEN_WIDTH - w) / 2;
-  int y = SCREEN_HEIGHT - 60;
+  int y = 100; // Center-ish (Top-Mid) to avoid covering bottom buttons
 
-  // Draw Toast Background
-  _tft->fillRoundRect(x, y, w, h, 8, TFT_WHITE);
-  _tft->drawRoundRect(x, y, w, h, 8, TFT_BLACK);
+  // Colors
+  uint16_t COLOR_CARD = 0x18E3; // Charcoal
+  uint16_t COLOR_BORDER = TFT_SILVER;
+
+  // Draw Toast Background (Premium Card Style)
+  _tft->fillRoundRect(x, y, w, h, 8, COLOR_CARD);
+  _tft->drawRoundRect(x, y, w, h, 8, COLOR_BORDER);
 
   // Draw Text
-  _tft->setTextColor(TFT_BLACK, TFT_WHITE);
-  _tft->setTextSize(1);
+  _tft->setTextColor(TFT_WHITE, COLOR_CARD);
+  _tft->setFreeFont(&Org_01); // Use styled font
+  _tft->setTextSize(1);       // Size 1 is readable for Org_01
   _tft->setTextDatum(MC_DATUM);
-  _tft->drawString(message, SCREEN_WIDTH / 2, y + h / 2);
+  _tft->drawString(message, SCREEN_WIDTH / 2,
+                   y + h / 2 - 2); // Slight adjustment for font baseline
 
   delay(duration);
+}
+
+void UIManager::drawCarbonBackground(int x, int y, int w, int h) {
+  _tft->fillRect(x, y, w, h, getBackgroundColor());
+}
+
+// --- Theme Support ---
+void UIManager::setDarkMode(bool enable) {
+  if (_isDarkMode == enable)
+    return;
+  _isDarkMode = enable;
+
+  // Force global redraw if possible, or just let next update handle it?
+  // Ideally, we trigger a screen refresh.
+  // Simplest: fill screen and re-show current
+  if (_currentScreen) {
+    _tft->fillScreen(getBackgroundColor());
+    drawStatusBar(true);
+    _currentScreen->onShow(); // Reload screen to apply new colors
+  }
+}
+
+uint16_t UIManager::getBackgroundColor() {
+  return _isDarkMode ? TFT_BLACK : TFT_WHITE;
+}
+
+uint16_t UIManager::getTextColor() {
+  return _isDarkMode ? TFT_WHITE : TFT_BLACK;
+}
+
+uint16_t UIManager::getSecondaryColor() {
+  return _isDarkMode ? TFT_DARKGREY : TFT_LIGHTGREY;
 }

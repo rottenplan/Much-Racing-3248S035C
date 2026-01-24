@@ -8,8 +8,8 @@ extern TFT_eSPI tft; // Or access via _ui->getTft()
 void GnssLogScreen::onShow() {
   // Clear full screen
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK); // COLOR_BG
+  _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                            SCREEN_HEIGHT - STATUS_BAR_HEIGHT); // COLOR_BG
   _ui->drawStatusBar(true);
 
   _lines.clear();

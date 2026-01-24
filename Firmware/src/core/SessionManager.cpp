@@ -317,3 +317,94 @@ SessionManager::runFullTest(void (*progressCallback)(int, String)) {
   res.success = true;
   return res;
 }
+
+SessionManager::SessionAnalysis
+SessionManager::analyzeSession(String filename) {
+  SessionAnalysis result;
+  result.totalTime = 0;
+  result.totalDistance = 0;
+  result.maxSpeed = 0;
+  result.avgSpeed = 0;
+  result.validLaps = 0;
+  result.bestLap = 0;
+
+  File f = SD.open(filename, FILE_READ);
+  if (!f)
+    return result;
+
+  unsigned long firstTime = 0;
+  unsigned long lastTime = 0;
+  double prevLat = 0;
+  double prevLon = 0;
+  bool firstPoint = true;
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0)
+      continue;
+
+    if (line.startsWith("LAP,")) {
+      // LAP,Count,Time
+      int lastComma = line.lastIndexOf(',');
+      if (lastComma > 0) {
+        unsigned long t = line.substring(lastComma + 1).toInt();
+        result.lapTimes.push_back(t);
+        result.validLaps++;
+        if (result.bestLap == 0 || t < result.bestLap)
+          result.bestLap = t;
+      }
+    } else {
+      // Data line
+      if (!isdigit(line.charAt(0)) && line.charAt(0) != '-')
+        continue;
+
+      // Time,Lat,Lon,Speed...
+      int p1 = line.indexOf(',');
+      int p2 = line.indexOf(',', p1 + 1); // Lat
+      int p3 = line.indexOf(',', p2 + 1); // Lon
+      int p4 = line.indexOf(',', p3 + 1); // Speed
+
+      if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0) {
+        unsigned long t = line.substring(0, p1).toInt();
+        double lat = line.substring(p1 + 1, p2).toDouble();
+        double lon = line.substring(p2 + 1, p3).toDouble();
+        float speed = line.substring(p3 + 1, p4).toFloat();
+
+        if (firstPoint) {
+          firstTime = t;
+          prevLat = lat;
+          prevLon = lon;
+          firstPoint = false;
+        } else {
+          // Haversine
+          float dLat = (lat - prevLat) * DEG_TO_RAD;
+          float dLon = (lon - prevLon) * DEG_TO_RAD;
+          float a = sin(dLat / 2) * sin(dLat / 2) +
+                    cos(prevLat * DEG_TO_RAD) * cos(lat * DEG_TO_RAD) *
+                        sin(dLon / 2) * sin(dLon / 2);
+          float c = 2 * atan2(sqrt(a), sqrt(1 - a));
+          float dist = 6371000 * c; // meters
+          if (dist > 0.5) {
+            result.totalDistance += (dist / 1000.0); // Add to km
+          }
+          prevLat = lat;
+          prevLon = lon;
+        }
+        lastTime = t;
+        if (speed > result.maxSpeed)
+          result.maxSpeed = speed;
+      }
+    }
+  }
+  f.close();
+
+  if (lastTime > firstTime) {
+    result.totalTime = lastTime - firstTime;
+    float hours = result.totalTime / 3600000.0;
+    if (hours > 0)
+      result.avgSpeed = result.totalDistance / hours;
+  }
+
+  return result;
+}

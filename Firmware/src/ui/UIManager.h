@@ -53,6 +53,7 @@ public:
 
   // UI Helper
   void showToast(String message, int duration = 2000);
+  void drawCarbonBackground(int x, int y, int w, int h);
 
   // Touch Handling
   void setTouch(TAMC_GT911 *touch) { _touch = touch; }
@@ -66,11 +67,19 @@ public:
 
   TFT_eSPI *getTft() { return _tft; }
 
+  // Theme Support
+  void setDarkMode(bool enable);
+  bool isDarkMode() { return _isDarkMode; }
+  uint16_t getBackgroundColor();
+  uint16_t getTextColor();
+  uint16_t getSecondaryColor();
+
 private:
   TFT_eSPI *_tft;
   TAMC_GT911 *_touch; // Added touch pointer
   UserScreen *_currentScreen;
   ScreenType _currentType;
+  bool _isDarkMode;
   // ... existing code ...
 
   // Screens

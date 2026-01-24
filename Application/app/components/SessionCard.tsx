@@ -41,7 +41,7 @@ export default function SessionCard({
                     <div className="text-right">
                         {highlightLabel && <div className="text-xs text-text-secondary font-medium">{highlightLabel}</div>}
                         <div className={`text-xl font-data font-bold ${highlightColor === 'green' ? 'text-highlight' :
-                                highlightColor === 'red' ? 'text-primary' : 'text-foreground'
+                            highlightColor === 'red' ? 'text-primary' : 'text-foreground'
                             }`}>
                             {highlight}
                         </div>

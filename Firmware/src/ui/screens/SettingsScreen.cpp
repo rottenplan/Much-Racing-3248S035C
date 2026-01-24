@@ -20,7 +20,13 @@ void sdProgressCallback(int percent, String status) {
     return;
 
   // Draw Status
-  static_tft->setTextColor(TFT_WHITE, COLOR_BG);
+  static_tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  // static_tft is just a TFT pointer. We don't have UIManager instance here.
+  // We can't easily fix this callback without passing UIManager.
+  // But let's assume this callback handles its own colors or we skip it for
+  // now. Actually, we can assume standard colors for now or try to use macros
+  // if we redefine them. But the user said "only statusbar changed". Let's
+  // focus on the main class methods first.
   static_tft->setTextDatum(TC_DATUM); // Top Center
   static_tft->setTextSize(1);
   static_tft->setFreeFont(&Org_01);
@@ -53,7 +59,7 @@ void SettingsScreen::onShow() {
   loadSettings();           // Reload to ensure sync
 
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
+  tft->fillScreen(_ui->getBackgroundColor());
   drawList(0, true);
 }
 
@@ -72,6 +78,11 @@ void SettingsScreen::loadSettings() {
         _prefs.getInt("power_save", 1); // Default 5 min
     _settings.push_back(powerSave);
 
+    // Theme (Dark/Light) - REMOVED per user request
+    // SettingItem theme = {"THEME", TYPE_TOGGLE, "theme"};
+    // theme.checkState = _ui->isDarkMode();
+    // _settings.push_back(theme);
+
     // Brightness
     SettingItem brightness = {"BRIGHTNESS", TYPE_VALUE, "brightness"};
     brightness.options = {"10%", "20%", "30%", "40%", "50%",
@@ -79,12 +90,6 @@ void SettingsScreen::loadSettings() {
     brightness.currentOptionIdx =
         _prefs.getInt("brightness", 9); // Default 100%
     _settings.push_back(brightness);
-
-    // Units
-    SettingItem units = {"UNITS", TYPE_VALUE, "units"};
-    units.options = {"Metric (km/h)", "Imperial (mph)"};
-    units.currentOptionIdx = _prefs.getInt("units", 0); // Default Metric
-    _settings.push_back(units);
 
     _prefs.end();
 
@@ -94,14 +99,20 @@ void SettingsScreen::loadSettings() {
     // Double Tap
     _settings.push_back({"GNSS FINE TUNING", TYPE_ACTION});
 
-    // SD Card Test Sub-menu
-    _settings.push_back({"SD CARD TEST", TYPE_ACTION});
+    // Double Tap
+    _settings.push_back({"GNSS FINE TUNING", TYPE_ACTION});
+
+    // Utility Sub-menu (New)
+    _settings.push_back({"UTILITY", TYPE_ACTION});
 
     // RPM Settings Sub-menu
     _settings.push_back({"RPM SETTING", TYPE_ACTION});
 
     // WiFi / Cloud Sub-menu
     _settings.push_back({"WIFI / CLOUD", TYPE_ACTION});
+
+    // About Device
+    _settings.push_back({"ABOUT DEVICE", TYPE_ACTION});
 
   } else if (_currentMode == MODE_WIFI_MENU) {
     _prefs.begin("laptimer", false);
@@ -155,6 +166,12 @@ void SettingsScreen::loadSettings() {
 
     // Engine Hours (Moved here)
     _settings.push_back({"ENGINE HOURS", TYPE_ACTION});
+
+    // Units (Moved from Main)
+    SettingItem units = {"UNITS", TYPE_VALUE, "units"};
+    units.options = {"Metric (km/h)", "Imperial (mph)"};
+    units.currentOptionIdx = _prefs.getInt("units", 0); // Default Metric
+    _settings.push_back(units);
 
     _prefs.end();
   } else if (_currentMode == MODE_CLOCK) {
@@ -292,6 +309,17 @@ void SettingsScreen::loadSettings() {
       }
     }
     _settings.push_back(baud);
+
+    _prefs.end();
+
+  } else if (_currentMode == MODE_UTILITY) {
+    _prefs.begin("laptimer", false);
+
+    // SD Card Test (Moved here)
+    _settings.push_back({"SD CARD TEST", TYPE_ACTION});
+
+    // TFT Benchmark (Standard)
+    _settings.push_back({"TFT BENCHMARK", TYPE_ACTION});
 
     _prefs.end();
   }
@@ -432,6 +460,11 @@ void SettingsScreen::saveSetting(int idx) {
       wifiManager.setEnabled(item.checkState);
     }
 
+    if (item.key == "theme") {
+      // _ui->setDarkMode(item.checkState);
+      // _prefs.putBool("dark_mode", item.checkState);
+    }
+
     _prefs.putBool(item.key.c_str(), item.checkState);
   }
   _prefs.end();
@@ -447,7 +480,7 @@ void SettingsScreen::update() {
       _scanAnimStep = (_scanAnimStep + 1) % 4;
 
       TFT_eSPI *tft = _ui->getTft();
-      tft->setTextColor(TFT_WHITE, COLOR_BG);
+      tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
       tft->setTextDatum(MC_DATUM);
       String dots = "";
       for (int i = 0; i < _scanAnimStep; i++)
@@ -460,8 +493,8 @@ void SettingsScreen::update() {
       _isScanning = false;
       _scanCount = n;
       // Clear only content area
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
       drawWiFiList();
       _lastWiFiTouch = millis();
@@ -472,6 +505,23 @@ void SettingsScreen::update() {
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x == -1)
     return;
+
+  // FIX: Handle Top-Left Back Button for SD Test (Premium Layout)
+  if (_currentMode == MODE_SD_TEST && p.x < 60 && p.y < 60) {
+    if (millis() - lastSettingTouch < 200)
+      return;
+    lastSettingTouch = millis();
+
+    // Return to Utility Menu
+    _currentMode = MODE_UTILITY;
+    _ui->setTitle("UTILITY");
+    loadSettings();
+    _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+    _ui->drawStatusBar(true);
+    drawList(0, true);
+    return;
+  }
 
   // Tombol Kembali (Bottom-Left corner, y > 210)
   if (p.x < 80 && p.y > 210) {
@@ -497,8 +547,8 @@ void SettingsScreen::update() {
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
         loadSettings();
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
         _ui->drawStatusBar(true);
         _scrollOffset = 0;
         _ui->drawStatusBar(true);
@@ -509,8 +559,31 @@ void SettingsScreen::update() {
         _currentMode = MODE_RPM;
         _ui->setTitle("RPM SETTINGS");
         loadSettings();
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+        _ui->drawStatusBar(true);
+        _scrollOffset = 0;
+        drawList(0, true);
+        _scrollOffset = 0;
+        drawList(0, true);
+      } else if (_currentMode == MODE_UTILITY) {
+        // Return to Main Settings
+        _currentMode = MODE_MAIN;
+        _ui->setTitle("SETTINGS");
+        loadSettings();
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+        _ui->drawStatusBar(true);
+        _scrollOffset = 0;
+        drawList(0, true);
+      } else if (_currentMode == MODE_GRAPHIC_TEST) {
+        // Return to Utility Menu
+        endGraphicTest();
+        _currentMode = MODE_UTILITY;
+        _ui->setTitle("UTILITY");
+        loadSettings();
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
         _ui->drawStatusBar(true);
         _scrollOffset = 0;
         drawList(0, true);
@@ -519,9 +592,8 @@ void SettingsScreen::update() {
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
         loadSettings();
-        // Clear only content area
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
         _ui->drawStatusBar(true);
         _scrollOffset = 0;
         drawList(0, true);
@@ -572,7 +644,8 @@ void SettingsScreen::update() {
     // Only handle standard List Touch for list-based modes
     if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM ||
         _currentMode == MODE_CLOCK || _currentMode == MODE_ENGINE ||
-        _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU) {
+        _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU ||
+        _currentMode == MODE_UTILITY) {
       int idx = _scrollOffset + ((p.y - listY) / itemH);
 
       if (idx >= 0 && idx < _settings.size()) {
@@ -610,8 +683,8 @@ void SettingsScreen::update() {
         _enteredPass = "";
         _currentMode = MODE_WIFI_PASS;
         // Clear only content area
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
         _ui->drawStatusBar(true);
         drawKeyboard();
         _lastKeyboardTouch = millis(); // Prevent immediate key press
@@ -669,6 +742,26 @@ void SettingsScreen::update() {
   if (_currentMode == MODE_GPS) {
     drawGPSStatus();
   }
+
+  if (_currentMode == MODE_GRAPHIC_TEST) {
+    updateGraphicTest();
+  }
+
+  if (_currentMode == MODE_ABOUT) {
+    UIManager::TouchPoint p = _ui->getTouchPoint();
+    if (p.x != -1) {
+      if (millis() - lastSettingTouch > 200) {
+        lastSettingTouch = millis();
+        // Exit on any touch or specific back button
+        _currentMode = MODE_MAIN;
+        loadSettings();
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+        _ui->drawStatusBar(true);
+        drawList(0, true);
+      }
+    }
+  }
 }
 
 void SettingsScreen::handleTouch(int idx) {
@@ -693,8 +786,8 @@ void SettingsScreen::handleTouch(int idx) {
       _currentMode = MODE_CLOCK;
       loadSettings();
       // Clear only content area
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
       drawList(0, true);
       return;
@@ -705,8 +798,8 @@ void SettingsScreen::handleTouch(int idx) {
       _currentMode = MODE_ENGINE;
       loadSettings();
       // Clear only content area
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
       drawList(0, true);
       _ui->drawStatusBar(true);
@@ -714,20 +807,23 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "WIFI / CLOUD") {
       _currentMode = MODE_WIFI_MENU;
       loadSettings();
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
       drawList(0, true);
+    } else if (item.name == "ABOUT DEVICE") {
+      _currentMode = MODE_ABOUT;
+      drawAbout();
     } else if (item.name == "WIFI SETUP") {
       // Start WiFi scan
       _currentMode = MODE_WIFI;
       TFT_eSPI *tft = _ui->getTft();
       // Clear only content area
-      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
 
-      tft->setTextColor(TFT_WHITE, COLOR_BG);
+      tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
       tft->setTextDatum(MC_DATUM);
       tft->drawString("Scanning...", SCREEN_WIDTH / 2, 120);
 
@@ -742,8 +838,8 @@ void SettingsScreen::handleTouch(int idx) {
       // Trigger cloud sync
       TFT_eSPI *tft = _ui->getTft();
       // Clear only content area
-      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
 
       tft->setTextColor(TFT_CYAN, COLOR_BG);
@@ -784,11 +880,11 @@ void SettingsScreen::handleTouch(int idx) {
         // Show result
         tft->fillRect(0, 80, SCREEN_WIDTH, 100, COLOR_BG);
         if (success) {
-          tft->setTextColor(TFT_GREEN, COLOR_BG);
+          tft->setTextColor(TFT_GREEN, _ui->getBackgroundColor());
           tft->drawString("Sync Success!", SCREEN_WIDTH / 2, 100);
           delay(2000);
         } else {
-          tft->setTextColor(TFT_RED, COLOR_BG);
+          tft->setTextColor(TFT_RED, _ui->getBackgroundColor());
           tft->drawString("Sync Failed!", SCREEN_WIDTH / 2, 100);
           delay(2000);
         }
@@ -797,19 +893,19 @@ void SettingsScreen::handleTouch(int idx) {
       _currentMode = MODE_MAIN;
       loadSettings();
       // Clear only content area
-      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
       drawList(0, true);
     } else if (item.name == "REMOVE ACCOUNT") {
       // Remove account credentials from storage
       TFT_eSPI *tft = _ui->getTft();
       // Clear only content area
-      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
 
-      tft->setTextColor(TFT_YELLOW, COLOR_BG);
+      tft->setTextColor(TFT_YELLOW, _ui->getBackgroundColor());
       tft->setTextDatum(MC_DATUM);
       tft->setTextFont(2); // Use Standard Font 2 (Sans Serif)
       tft->setTextSize(1);
@@ -847,25 +943,37 @@ void SettingsScreen::handleTouch(int idx) {
       _currentMode = MODE_RPM;
       loadSettings();
       // Clear only content area
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true); // Redraw Status Bar
       drawList(0, true);
     } else if (item.name == "GNSS FINE TUNING") {
       _currentMode = MODE_GNSS_CONFIG;
       loadSettings();
       // Clear only content area
-      _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
       drawList(0, true);
+    } else if (item.name == "UTILITY") {
+      _currentMode = MODE_UTILITY;
+      _ui->setTitle("UTILITY");
+      loadSettings();
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+      drawList(0, true);
+    } else if (item.name == "TFT BENCHMARK") {
+      _currentMode = MODE_GRAPHIC_TEST;
+      startGraphicTest();
     } else if (item.name == "SD CARD TEST") {
       _currentMode = MODE_SD_TEST;
       _ui->setTitle("SD CARD TEST");
       TFT_eSPI *tft = _ui->getTft();
       // Clear only content area
-      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true); // Redraw Status Bar
 
       // Draw "Running..."
@@ -883,8 +991,8 @@ void SettingsScreen::handleTouch(int idx) {
 
       // Redraw with results
       // Clear only content area
-      tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true); // Redraw Status Bar
       drawSDTest();
 
@@ -900,6 +1008,48 @@ void SettingsScreen::handleTouch(int idx) {
       */
     }
   }
+}
+
+// ... existing code ...
+
+void SettingsScreen::drawAbout() {
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillScreen(_ui->getBackgroundColor());
+  _ui->drawStatusBar(true);
+
+  // Card Background
+  int cardX = 20;
+  int cardY = 50;
+  int cardW = SCREEN_WIDTH - 40;
+  int cardH = 160;
+
+  tft->fillRoundRect(cardX, cardY, cardW, cardH, 10, 0x18E3); // Charcoal
+  tft->drawRoundRect(cardX, cardY, cardW, cardH, 10, TFT_DARKGREY);
+
+  // Content
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->setTextDatum(TC_DATUM);
+  tft->setTextFont(4); // Large Font
+  tft->drawString("Much Racing", SCREEN_WIDTH / 2, cardY + 20);
+
+  tft->setTextFont(2);
+  tft->setTextColor(TFT_CYAN, 0x18E3);
+  tft->drawString("Race Computer", SCREEN_WIDTH / 2, cardY + 50);
+
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->setTextFont(1);
+  tft->drawString("Version 1.0 (Beta)", SCREEN_WIDTH / 2, cardY + 80);
+
+  String mac = WiFi.macAddress();
+  tft->drawString("Device ID: " + mac, SCREEN_WIDTH / 2, cardY + 95);
+
+  tft->setTextColor(TFT_ORANGE, 0x18E3);
+  tft->drawString("Made by Muchdas", SCREEN_WIDTH / 2, cardY + 120);
+
+  // Footer Hint
+  tft->setTextColor(TFT_DARKGREY, _ui->getBackgroundColor());
+  tft->setTextDatum(BC_DATUM);
+  tft->drawString("Tap to Return", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 10);
 }
 
 void SettingsScreen::drawHeader(String title, uint16_t backColor) {
@@ -919,11 +1069,11 @@ void SettingsScreen::drawGPSStatus(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
   if (force) {
-    tft->fillScreen(COLOR_BG);
+    tft->fillScreen(_ui->getBackgroundColor());
     _ui->drawStatusBar(true);
 
     // Static Header
-    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+    tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
     tft->setTextDatum(TL_DATUM);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
@@ -932,25 +1082,27 @@ void SettingsScreen::drawGPSStatus(bool force) {
     // Static layout elements
     int yStats = 45; // Shifted up from 62 to prevent overlap
     int hStatsHeader = 18;
-    tft->fillRect(10, yStats, 160, hStatsHeader, TFT_WHITE);
-    tft->setTextColor(TFT_BLACK, TFT_WHITE);
+    tft->fillRect(10, yStats, 160, hStatsHeader, _ui->getTextColor());
+    tft->setTextColor(_ui->getBackgroundColor(), _ui->getTextColor());
     tft->setTextSize(1);
     tft->drawString("GPS STATUS", 15, yStats + 9);
 
+    // List Rect
     int listH = 6 * 15 + 8; // 6 items * 15px + pad
-    tft->drawRect(10, yStats + hStatsHeader, 160, listH, TFT_WHITE);
+    tft->drawRect(10, yStats + hStatsHeader, 160, listH, _ui->getTextColor());
 
     // Radar
     int cX = 245, cY = 120, r = 55;
-    tft->drawCircle(cX, cY, r, TFT_WHITE);
+
+    // Radar
     tft->drawCircle(cX, cY, r * 0.66, COLOR_SECONDARY);
     tft->drawCircle(cX, cY, r * 0.33, COLOR_SECONDARY);
     tft->drawFastHLine(cX - r, cY, 2 * r, COLOR_SECONDARY);
     tft->drawFastVLine(cX, cY - r, 2 * r, COLOR_SECONDARY);
 
     auto drawCard = [&](String l, int x, int y) {
-      tft->fillCircle(x, y, 9, TFT_WHITE);
-      tft->setTextColor(TFT_BLACK, TFT_WHITE);
+      tft->fillCircle(x, y, 9, _ui->getTextColor());
+      tft->setTextColor(_ui->getBackgroundColor(), _ui->getTextColor());
       tft->setTextDatum(MC_DATUM);
       tft->drawString(l, x, y + 1);
     };
@@ -988,7 +1140,7 @@ void SettingsScreen::drawGPSStatus(bool force) {
   auto drawRowValue = [&](String label, String val, String lastVal, int y) {
     if (force || val != lastVal) {
       tft->setTextDatum(ML_DATUM);
-      tft->setTextColor(TFT_WHITE, COLOR_BG);
+      tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
       tft->setFreeFont(&Org_01);
       tft->setTextSize(1);
 
@@ -1000,7 +1152,7 @@ void SettingsScreen::drawGPSStatus(bool force) {
       }
 
       // Clear and draw value
-      tft->fillRect(75, y, 90, hItem - 1, COLOR_BG);
+      tft->fillRect(75, y, 90, hItem - 1, _ui->getBackgroundColor());
       tft->drawString(val, 75, y + (hItem / 2));
     }
   };
@@ -1022,8 +1174,8 @@ void SettingsScreen::drawGPSStatus(bool force) {
   if (force || lat != _lastLat || lon != _lastLon) {
     int tableBottom = yStats + hStatsHeader + (6 * hItem + 8);
     int yLat = tableBottom + 10;
-    tft->fillRect(10, yLat, 200, 40, COLOR_BG);
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
+    tft->fillRect(10, yLat, 200, 40, _ui->getBackgroundColor());
+    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(TL_DATUM);
     tft->drawString("LAT : " + String(lat, 6), 15, yLat);
     tft->drawString("LNG : " + String(lon, 6), 15, yLat + 18);
@@ -1060,56 +1212,129 @@ void SettingsScreen::drawGPSStatus(bool force) {
 
 void SettingsScreen::drawSDTest() {
   TFT_eSPI *tft = _ui->getTft();
-  drawHeader(""); // Just draw the back button
 
-  int y = 45; // Move up from 80
-  int gap = 22;
-  int labelX = 20;
-  int valX = 100; // Align values
+  // Clear Content
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+
+  // Header (Premium)
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->drawString("SD CARD TEST", SCREEN_WIDTH / 2, 28);
 
   tft->setTextDatum(TL_DATUM);
-  tft->setTextFont(2);
+  tft->setTextSize(1);
+  tft->drawString("<", 10, 25);
+
+  int y = 60;
 
   if (!_sdResult.success && _sdResult.cardType == "") {
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
-    tft->drawString("Running SD Test...", labelX, y);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(2);
+    tft->drawString("Running SD Test...", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
     return;
   }
 
   if (!_sdResult.success && _sdResult.cardType == "NO CARD") {
-    tft->setTextColor(TFT_RED, COLOR_BG);
-    tft->drawString("NO SD CARD FOUND!", labelX, y);
+    // Error Card
+    tft->fillRoundRect(20, 80, SCREEN_WIDTH - 40, 100, 8, 0x18E3);
+    tft->drawRoundRect(20, 80, SCREEN_WIDTH - 40, 100, 8, TFT_RED);
+
+    tft->setTextColor(TFT_RED, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(4);
+    tft->drawString("NO SD CARD", SCREEN_WIDTH / 2, 120);
+    tft->setTextFont(2);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->drawString("Please Insert Card", SCREEN_WIDTH / 2, 150);
     return;
   }
 
-  // Result Display
-  auto drawInfo = [&](String label, String value,
-                      uint16_t valColor = TFT_WHITE) {
-    tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-    tft->drawString(label, labelX, y);
-    tft->setTextColor(valColor, COLOR_BG);
-    tft->drawString(value, valX, y);
-    y += gap;
-  };
+  // --- RESULT CARDS ---
 
-  drawInfo("Card Type:", _sdResult.cardType);
-  drawInfo("Total:", _sdResult.sizeLabel);
-  drawInfo("Used:", _sdResult.usedLabel);
+  // 1. INFO CARD
+  int cardW = SCREEN_WIDTH - 20;
+  int cardX = 10;
+  int infoH = 80;
 
-  y += 5; // Extra gap before speed test
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->drawString("Speed Test Results:", labelX, y);
-  y += gap;
+  tft->fillRoundRect(cardX, y, cardW, infoH, 6, 0x18E3); // Charcoal
 
-  drawInfo(" Read:", String(_sdResult.readSpeedKBps, 0) + " KB/s", TFT_GREEN);
-  drawInfo(" Write:", String(_sdResult.writeSpeedKBps, 0) + " KB/s", TFT_GREEN);
+  // Card Title
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextFont(1);
+  tft->drawString("CARD INFO", cardX + 10, y + 5);
+
+  // Type / Size / Used Grid
+  // Row 1: Type | Size
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextFont(2);
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+
+  tft->drawString("Type:", cardX + 10, y + 25);
+  tft->setTextColor(TFT_SKYBLUE, 0x18E3);
+  tft->drawString(_sdResult.cardType, cardX + 60, y + 25);
+
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->drawString("Size:", cardX + 160, y + 25);
+  tft->setTextColor(TFT_ORANGE, 0x18E3);
+  tft->drawString(_sdResult.sizeLabel, cardX + 200, y + 25);
+
+  // Row 2: Used
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->drawString("Used:", cardX + 10, y + 50);
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->drawString(_sdResult.usedLabel, cardX + 60, y + 50);
+
+  // 2. SPEED CARD
+  y += infoH + 10;
+  int speedH = 75;
+
+  tft->fillRoundRect(cardX, y, cardW, speedH, 6, 0x10A2); // Slate
+
+  tft->setTextColor(TFT_SILVER, 0x10A2);
+  tft->setTextFont(1);
+  tft->drawString("BENCHMARK", cardX + 10, y + 5);
+
+  // Speed Grid
+  // Read | Write
+  // Split card width in 2
+  int midX = cardX + cardW / 2;
+
+  // Read
+  tft->setTextColor(TFT_WHITE, 0x10A2);
+  tft->setTextDatum(TC_DATUM);
+  tft->setTextFont(1);
+  tft->drawString("READ SPEED", cardX + cardW / 4, y + 20);
+
+  tft->setTextFont(4);
+  tft->setTextColor(TFT_GREEN, 0x10A2);
+  tft->drawString(String(_sdResult.readSpeedKBps, 0) + " KB/s",
+                  cardX + cardW / 4, y + 40);
+
+  // Write
+  tft->setTextColor(TFT_WHITE, 0x10A2);
+  tft->setTextFont(1);
+  tft->drawString("WRITE SPEED", midX + cardW / 4, y + 20);
+
+  tft->setTextFont(4);
+  tft->setTextColor(TFT_CYAN, 0x10A2);
+  tft->drawString(String(_sdResult.writeSpeedKBps, 0) + " KB/s",
+                  midX + cardW / 4, y + 40);
+
+  tft->drawLine(midX, y + 20, midX, y + speedH - 10, TFT_SILVER);
 }
 
 void SettingsScreen::drawList(int scrollOffset, bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
   // Highlight Back Arrow if selected
-  uint16_t backColor = (_selectedIdx == -2) ? COLOR_HIGHLIGHT : COLOR_TEXT;
+  uint16_t backColor =
+      (_selectedIdx == -2) ? COLOR_HIGHLIGHT : _ui->getTextColor();
 
   if (force) {
     _ui->drawStatusBar(true);
@@ -1124,7 +1349,8 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
 
   // Clear list area to prevent ghosts when scrolling
   if (force) {
-    tft->fillRect(0, listY, SCREEN_WIDTH, maxY - listY, COLOR_BG);
+    tft->fillRect(0, listY, SCREEN_WIDTH, maxY - listY,
+                  _ui->getBackgroundColor());
   }
 
   int visibleItems = (maxY - listY) / itemH;
@@ -1142,8 +1368,10 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
 
     if (force || stateChanged) {
       // Background
-      uint16_t bgColor = (sIdx == _selectedIdx) ? TFT_WHITE : COLOR_BG;
-      uint16_t txtColor = (sIdx == _selectedIdx) ? TFT_BLACK : COLOR_TEXT;
+      uint16_t bgColor = (sIdx == _selectedIdx) ? _ui->getTextColor()
+                                                : _ui->getBackgroundColor();
+      uint16_t txtColor = (sIdx == _selectedIdx) ? _ui->getBackgroundColor()
+                                                 : _ui->getTextColor();
 
       // Explicitly clear background
       tft->fillRect(0, y, SCREEN_WIDTH, itemH, bgColor);
@@ -1336,4 +1564,271 @@ void SettingsScreen::connectWiFi() {
     _ui->drawStatusBar(true);
     drawKeyboard(true); // Full redraw to restore keyboard UI
   }
+}
+
+void SettingsScreen::startGraphicTest() {
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillScreen(TFT_BLACK);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextFont(2);
+  tft->drawString("Running Benchmark...", 10, 10);
+
+  runBenchmark();
+
+  // After benchmark, we just show the results (already printed by runBenchmark)
+
+  tft->setTextColor(TFT_GREEN, TFT_BLACK);
+  tft->setTextDatum(BC_DATUM);
+  tft->setTextFont(2);
+  tft->drawString("Touch to Exit", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 5);
+}
+
+void SettingsScreen::updateGraphicTest() {
+  // Check for any touch to exit
+  UIManager::TouchPoint p = _ui->getTouchPoint();
+  if (p.x != -1) {
+    // Debounce a bit to avoid catching the touch that started the test
+    static unsigned long lastTouch = 0;
+    if (millis() - lastTouch > 500) {
+      endGraphicTest();
+      _currentMode = MODE_UTILITY;
+      _ui->setTitle("UTILITY");
+      loadSettings();
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+    }
+    lastTouch = millis();
+  }
+}
+
+void SettingsScreen::endGraphicTest() {
+  // Cleanup if needed
+}
+
+void SettingsScreen::runBenchmark() {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long total = 0;
+  int xPos = 5;
+  int yPos = 28;
+  int yStep = 16; // Tighter spacing to fit 14 items + header
+
+  tft->fillScreen(TFT_BLACK);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->setTextFont(2);
+
+  // Headers
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextColor(TFT_GREEN, TFT_BLACK);
+  tft->drawString("Benchmark", xPos, 5);
+  tft->setTextDatum(TR_DATUM);
+  tft->drawString("microseconds", SCREEN_WIDTH - 5, 5);
+  tft->drawLine(0, 25, SCREEN_WIDTH, 25, TFT_DARKGREY);
+
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+
+  // Helper lambda to run test and print result
+  auto runAndPrint = [&](const char *name, unsigned long time) {
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString(name, xPos, yPos);
+    tft->setTextDatum(TR_DATUM);
+    tft->drawString(String(time), SCREEN_WIDTH - 5, yPos);
+    yPos += yStep;
+    total += time;
+    delay(500); // Slower animation per user request
+  };
+
+  runAndPrint("Screen fill", testFillScreen());
+  runAndPrint("Text", testText());
+  runAndPrint("Lines", testLines(TFT_CYAN));
+  runAndPrint("Horiz/Vert Lines", testFastLines(TFT_RED, TFT_BLUE));
+  runAndPrint("Rectangles", testRects(TFT_GREEN));
+  runAndPrint("Rectangles-filled", testFilledRects(TFT_YELLOW, TFT_MAGENTA));
+  runAndPrint("Circles", testCircles(10, TFT_WHITE));
+  runAndPrint("Circles-filled", testFilledCircles(10, TFT_MAGENTA));
+  runAndPrint("Triangles", testTriangles());
+  runAndPrint("Triangles-filled", testFilledTriangles());
+  runAndPrint("Rounded rects", testRoundRects());
+  runAndPrint("Rounded rects-fill", testFilledRoundRects());
+
+  // Total
+  yPos += 5;
+  tft->drawLine(0, yPos, SCREEN_WIDTH, yPos, TFT_DARKGREY);
+  yPos += 5;
+  tft->setTextColor(TFT_YELLOW, TFT_BLACK);
+  tft->setTextDatum(TL_DATUM);
+  tft->drawString("Total", xPos, yPos);
+  tft->setTextDatum(TR_DATUM);
+  tft->drawString(String(total), SCREEN_WIDTH - 5, yPos);
+}
+
+unsigned long SettingsScreen::testFillScreen() {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start = micros();
+  tft->fillScreen(TFT_BLACK);
+  tft->fillScreen(TFT_RED);
+  tft->fillScreen(TFT_GREEN);
+  tft->fillScreen(TFT_BLUE);
+  tft->fillScreen(TFT_BLACK);
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testText() {
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillScreen(TFT_BLACK);
+  unsigned long start = micros();
+  tft->setTextColor(TFT_WHITE);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextFont(2);
+  for (int i = 0; i < 500; i++) {
+    tft->drawString("Hello World", 0, 0);
+    tft->drawNumber(i, 100, 100);
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testLines(uint16_t color) {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int x1, y1, x2, y2, w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+
+  x1 = y1 = 0;
+  y2 = h - 1;
+  start = micros();
+  for (x2 = 0; x2 < w; x2 += 6)
+    tft->drawLine(x1, y1, x2, y2, color);
+  x2 = w - 1;
+  for (y2 = 0; y2 < h; y2 += 6)
+    tft->drawLine(x1, y1, x2, y2, color);
+
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testFastLines(uint16_t color1, uint16_t color2) {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int y = 0; y < h; y += 5)
+    tft->drawFastHLine(0, y, w, color1);
+  for (int x = 0; x < w; x += 5)
+    tft->drawFastVLine(x, 0, h, color2);
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testRects(uint16_t color) {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int x = 2; x < w; x += 6) {
+    if (x + 2 > h)
+      break;
+    tft->drawRect(w / 2 - x / 2, h / 2 - x / 2, x, x, color);
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testFilledRects(uint16_t color1,
+                                              uint16_t color2) {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int x = w - 1; x > 6; x -= 6) {
+    if (x > h)
+      continue;
+    tft->fillRect(w / 2 - x / 2, h / 2 - x / 2, x, x, color1);
+    tft->drawRect(w / 2 - x / 2, h / 2 - x / 2, x, x, color2);
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testFilledCircles(uint8_t radius,
+                                                uint16_t color) {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int x = radius; x < w; x += radius * 2) {
+    for (int y = radius; y < h; y += radius * 2) {
+      tft->fillCircle(x, y, radius, color);
+    }
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testCircles(uint8_t radius, uint16_t color) {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int x = 0; x < w + radius; x += radius * 2) {
+    for (int y = 0; y < h + radius; y += radius * 2) {
+      tft->drawCircle(x, y, radius, color);
+    }
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testTriangles() {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int i = 0; i < w / 2; i += 5) {
+    tft->drawTriangle(w / 2, h / 2 - i, w / 2 - i, h / 2 + i, w / 2 + i,
+                      h / 2 + i, TFT_CYAN);
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testFilledTriangles() {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int i = w / 2; i > 10; i -= 5) {
+    tft->fillTriangle(w / 2, h / 2 - i, w / 2 - i, h / 2 + i, w / 2 + i,
+                      h / 2 + i, tft->color565(0, i, i));
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testRoundRects() {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int i = 0; i < w / 2 - 10; i += 6) {
+    if (i * 2 + 10 > h)
+      break;
+    tft->drawRoundRect(i, i, w - 2 * i, h - 2 * i, 10, TFT_RED);
+  }
+  return micros() - start;
+}
+
+unsigned long SettingsScreen::testFilledRoundRects() {
+  TFT_eSPI *tft = _ui->getTft();
+  unsigned long start;
+  int w = tft->width(), h = tft->height();
+  tft->fillScreen(TFT_BLACK);
+  start = micros();
+  for (int i = 0; i < w / 2 - 10; i += 6) {
+    if (i * 2 + 10 > h)
+      break;
+    tft->fillRoundRect(i, i, w - 2 * i, h - 2 * i, 10, tft->color565(i, 0, i));
+  }
+  return micros() - start;
 }

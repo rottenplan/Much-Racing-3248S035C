@@ -42,8 +42,8 @@ void DragMeterScreen::onShow() {
 
   TFT_eSPI *tft = _ui->getTft();
   // Clear only content area
-  _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                          SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                            SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
   _ui->setTitle("DRAG METER");
   drawDashboardStatic();
 
@@ -99,25 +99,26 @@ void DragMeterScreen::update() {
           } else if (_state == STATE_DRAG_MODE_MENU) {
             _state = STATE_MENU;
             _ui->setTitle("DRAG METER");
-            _selectedDragModeIdx = -1;           // Reset selection
-            _ui->getTft()->fillScreen(COLOR_BG); // Clear entire screen
+            _selectedDragModeIdx = -1; // Reset selection
+            _ui->getTft()->fillScreen(
+                _ui->getBackgroundColor()); // Clear entire screen
             drawMenu();
           } else if (_state == STATE_PREDICTIVE_MENU) {
             _state = STATE_MENU;
             _ui->setTitle("DRAG METER");
             _selectedPredictiveIdx = -1;
-            _ui->getTft()->fillScreen(COLOR_BG);
+            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
             drawMenu();
           } else if (_state == STATE_SUMMARY_VIEW) {
             _state = STATE_MENU;
             _ui->setTitle("DRAG METER");
-            _ui->getTft()->fillScreen(COLOR_BG);
+            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
             drawMenu();
           } else {
             // If in running mode, go back to menu
             _state = STATE_MENU;
             _ui->setTitle("DRAG METER");
-            _ui->getTft()->fillScreen(COLOR_BG);
+            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
             drawDashboardStatic();
           }
         } else {
@@ -212,7 +213,7 @@ void DragMeterScreen::update() {
       // Toggle Area (Header center/right)
       if (p.y < 50 && p.x > 100) {
         _summaryShowBest = !_summaryShowBest;
-        _ui->getTft()->fillScreen(COLOR_BG);
+        _ui->getTft()->fillScreen(_ui->getBackgroundColor());
         drawSummary();
       }
     }
@@ -267,8 +268,8 @@ void DragMeterScreen::update() {
       if (elapsed >= _treeInterval) {
         // GO!
         _runState = RUN_RUNNING;
-        _runStartTime = millis();            // Start timer
-        _ui->getTft()->fillScreen(COLOR_BG); // Clear tree
+        _runStartTime = millis();                             // Start timer
+        _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear tree
         drawDashboardStatic();
       } else {
         drawChristmasTreeOverlay();
@@ -284,20 +285,33 @@ void DragMeterScreen::update() {
 void DragMeterScreen::checkStartCondition() {
   float speed = gpsManager.getSpeedKmph();
   if (speed > 1.0) { // Moving (> 1 km/h)
+    unsigned long now = millis();
+
+    if (_runState == RUN_WAITING) {
+      // First motion detection
+      _startLat = gpsManager.getLatitude();
+      _startLon = gpsManager.getLongitude();
+      _startAlt = gpsManager.getAltitude();
+      _startPosition = 0;
+      _totalRunDistance = 0;
+    }
+
     if (_rolloutEnabled) {
-      // Integrate distance: dist += speed (m/s) * dt
-      // Simple approx: speed in m/s * (millis - lastUpdate) / 1000
-      float speedMs = speed / 3.6;
-      unsigned long now = millis();
-      float dt = (now - _lastUpdate) / 1000.0;
-      if (dt > 1.0)
-        dt = 0.1; // Cap dt if weird jump
-      _startPosition += speedMs * dt;
+      // For rollout, we track distance from initial movement
+      double dist = gpsManager.distanceBetween(_startLat, _startLon,
+                                               gpsManager.getLatitude(),
+                                               gpsManager.getLongitude());
+      _startPosition = dist; // approximate rollout distance
       _lastUpdate = now;
 
       if (_startPosition >= 0.3048) { // 1 ft
         _runState = RUN_RUNNING;
         _runStartTime = now;
+        // Start "official" run from here
+        _startLat = gpsManager.getLatitude();
+        _startLon = gpsManager.getLongitude();
+        _startAlt = gpsManager.getAltitude();
+
         // Reset disciplines
         for (auto &d : _disciplines) {
           d.completed = false;
@@ -331,7 +345,7 @@ void DragMeterScreen::drawPredictiveMode() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Draw Big Predicted Time
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->setTextDatum(MC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(6); // Very big
@@ -350,13 +364,13 @@ void DragMeterScreen::drawPredictiveMode() {
   tft->setTextSize(2);
   if (_targetTime > 0 && _predictedFinalTime > 0) {
     float delta = _predictedFinalTime - _targetTime;
-    uint16_t color = TFT_WHITE;
+    uint16_t color = _ui->getTextColor();
     if (abs(delta) <= 0.1)
       color = TFT_GREEN;
     else
       color = TFT_RED;
 
-    tft->setTextColor(color, COLOR_BG);
+    tft->setTextColor(color, _ui->getBackgroundColor());
     String deltaStr = "Target: " + String(_targetTime, 1) + "s";
     tft->drawString(deltaStr, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 50);
   }
@@ -399,7 +413,7 @@ void DragMeterScreen::saveReferenceRun() {
 void DragMeterScreen::checkStopCondition() {
   // If speed drops to 0 and we have been running for a bit?
   // Or simply if speed < 1.0
-  if (gpsManager.getSpeedKmph() < 1.0) {
+  if (gpsManager.getSpeedKmph() < 5.0) {
     // Only stop if we actually started (which we did if we are here)
 
     saveReferenceRun(); // Save if good run
@@ -431,7 +445,7 @@ void DragMeterScreen::checkStopCondition() {
 
     // Go to Summary
     _state = STATE_SUMMARY_VIEW;
-    _ui->getTft()->fillScreen(COLOR_BG);
+    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
     drawSummary();
   }
 }
@@ -440,31 +454,34 @@ void DragMeterScreen::updateDisciplines() {
   float speed = gpsManager.getSpeedKmph();
   unsigned long now = millis();
   unsigned long runTime = now - _runStartTime;
-  // We definitely need distance tracking here for distance disciplines
-  // _currentDistance += speed * dt...
-  // Let's rely on simple integration for now as we don't have DistanceManager
-  static unsigned long lastUpdate = 0;
-  if (lastUpdate == 0)
-    lastUpdate = now;
-  float dt = (now - lastUpdate) / 1000.0;
-  if (dt > 0.5)
-    dt = 0.1; // Cap
-  lastUpdate = now;
 
-  if (_runState == RUN_RUNNING && runTime < 100)
-    _totalRunDistance = 0; // Reset at start
+  // Geometric Distance
+  double currentLat = gpsManager.getLatitude();
+  double currentLon = gpsManager.getLongitude();
+  double currentAlt = gpsManager.getAltitude();
 
-  _totalRunDistance += (speed / 3.6) * dt;
-  _currentSpeed = speed; // Update display var
-  _slope = 0;
+  // Calculate total run distance from start point
+  _totalRunDistance =
+      gpsManager.distanceBetween(_startLat, _startLon, currentLat, currentLon);
+
+  _currentSpeed = speed;
+
+  // Calculate Slope: (Rise / Run) * 100
+  // Only valid if we have moved enough to reduce GPS altitude noise impact
+  if (_totalRunDistance > 50.0) {
+    float rise = currentAlt - _startAlt;
+    _slope = (rise / _totalRunDistance) * 100.0;
+  } else {
+    _slope = 0.0;
+  }
 
   // LOG DATA
   if (_runState == RUN_RUNNING && sessionManager.isLogging()) {
     // Time,Lat,Lon,Speed,Sats,Alt,Heading
-    String data = String(millis()) + "," + String(gpsManager.getLatitude(), 6) +
-                  "," + String(gpsManager.getLongitude(), 6) + "," +
-                  String(speed, 2) + "," + String(gpsManager.getSatellites()) +
-                  "," + String(gpsManager.getAltitude(), 2) + "," +
+    String data = String(millis()) + "," + String(currentLat, 6) + "," +
+                  String(currentLon, 6) + "," + String(speed, 2) + "," +
+                  String(gpsManager.getSatellites()) + "," +
+                  String(currentAlt, 2) + "," +
                   String(gpsManager.getHeading(), 2);
     sessionManager.logData(data);
   }
@@ -474,9 +491,8 @@ void DragMeterScreen::updateDisciplines() {
   for (auto &d : _disciplines) {
     if (!d.completed) {
       allComplete = false;
-      // Capture slope if available (mocking logic or real if GPSManager has it)
-      // d.slope = gpsManager.getSlope(); // Assuming fake for now
-      d.slope = (random(-20, 20) / 10.0); // Dummy: -2.0 to 2.0%
+
+      d.slope = _slope; // Capture current slope
 
       // Peak Speed
       if (speed > d.peakSpeed)
@@ -487,34 +503,32 @@ void DragMeterScreen::updateDisciplines() {
           d.completed = true;
           d.resultTime = runTime;
           d.endSpeed = speed;
-          // Validate slope: < -1.5% invalid
-          if (d.slope < -1.5)
-            d.valid = false;
-          else
-            d.valid = true;
+          // Validate slope: < -1.0% invalid (NHRA rule approx)
+          d.valid = (d.slope >= -1.0);
         }
       } else {
         if (speed >= d.target) {
           d.completed = true;
           d.resultTime = runTime;
-          // Validate slope
-          if (d.slope < -1.5)
-            d.valid = false;
-          else
-            d.valid = true;
+          d.valid = (d.slope >= -1.0);
         }
       }
     }
   }
 
-  // Braking Logic
+  // Run Finishing Logic
   if (allComplete) {
     if (!_brakingMeasurable) {
-      _brakingMeasurable = true;
-      _brakingStartDistance = _totalRunDistance;
+      _brakingMeasurable = true; // Mark as finished phase
     }
-  } else {
-    _brakingMeasurable = false;
+
+    // Auto-Stop Condition: Speed drops low OR timeout
+    if (speed < 5.0) {
+      _oneFootReached = false; // reset flag reuse
+      // Call stop/save
+      checkStopCondition(); // This function will see speed < 5.0 logic if
+                            // updated
+    }
   }
 
   // Update highlight
@@ -531,7 +545,7 @@ void DragMeterScreen::updateDisciplines() {
 void DragMeterScreen::startChristmasTree() {
   _runState = RUN_COUNTDOWN;
   _startTime = millis();
-  _ui->getTft()->fillScreen(COLOR_BG);
+  _ui->getTft()->fillScreen(_ui->getBackgroundColor());
   // Draw Tree Background
 }
 
@@ -546,10 +560,10 @@ void DragMeterScreen::drawChristmasTreeOverlay() {
 
   // Draw Traffic Light
   // Pre-Stage (White)
-  tft->fillCircle(cx, cy - 60, 20, TFT_WHITE);
+  tft->fillCircle(cx, cy - 60, 20, _ui->getTextColor());
 
   // Stage (White)
-  tft->fillCircle(cx, cy - 20, 20, TFT_WHITE);
+  tft->fillCircle(cx, cy - 20, 20, _ui->getTextColor());
 
   // Yellows
   if (phase >= 1)
@@ -570,23 +584,23 @@ void DragMeterScreen::handleMenuTouch(int idx) {
   if (item == "DRAG SCREEN") {
     _state = STATE_RUNNING;
     _ui->setTitle("DRAG METER");
-    _ui->getTft()->fillScreen(COLOR_BG);
+    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
     drawDashboardStatic();
   } else if (item == "DRAG MODE") {
     _state = STATE_DRAG_MODE_MENU;
     _ui->setTitle("DRAG MODE");
     _selectedDragModeIdx = -1;
-    _ui->getTft()->fillScreen(COLOR_BG);
+    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
     drawDragModeMenu();
   } else if (item == "PREDICTIVE") {
     _state = STATE_PREDICTIVE_MENU;
     _ui->setTitle("PREDICTIVE");
-    _ui->getTft()->fillScreen(COLOR_BG);
+    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
     drawPredictiveMenu();
   } else if (item == "SUMMARY") {
     _state = STATE_SUMMARY_VIEW;
     _ui->setTitle("RUN SUMMARY");
-    _ui->getTft()->fillScreen(COLOR_BG); // Clear for summary
+    _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear for summary
     drawSummary();
   }
 }
@@ -599,7 +613,7 @@ void DragMeterScreen::handleDragModeTouch(int idx) {
     // Go to Running View
     _state = STATE_RUNNING;
     _ui->setTitle("DRAG METER");
-    _ui->getTft()->fillScreen(COLOR_BG);
+    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
     drawDashboardStatic();
   }
 }
@@ -653,7 +667,7 @@ void DragMeterScreen::drawDashboardStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Common Header (Back Arrow)
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
   tft->setTextDatum(TL_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
@@ -674,21 +688,21 @@ void DragMeterScreen::drawDashboardStatic() {
   } else {
     _ui->setTitle("DRAG METER");
     // Draw Running View (Back arrow already drawn)
-    tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
+    tft->drawFastHLine(0, 45, SCREEN_WIDTH, _ui->getTextColor());
 
     // Speed Area
     // "KPH" Label
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
+    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(TR_DATUM); // Top Right
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
     tft->drawString("KPH", SCREEN_WIDTH - 10, 80);
 
     // Horizontal Line below Speed
-    tft->drawFastHLine(0, 110, SCREEN_WIDTH, TFT_WHITE);
+    tft->drawFastHLine(0, 110, SCREEN_WIDTH, _ui->getTextColor());
 
     // Draw Mode Toggle Arrows
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
+    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(TC_DATUM);
     tft->setTextSize(1);
     if (_displayMode == DISPLAY_NORMAL) {
@@ -699,7 +713,7 @@ void DragMeterScreen::drawDashboardStatic() {
 
     // Vertical Line splitting List and Highlight
     tft->drawFastVLine(SCREEN_WIDTH / 2, 110, SCREEN_HEIGHT - 110 - 20,
-                       TFT_WHITE); // -20 for footer
+                       _ui->getTextColor()); // -20 for footer
 
     // List Area (Left)
     // Labels updated in Dynamic or Static? Labels are static.
@@ -715,12 +729,12 @@ void DragMeterScreen::drawDashboardStatic() {
     // We will draw this in Dynamic to avoid flickering or redraw it here and
     // update text in Dynamic? Better to draw static bg here.
     tft->fillRect(SCREEN_WIDTH / 2 + 1, 111, SCREEN_WIDTH / 2 - 1,
-                  SCREEN_HEIGHT - 110 - 21, TFT_WHITE);
+                  SCREEN_HEIGHT - 110 - 21, _ui->getTextColor());
 
     // Footer Area (Slope)
     tft->fillRect(0, SCREEN_HEIGHT - 20, SCREEN_WIDTH, 20,
-                  COLOR_BG); // Clear footer
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
+                  _ui->getBackgroundColor()); // Clear footer
+    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(TL_DATUM);
     tft->setTextSize(1); // Smaller font for footer
     tft->drawString("SL:", 10, SCREEN_HEIGHT - 15);
@@ -742,7 +756,7 @@ void DragMeterScreen::drawDashboardDynamic() {
   // NORMAL MODE DRAWING
   // 1. Update Speed
   // Big Font
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->setTextDatum(TC_DATUM);
   tft->setTextFont(7); // Big 7-segment like font
   tft->setTextSize(1); // Standard size for font 7
@@ -753,7 +767,7 @@ void DragMeterScreen::drawDashboardDynamic() {
   tft->drawString(String(_currentSpeed, 1), SCREEN_WIDTH / 2 - 20, 50);
 
   // 2. Update List Values (Left)
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->setTextDatum(TR_DATUM); // Align Right for values
   tft->setFreeFont(&Org_01);   // Back to Org_01
   tft->setTextSize(2);
@@ -769,7 +783,7 @@ void DragMeterScreen::drawDashboardDynamic() {
   }
 
   // 3. Highlight Box (Right) - White BG, Black Text
-  tft->setTextColor(TFT_BLACK, TFT_WHITE);
+  tft->setTextColor(_ui->getBackgroundColor(), _ui->getTextColor());
 
   // Title (e.g., "400 m")
   tft->setTextDatum(TC_DATUM);
@@ -782,7 +796,7 @@ void DragMeterScreen::drawDashboardDynamic() {
   tft->drawString(_highlightValue, (SCREEN_WIDTH * 3) / 4, 160);
 
   // 4. Slope (Footer)
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->setFreeFont(&Org_01); // Back to Org_01
   tft->setTextSize(1);
   tft->setTextDatum(TL_DATUM);
@@ -793,7 +807,7 @@ void DragMeterScreen::drawSummary() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Header
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
@@ -918,6 +932,8 @@ void DragMeterScreen::drawSummary() {
   tft->setTextDatum(TR_DATUM);
   tft->drawString(String(brakeDist, 1) + " m", SCREEN_WIDTH - 10,
                   SCREEN_HEIGHT - 20);
+
+  _ui->drawStatusBar(true);
 }
 
 void DragMeterScreen::drawMenu() {

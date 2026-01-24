@@ -8,7 +8,7 @@ extern GPSManager gpsManager;
 
 void SpeedometerScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG); // Latar belakang gelap
+  tft->fillScreen(_ui->getBackgroundColor()); // Latar belakang gelap
 
   _lastSpeed = -1;
   _lastRPM = -1;
@@ -108,10 +108,22 @@ void SpeedometerScreen::drawDashboard(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
   // --- PENGATURAN WARNA ---
-  uint16_t colTheme = TFT_GREEN; // Warna utama (Hijau)
-  uint16_t colRed = TFT_RED;     // Warna merah untuk Top Speed
-  uint16_t colWhite = TFT_WHITE; // Warna putih
-  uint16_t colBlack = TFT_BLACK; // Warna hitam
+  uint16_t colTheme = TFT_GREEN;                 // Warna utama (Hijau)
+  uint16_t colRed = TFT_RED;                     // Warna merah untuk Top Speed
+  uint16_t colWhite = _ui->getTextColor();       // Warna putih (Teks Utama)
+  uint16_t colBlack = _ui->getBackgroundColor(); // Warna hitam (Latar Belakang)
+
+  // Special case: Inverted boxes (e.g. Center Box was White BG, Black Text)
+  // If Dark Mode: BG=Black, colWhite=White. CenterBox=White, Text=Black. OK.
+  // If Light Mode: BG=White, colWhite=Black. CenterBox=Black (should be?),
+  // Text=White. We need distinct "Contrast Text" and "Contrast BG" or just
+  // strictly use logic.
+
+  // Let's redefine for clarity in this specific dashboard which uses "Boxes"
+  uint16_t colBoxBg =
+      _ui->getTextColor(); // Box Background (Opposite of Main BG)
+  uint16_t colBoxText =
+      _ui->getBackgroundColor(); // Text inside Box (Same as Main BG)
 
   // --- PENGATURAN POSISI (OFFSET) ---
   int offTop = 15; // Geser Atas (Dikurangi dari 33 agar naik)
@@ -119,8 +131,9 @@ void SpeedometerScreen::drawDashboard(bool force) {
 
   if (force) {
     // Clear only content area
-    tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+    _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+    _ui->drawStatusBar(true);
 
     // --- 0. INDIKATOR KECIL DI ATAS (Revised: Bigger & Fitted) ---
     // Status Bar assumed ~20px. Header starts at 39+offTop (54px).
@@ -131,7 +144,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     // Layout: Left(20, width 80) - Gap(10) - Center(110, width 100) - Gap(10) -
     // Right(220, width 80)
     tft->fillRect(20, boxY, 80, boxH, colTheme);   // Hijau
-    tft->fillRect(110, boxY, 100, boxH, colWhite); // Putih
+    tft->fillRect(110, boxY, 100, boxH, colBoxBg); // Putih (Contrast)
     tft->fillRect(220, boxY, 80, boxH, colRed);    // Merah
 
     // --- TEXT INDIKATOR ---
@@ -143,27 +156,28 @@ void SpeedometerScreen::drawDashboard(bool force) {
     int yTextMid = boxY + (boxH / 2) + 2; // +2 adjustment for font baseline
 
     // Box 1 (Green/Kiri): Max RPM
-    tft->setTextColor(colWhite, colTheme);
+    tft->setTextColor(colBoxText,
+                      colTheme); // Text=BGColor (Black in Dark), BG=Green
     sprintf(buf, "%d", _maxRPM);
     tft->drawString(buf, 60, yTextMid); // Center of 20+80=100 -> 60
 
     // Box 2 (White/Tengah): Max Speed
-    tft->setTextColor(colBlack, colWhite);
+    tft->setTextColor(colBoxText, colBoxBg); // Text=BGColor, BG=Contrast
     sprintf(buf, "%.0f", _maxSpeed);
     tft->drawString(buf, 160, yTextMid); // Center of 110+100=210 -> 160
 
     // Box 3 (Red/Kanan): GPS Signal
-    tft->setTextColor(colWhite, colRed);
+    tft->setTextColor(colBoxText, colRed); // Text=BGColor, BG=Red
     sprintf(buf, "%d", _lastSats);
     tft->drawString(buf, 260, yTextMid); // Center of 220+80=300 -> 260
 
     tft->setTextDatum(TL_DATUM); // Reset
 
     // --- 1. HEADER BAR (SPEED) ---
-    tft->fillRect(2, 39 + offTop, 320, 19, colWhite);
+    tft->fillRect(2, 39 + offTop, 320, 19, colBoxBg);
 
     // Tulisan "SPEED" - DI CENTERKAN
-    tft->setTextColor(colBlack, colWhite);
+    tft->setTextColor(colBoxText, colBoxBg);
     tft->setTextSize(2);
     tft->setTextDatum(MC_DATUM);
     tft->drawString("SPEED", 160, 39 + offTop + 10);
@@ -175,7 +189,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextDatum(TL_DATUM);
 
     // --- 2. ANGKA KECEPATAN BESAR ---
-    tft->setTextColor(colTheme, COLOR_BG);
+    tft->setTextColor(colTheme, _ui->getBackgroundColor());
     tft->setTextSize(7);
     tft->setTextDatum(MC_DATUM);
 
@@ -192,7 +206,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
 
     // --- 3. DATA TRIP ---
     // Geser naik lagi ke 122 (User request: "0000 naikan lagi")
-    tft->setTextColor(colTheme, COLOR_BG);
+    tft->setTextColor(colTheme, _ui->getBackgroundColor());
     tft->setTextSize(1);
     tft->drawCentreString("LONG TRIP", 160, 122 + offTop, 1);
 
@@ -205,7 +219,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     // --- 5. SKALA & GARIS ---
     int yScaleVal = 176 + offBot;
 
-    tft->setTextColor(colWhite, COLOR_BG);
+    tft->setTextColor(colWhite, _ui->getBackgroundColor());
     tft->setTextSize(1);
 
     // Angka Skala
@@ -240,7 +254,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     // Note: offBot=10. Y=205.
     // If we want it at 215 Absolute: 205+10 = 215. This is correct.
     tft->setTextSize(2);
-    tft->setTextColor(colWhite, COLOR_BG);
+    tft->setTextColor(colWhite, _ui->getBackgroundColor());
     char rpmBuf[10];
     int dispRpm = (_lastRPM < 0) ? 0 : _lastRPM;
     sprintf(rpmBuf, "%d", dispRpm);
@@ -271,21 +285,21 @@ void SpeedometerScreen::drawDashboard(bool force) {
     int yTextMid = boxY + (boxH / 2) + 2;
 
     // Box 1: Max RPM
-    tft->setTextColor(colWhite, colTheme);
+    tft->setTextColor(colBoxText, colTheme);
     tft->setTextPadding(70); // Width 80 -> Padding 70 safe
     sprintf(buf, "%d", _maxRPM);
     tft->drawString(buf, 60, yTextMid);
     tft->setTextPadding(0);
 
     // Box 2: Max Speed
-    tft->setTextColor(colBlack, colWhite);
+    tft->setTextColor(colBoxText, colBoxBg);
     tft->setTextPadding(90); // Width 100 -> Padding 90 safe
     sprintf(buf, "%.0f", _maxSpeed);
     tft->drawString(buf, 160, yTextMid);
     tft->setTextPadding(0);
 
     // Box 3: GPS Satellites
-    tft->setTextColor(colWhite, colRed);
+    tft->setTextColor(colBoxText, colRed);
     tft->setTextPadding(70); // Width 80 -> Padding 70 safe
     sprintf(buf, "%d", _lastSats);
     tft->drawString(buf, 260, yTextMid);
@@ -294,7 +308,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextDatum(TL_DATUM);
 
     // 2. Update Speed Utama
-    tft->setTextColor(colTheme, COLOR_BG);
+    tft->setTextColor(colTheme, _ui->getBackgroundColor());
     tft->setTextSize(7);
     tft->setTextDatum(MC_DATUM);
     tft->setTextPadding(240); // PADDING untuk hapus sisa angka lama
@@ -306,7 +320,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextDatum(TL_DATUM);
 
     // 3. Update Trip
-    tft->setTextColor(colTheme, COLOR_BG);
+    tft->setTextColor(colTheme, _ui->getBackgroundColor());
     tft->setTextSize(3);
     tft->setTextPadding(120); // PADDING
     char tripBuf[10];
@@ -327,7 +341,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
 
     // Update Angka RPM
     tft->setTextSize(2);
-    tft->setTextColor(colWhite, COLOR_BG);
+    tft->setTextColor(colWhite, _ui->getBackgroundColor());
     tft->setTextPadding(100); // PADDING untuk mencegah ghosting
     char rpmBuf[10];
     int dispRpm = (_lastRPM < 0) ? 0 : _lastRPM;

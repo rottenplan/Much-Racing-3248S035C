@@ -181,9 +181,9 @@ export default function TrackDetailPage() {
                   <tr key={entry.rank} className="hover:bg-card-bg transition">
                     <td className="py-3 px-4">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${entry.rank === 1 ? 'bg-highlight text-white' :
-                          entry.rank === 2 ? 'bg-zinc-400 text-black' :
-                            entry.rank === 3 ? 'bg-orange-700 text-white' :
-                              'bg-background-secondary text-text-secondary'
+                        entry.rank === 2 ? 'bg-zinc-400 text-black' :
+                          entry.rank === 3 ? 'bg-orange-700 text-white' :
+                            'bg-background-secondary text-text-secondary'
                         }`}>
                         {entry.rank}
                       </div>

@@ -9,9 +9,8 @@ extern GPSManager gpsManager;
 
 void GpsStatusScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
-  // Clear only content area
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  // Clear entire screen to black to prevent artifacts
+  tft->fillScreen(TFT_BLACK);
 
   // Force Status Bar Redraw to ensure no artifacts at top
   _ui->drawStatusBar(true);
@@ -68,6 +67,9 @@ void GpsStatusScreen::update() {
   drawStatus();
 }
 
+// Safe Area Offset (Status Bar Height)
+#define TOP_OFFSET 25
+
 void GpsStatusScreen::drawStatus() {
   TFT_eSPI *tft = _ui->getTft();
 
@@ -77,186 +79,178 @@ void GpsStatusScreen::drawStatus() {
   double lat = gpsManager.getLatitude();
   double lng = gpsManager.getLongitude();
 
-  // --- 1. Date/Time (Highlighted in Middle) ---
-  int h, m, s, d, mo, y;
-  gpsManager.getLocalTime(h, m, s, d, mo, y);
+  // Colors
+  uint16_t COLOR_CARD = 0x18E3;
+  uint16_t COLOR_LABEL = TFT_SILVER;
+  uint16_t COLOR_VALUE = TFT_WHITE;
 
-  static unsigned long lastTimeDraw = 0;
-  // If we just entered, force draw?
-  // We can use _lastSats == -1 as a 'first run' indicator or just checking
-  // millis. Ideally, lastTimeDraw should be reset in onShow, but it's static
-  // local. Workaround: Use a member variable for drawing timer or just let it
-  // update.
+  // --- 1. DATE/TIME & LAT/LON CARD (Left Side) ---
+  // If first run or interval, redraw card base
+  static unsigned long lastUpdate = 0;
+  bool forceRedraw = (_lastSats == -1);
 
-  if (millis() - lastTimeDraw > 1000 ||
-      _lastSats == -1) { // Force update on first run
-    lastTimeDraw = millis();
+  if (forceRedraw || millis() - lastUpdate > 1000) {
+    lastUpdate = millis();
+    int cardX = 10;
+    int cardY = TOP_OFFSET + 10;
+    int cardW = 160;
+    int cardH = 135;
 
-    // White Box Highlight aligned with Radar (approx Y=105)
-    int yTime = TOP_OFFSET + 80;
+    // Draw Card Background (only if needed or clean update)
+    if (forceRedraw) {
+      tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, COLOR_CARD); // Charcoal
+      tft->drawRoundRect(cardX, cardY, cardW, cardH, 8, TFT_DARKGREY);
 
-    // Prepare Date String to calculate width
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(1);
+      // Labels
+      tft->setTextColor(COLOR_LABEL, COLOR_CARD);
+      tft->setTextDatum(TL_DATUM);
+      tft->setFreeFont(&Org_01);
+      tft->setTextSize(1);
+      tft->drawString("LOCATION", cardX + 10, cardY + 5);
+
+      tft->drawLine(cardX + 5, cardY + 20, cardX + cardW - 5, cardY + 20,
+                    TFT_DARKGREY);
+    }
+
+    // Dynamic Values - Time
+    int h, m, s, d, mo, y;
+    gpsManager.getLocalTime(h, m, s, d, mo, y);
+
     char dateBuf[32];
-    sprintf(dateBuf, "%02d/%02d/%04d UTC+07:00", mo, d, y);
-    int dateW = tft->textWidth(dateBuf);
-
-    // Check Time Width (Font 4)
-    tft->setTextFont(4);
+    sprintf(dateBuf, "%02d/%02d/%04d", d, mo, y);
     char timeBuf[16];
     sprintf(timeBuf, "%02d:%02d:%02d", h, m, s);
-    int timeW = tft->textWidth(timeBuf);
 
-    // Calculate Box Width (Max of Date/Time + padding), capped at 170 (Radar
-    // starts at 175)
-    int boxW = (dateW > timeW ? dateW : timeW) + 15;
-    if (boxW > 170)
-      boxW = 170;
-
-    tft->fillRect(0, yTime, boxW, 45, TFT_WHITE);
-
-    tft->setTextColor(TFT_BLACK, TFT_WHITE); // Inverted Text
+    tft->setTextColor(TFT_SKYBLUE, COLOR_CARD);
     tft->setTextDatum(TL_DATUM);
+    tft->setTextFont(2);
+    tft->drawString(dateBuf, cardX + 10, cardY + 25);
 
-    // Draw Date
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(1);
-    tft->drawString(dateBuf, 5, yTime + 5);
+    tft->setTextFont(4); // Big Time
+    tft->setTextColor(TFT_WHITE, COLOR_CARD);
+    tft->drawString(timeBuf, cardX + 10, cardY + 42);
 
-    // Draw Time
-    tft->setTextFont(4); // Large Font
-    tft->setTextSize(1);
-    tft->drawString(timeBuf, 5, yTime + 20);
-  }
-
-  // --- 2. Lat/Lng (Highlighted) ---
-  // Draw only if changed significantly, but for highlighting box we might want
-  // to redraw if not present? Actually, let's redraw the values on top of the
-  // box. Ideally, draw the box once or only when values update? If we redraw
-  // values, we need to clear previous. With a box, we can just refill the box
-  // or part of it.
-
-  // Let's refill the whole Lat/Lng area to be safe and clean.
-  if (abs(lat - _lastLat) > 0.00001 ||
-      abs(lng - _lastLng) > 0.00001) { // Or force redraw logic if needed
-    int yLatBox = TOP_OFFSET + 10;
-    int boxHeight = 55;
-    int boxWidth = 170; // Match Date/Time box width cap approx
-
-    // Draw White Box
-    tft->fillRect(0, yLatBox, boxWidth, boxHeight, TFT_WHITE);
-
-    tft->setTextColor(TFT_BLACK, TFT_WHITE); // Inverted
-    tft->setTextDatum(TL_DATUM);
-
-    // Labels & Values
+    // Dynamic Values - Lat/Lon
     // LAT
+    tft->setTextColor(COLOR_LABEL, COLOR_CARD);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(1);
-    tft->drawString("LAT", 5, yLatBox + 5);
+    tft->drawString("LAT", cardX + 10, cardY + 75);
 
-    tft->setTextFont(4); // Large Font for Value
-    tft->setTextSize(1);
-    tft->drawString(String(lat, 6), 35, yLatBox + 2);
+    tft->setTextColor(TFT_WHITE, COLOR_CARD);
+    tft->setTextFont(2);
+    tft->drawString(String(lat, 6), cardX + 40, cardY + 72);
 
-    // LNG
-    int yLngRow = yLatBox + 28;
+    // LON
+    tft->setTextColor(COLOR_LABEL, COLOR_CARD);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(1);
-    tft->drawString("LNG", 5, yLngRow + 5);
+    tft->drawString("LON", cardX + 10, cardY + 95);
 
-    tft->setTextFont(4);
-    tft->setTextSize(1);
-    tft->drawString(String(lng, 6), 35, yLngRow + 2);
+    tft->setTextColor(TFT_WHITE, COLOR_CARD);
+    tft->setTextFont(2);
+    tft->drawString(String(lng, 6), cardX + 40, cardY + 92);
 
-    _lastLat = lat;
-    _lastLng = lng;
+    // Alt / Heading tiny
+    int alt = (int)gpsManager.getAltitude();
+    int head = (int)gpsManager.getHeading();
+    tft->setTextColor(TFT_ORANGE, COLOR_CARD);
+    tft->setFreeFont(&Org_01);
+    tft->drawString("ALT: " + String(alt) + "m", cardX + 10, cardY + 115);
+    tft->drawString("DIR: " + String(head), cardX + 90, cardY + 115);
   }
 
-  // --- 3. Sat Counts (Text) ---
-  if (sats != _lastSats) {
+  // --- 2. SATELLITE INFO (Bottom Card) ---
+  if (forceRedraw || sats != _lastSats || hz != _lastHz) {
+    int cardX = 10;
+    int cardY = TOP_OFFSET + 150; // Moved up to 175
+    int cardW = SCREEN_WIDTH - 20;
+    int cardH = 60; // Increased height to fit content
+
+    if (forceRedraw) {
+      tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, 0x10A2); // Slate
+    }
+
+    // Clear text area inside card
+    tft->fillRoundRect(cardX + 2, cardY + 25, cardW - 4, 33, 0, 0x10A2);
+
+    tft->setTextColor(TFT_SILVER, 0x10A2);
+    tft->setTextDatum(TL_DATUM);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(1);
-    tft->setTextColor(TFT_WHITE, TFT_BLACK);
-    tft->setTextDatum(TL_DATUM);
 
-    int yRow1 = TOP_OFFSET + 135;
-    int yRow2 = TOP_OFFSET + 150;
+    if (forceRedraw) {
+      tft->drawString("STATUS", cardX + 10, cardY + 5);
+      // Labels moved UP
+      tft->drawString("SATS", cardX + 30, cardY + 18);
+      tft->drawString("Hz", cardX + 80, cardY + 18);
+      tft->drawString("HDOP", cardX + 130, cardY + 18);
+    }
 
-    tft->fillRect(10, yRow1, 150, 35, TFT_BLACK);
+    // Sat Count (Values moved DOWN)
+    int valY = cardY + 42;
 
-    char buf[32];
-    sprintf(buf, "GPS:%d Sat. GAL:0 Sat.", sats);
-    tft->drawString(buf, 10, yRow1);
+    tft->setTextColor(TFT_GREEN, 0x10A2);
+    tft->setTextFont(4);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString(String(sats), cardX + 30, valY);
 
-    sprintf(buf, "GLO:0 Sat. BEI:0 Sat.");
-    tft->drawString(buf, 10, yRow2);
+    // Hz
+    tft->setTextColor(TFT_CYAN, 0x10A2);
+    tft->setTextFont(4);
+    tft->drawString(String(hz), cardX + 80, valY);
+
+    // HDOP
+    tft->setTextColor(TFT_YELLOW, 0x10A2);
+    tft->setTextFont(4);
+    tft->drawString(String(hdop, 1), cardX + 130, valY);
+
+    // Fix Quality
+    String fixStr = gpsManager.isFixed() ? "3D FIX" : "NO FIX";
+    uint16_t fixColor = gpsManager.isFixed() ? TFT_GREEN : TFT_RED;
+    tft->setTextColor(fixColor, 0x10A2);
+    tft->setTextFont(2);
+    tft->setTextDatum(MR_DATUM);
+    tft->drawString(fixStr, cardX + cardW - 10, valY);
 
     _lastSats = sats;
-  }
-
-  // --- 4. Footer Info ---
-  if (abs(hdop - _lastHdop) > 0.01 || hz != _lastHz) {
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(1);
-    tft->setTextColor(TFT_WHITE, TFT_BLACK);
-    tft->setTextDatum(BL_DATUM);
-
-    int yFooter = 235; // Moved to bottom to avoid Radar and Sat overlap
-
-    // Clear bottom area, avoiding Back button (X < 50)
-    tft->fillRect(60, yFooter - 15, SCREEN_WIDTH - 60, 20, TFT_BLACK);
-
-    char footerBuf[64];
-    int fixQ = gpsManager.isFixed() ? 3 : 0;
-    int rx = gpsManager.getRxPin();
-    int tx = gpsManager.getTxPin();
-    int baud = gpsManager.getBaud();
-
-    // Show Pins and Baud for debugging
-    sprintf(footerBuf, "R:%d T:%d B:%d A:%d HDOP:%.2f", rx, tx, baud, fixQ,
-            hdop);
-    tft->drawString(footerBuf, 60, yFooter);
-
-    _lastHdop = hdop;
     _lastHz = hz;
   }
 
-  // --- 5. Radar Plot (Right Side) ---
-  // Center X = 240, Center Y = 120 + Offset?
-  // If we offset Y, it might clip bottom.
-  // Let's keep Y center at 120 + (OFFSET/2) -> 132?
-  // 120 + 12 = 132.
-  int cX = 240;
-  int cY = 120 + (TOP_OFFSET / 2);
-  int r = 65; // Slightly smaller to fit with offset
+  // --- 3. RADAR (Right Side) ---
+  int radarX = 180;
+  int radarY = TOP_OFFSET + 10;
+  int radarW = 130;
+  int radarH = 135;
+  int cX = radarX + radarW / 2;
+  int cY = radarY + radarH / 2;
+  int r = 55;
+
+  if (forceRedraw) {
+    // Container
+    tft->fillRoundRect(radarX, radarY, radarW, radarH, 8,
+                       TFT_BLACK); // Keep Black for contrast
+    tft->drawRoundRect(radarX, radarY, radarW, radarH, 8, TFT_DARKGREY);
+
+    // Circles
+    tft->drawCircle(cX, cY, r, TFT_DARKGREY);
+    tft->drawCircle(cX, cY, r * 0.6, TFT_DARKGREY);
+    tft->drawCircle(cX, cY, r * 0.2, TFT_DARKGREY);
+
+    // Crosshair
+    tft->drawLine(cX - r, cY, cX + r, cY, TFT_DARKGREY);
+    tft->drawLine(cX, cY - r, cX, cY + r, TFT_DARKGREY);
+
+    // Labels
+    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft->setTextDatum(MC_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(1);
+    tft->drawString("N", cX, cY - r - 5);
+  }
 
   if (!_lastFixed) {
-    // Radar lines are WHITE on BLACK.
-    tft->drawCircle(cX, cY, r, TFT_WHITE);
-    tft->drawCircle(cX, cY, r * 0.6, TFT_WHITE);
-    tft->drawCircle(cX, cY, r * 0.2, TFT_WHITE);
-
-    tft->drawLine(cX - r, cY, cX + r, cY, TFT_WHITE);
-    tft->drawLine(cX, cY - r, cX, cY + r, TFT_WHITE);
-
-    // Labels N/E/S/W (Inverted: White Circle, Black Text OR Black Circle White
-    // Text) "Negative UI" -> Usually White Lines on Black. Let's use White
-    // Circle, Black Text for contrast pop.
-    auto drawDir = [&](String d, int x, int y) {
-      tft->fillCircle(x, y, 7, TFT_WHITE);
-      tft->setTextColor(TFT_BLACK, TFT_WHITE);
-      tft->setTextDatum(MC_DATUM);
-      tft->setFreeFont(&Org_01);
-      tft->setTextSize(1);
-      tft->drawString(d, x, y + 1);
-    };
-    drawDir("N", cX, cY - r);
-    drawDir("S", cX, cY + r);
-    drawDir("E", cX + r, cY);
-    drawDir("W", cX - r, cY);
-
+    // Logic for satellites if we had them or just static crosshair
     _lastFixed = true;
   }
 }

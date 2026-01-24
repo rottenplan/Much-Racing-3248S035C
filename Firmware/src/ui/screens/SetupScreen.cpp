@@ -87,24 +87,24 @@ void SetupScreen::update() {
 void SetupScreen::drawWelcome() {
   TFT_eSPI *tft = _ui->getTft();
   // Clear entire screen
-  tft->fillScreen(COLOR_BG);
+  tft->fillScreen(_ui->getBackgroundColor());
 
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
+  tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
   tft->setTextDatum(MC_DATUM);
 
   // Title
   tft->setTextSize(1);
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->drawString("WELCOME TO", SCREEN_WIDTH / 2, 75);
 
   tft->setTextSize(2);
-  tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
+  tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
   tft->drawString("MUCH RACING", SCREEN_WIDTH / 2, 90);
 
   tft->setTextSize(1);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->drawString("LET'S GET STARTED", SCREEN_WIDTH / 2, 130);
 
   // Continue button
@@ -113,11 +113,11 @@ void SetupScreen::drawWelcome() {
 
 void SetupScreen::drawComplete() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
+  tft->fillScreen(_ui->getBackgroundColor());
 
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->setTextColor(TFT_GREEN, COLOR_BG);
+  tft->setTextColor(TFT_GREEN, _ui->getBackgroundColor());
   tft->setTextDatum(MC_DATUM);
 
   // Success message
@@ -141,12 +141,12 @@ void SetupScreen::drawAccountSetup(bool fullRedraw) {
   TFT_eSPI *tft = _ui->getTft();
 
   if (fullRedraw) {
-    tft->fillScreen(COLOR_BG);
+    tft->fillScreen(_ui->getBackgroundColor());
 
     // Header (Use Small Font 1 to avoid overlap with buttons)
     tft->setTextFont(1);
     tft->setTextSize(1);
-    tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
+    tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
     tft->setTextDatum(TC_DATUM);
     tft->drawString("ACCOUNT SETUP", SCREEN_WIDTH / 2, 5);
 
@@ -174,7 +174,7 @@ void SetupScreen::drawTextField(const char *label, String value, int y,
   tft->setFreeFont(&Org_01);
   tft->setTextSize(1);
   tft->setTextDatum(BL_DATUM);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->drawString(label, 10, y);
 
   // Field background (Start box at y+2 to give gap)
@@ -220,9 +220,10 @@ void SetupScreen::drawButton(const char *label, int x, int y, int w, int h,
                              bool isHighlighted) {
   TFT_eSPI *tft = _ui->getTft();
 
-  uint16_t bgColor = isHighlighted ? COLOR_PRIMARY : COLOR_BG;
+  uint16_t bgColor = isHighlighted ? COLOR_PRIMARY : _ui->getBackgroundColor();
   uint16_t borderColor = isHighlighted ? COLOR_PRIMARY : COLOR_SECONDARY;
-  uint16_t textColor = isHighlighted ? COLOR_BG : COLOR_TEXT;
+  uint16_t textColor =
+      isHighlighted ? _ui->getBackgroundColor() : _ui->getTextColor();
 
   tft->fillRect(x, y, w, h, bgColor);
   tft->drawRect(x, y, w, h, borderColor);
@@ -240,12 +241,12 @@ void SetupScreen::drawKeyboard(int y, bool isPassword) {
 // New WiFi Scan Screen
 void SetupScreen::drawWiFiScan() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(COLOR_BG);
+  tft->fillScreen(_ui->getBackgroundColor());
 
   // Header (Small Font 1)
   tft->setTextFont(1);
   tft->setTextSize(1);
-  tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
+  tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
   tft->setTextDatum(TC_DATUM);
   tft->drawString("SELECT WIFI NETWORK", SCREEN_WIDTH / 2, 5);
 
@@ -254,7 +255,7 @@ void SetupScreen::drawWiFiScan() {
   drawButton("SCAN", SCREEN_WIDTH - 55, 2, 50, 20, false);
 
   if (!_hasScanned) {
-    tft->setTextColor(COLOR_TEXT, COLOR_BG);
+    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(MC_DATUM);
     tft->drawString("Scanning...", SCREEN_WIDTH / 2, 120);
 
@@ -264,7 +265,8 @@ void SetupScreen::drawWiFiScan() {
 
     // Clear "Scanning..." text area only, don't wipe whole screen (prevents
     // flicker)
-    tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, COLOR_BG);
+    tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50,
+                  _ui->getBackgroundColor());
   }
 
   // List Networks
@@ -277,7 +279,7 @@ void SetupScreen::drawWiFiScan() {
     String ssid = wifiManager.getSSID(i);
     if (ssid.length() > 18)
       ssid = ssid.substring(0, 15) + "...";
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
+    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(ML_DATUM);
     tft->drawString(ssid, 30, y + 15);
     int rssi = wifiManager.getRSSI(i);
@@ -288,7 +290,7 @@ void SetupScreen::drawWiFiScan() {
   // Custom Manual Entry Option
   int visibleCount = (_scanCount > limit) ? limit : _scanCount;
   int y = startY + visibleCount * itemH;
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
   tft->setTextDatum(MC_DATUM);
   tft->drawString("Manually Enter SSID", SCREEN_WIDTH / 2, y + 15);
 }
@@ -298,11 +300,11 @@ void SetupScreen::drawWiFiSetup(bool fullRedraw) {
   TFT_eSPI *tft = _ui->getTft();
 
   if (fullRedraw) {
-    tft->fillScreen(COLOR_BG);
+    tft->fillScreen(_ui->getBackgroundColor());
     // Header (Small Font 1)
     tft->setTextFont(1);
     tft->setTextSize(1);
-    tft->setTextColor(COLOR_PRIMARY, COLOR_BG);
+    tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
     tft->setTextDatum(TC_DATUM);
     tft->drawString("ENTER WIFI PASSWORD", SCREEN_WIDTH / 2, 5);
 
@@ -448,10 +450,11 @@ void SetupScreen::handleWiFiTouch(int x, int y) {
       TFT_eSPI *tft = _ui->getTft();
 
       // Clear Main Area below Header (30px down)
-      tft->fillRect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30, COLOR_BG);
+      tft->fillRect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30,
+                    _ui->getBackgroundColor());
 
       // _ui->drawStatusBar(true); // Removed to prevent overlap
-      tft->setTextColor(TFT_WHITE, COLOR_BG);
+      tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
       tft->setTextDatum(MC_DATUM);
       tft->drawString("CONNECTING...", SCREEN_WIDTH / 2, 120);
 
@@ -459,14 +462,14 @@ void SetupScreen::handleWiFiTouch(int x, int y) {
           wifiManager.connect(_wifiSSID.c_str(), _wifiPassword.c_str());
 
       // Clear Status Area
-      tft->fillRect(0, 100, SCREEN_WIDTH, 50, COLOR_BG);
+      tft->fillRect(0, 100, SCREEN_WIDTH, 50, _ui->getBackgroundColor());
 
       if (connected) {
-        tft->setTextColor(TFT_GREEN, COLOR_BG);
+        tft->setTextColor(TFT_GREEN, _ui->getBackgroundColor());
         tft->drawString("CONNECTED!", SCREEN_WIDTH / 2, 120);
         delay(1500);
       } else {
-        tft->setTextColor(TFT_RED, COLOR_BG);
+        tft->setTextColor(TFT_RED, _ui->getBackgroundColor());
         tft->drawString("FAILED!", SCREEN_WIDTH / 2, 120);
         delay(1500);
       }

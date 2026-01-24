@@ -470,8 +470,6 @@ void HistoryScreen::drawGroups(int scrollOffset) {
 
     tft->drawString(_groups[i], 10, y + 8);
 
-    tft->drawString(_groups[i], 10, y + 8);
-
     count++;
   }
 
@@ -613,8 +611,6 @@ void HistoryScreen::drawList(int scrollOffset) {
     tft->drawString(dDisp, 45, y + 4, 2);
     tft->drawString(tRaw, 155, y + 4, 2);
 
-    tft->drawString(tRaw, 155, y + 4, 2);
-
     count++;
   }
 
@@ -727,30 +723,142 @@ void HistoryScreen::drawViewData() {
   }
   tft->drawString(title, SCREEN_WIDTH / 2, 25);
 
-  // Valid data check
-  if (_lastTapIdx < 0 || _lastTapIdx >= _historyList.size())
-    return;
-  // Note: _lastTapIdx here needs to track the ACTUAL selected session index
-  // from LIST mode. We should store the selected session index in a separate
-  // variable if _lastTapIdx is transient using tap logic. Let's assume
-  // _selectedIdx in MODE_LIST pointed to the filtered index, we need to map
-  // it. However, HistoryScreen::update currently maps visible index to actual
-  // list index. We'll fix this in update() by storing `_activeSessionIdx`.
+  // Retrieve Analysis
+  static SessionManager::SessionAnalysis analysis;
+  static String lastLoadedFile = "";
 
-  // Placeholder Content
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextFont(2);
-  tft->drawString("Page " + String(_viewPage + 1) + "/5", SCREEN_WIDTH / 2,
-                  100);
-  tft->drawString("Content Placeholder", SCREEN_WIDTH / 2, 130);
-
-  if (_viewPage == 4) {
-    tft->drawString("(Replay Animation)", SCREEN_WIDTH / 2, 160);
+  String currentFile = _historyList[_lastTapIdx].filename;
+  if (currentFile != lastLoadedFile) {
+    // Show Loading...
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString("Loading...", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+    analysis = sessionManager.analyzeSession(currentFile);
+    lastLoadedFile = currentFile;
+    // Clear Loading
+    tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
   }
 
-  // Navigation hint
-  tft->setTextSize(1);
-  tft->drawString("Tap OK for Next", SCREEN_WIDTH / 2, 220);
+  int startY = 50;
+
+  if (_viewPage == 0) {
+    // SUMMARY PAGE
+    // 4 Grid Box
+    int boxW = (SCREEN_WIDTH - 25) / 2;
+    int boxH = 50;
+    int gap = 5;
+
+    // Box 1: Total Time
+    tft->fillRoundRect(10, startY, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("TOTAL TIME", 15, startY + 5);
+    // Fmt
+    unsigned long tt = analysis.totalTime;
+    int ms = tt % 1000;
+    int s = (tt / 1000) % 60;
+    int m = (tt / 60000) % 60;
+    int h = (tt / 3600000);
+    char buf[16];
+    sprintf(buf, "%02d:%02d:%02d", h, m, s);
+    tft->setTextColor(TFT_WHITE, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(4);
+    tft->drawString(buf, 10 + boxW / 2, startY + 30);
+
+    // Box 2: Valid Laps (Count)
+    tft->fillRoundRect(15 + boxW, startY, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("VALID LAPS", 20 + boxW, startY + 5);
+    tft->setTextColor(TFT_SKYBLUE, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString(String(analysis.validLaps), 15 + boxW + boxW / 2,
+                    startY + 30);
+
+    // Row 2
+    int Y2 = startY + boxH + gap;
+
+    // Box 3: Distance
+    tft->fillRoundRect(10, Y2, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("DISTANCE (km)", 15, Y2 + 5);
+    tft->setTextColor(TFT_ORANGE, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawFloat(analysis.totalDistance, 2, 10 + boxW / 2, Y2 + 30);
+
+    // Box 4: Max Speed
+    tft->fillRoundRect(15 + boxW, Y2, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("MAX SPEED", 20 + boxW, Y2 + 5);
+    tft->setTextColor(TFT_RED, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawFloat(analysis.maxSpeed, 1, 15 + boxW + boxW / 2, Y2 + 30);
+
+    // Best Lap Highlight
+    int Y3 = Y2 + boxH + 10;
+    tft->drawRect(10, Y3, SCREEN_WIDTH - 20, 50, TFT_DARKGREY);
+    tft->setTextColor(TFT_GOLD, TFT_BLACK);
+    tft->setTextDatum(MC_DATUM);
+    if (analysis.bestLap > 0) {
+      unsigned long b = analysis.bestLap;
+      int bs = (b / 1000) % 60;
+      int bm = (b / 60000);
+      int bms = b % 1000;
+      sprintf(buf, "BEST: %d:%02d.%02d", bm, bs, bms / 10);
+      tft->drawString(buf, SCREEN_WIDTH / 2, Y3 + 25);
+    } else {
+      tft->drawString("NO LAP DATA", SCREEN_WIDTH / 2, Y3 + 25);
+    }
+
+  } else if (_viewPage == 1) {
+    // LAP LIST
+    // Simple scrollable list?
+    // For now, just show first 6 laps or "Coming Soon" for full scroll
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextColor(TFT_SILVER, TFT_BLACK);
+    tft->drawString("LAP TIMES:", 20, startY);
+
+    if (analysis.lapTimes.empty()) {
+      tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+      tft->drawString("No Laps Recorded", 20, startY + 30);
+    } else {
+      int y = startY + 25;
+      int count = 0;
+      for (unsigned long t : analysis.lapTimes) {
+        if (count > 5)
+          break; // Show max 6
+        int ms = t % 1000;
+        int s = (t / 1000) % 60;
+        int m = (t / 60000);
+        char buf[32];
+        sprintf(buf, "%d.  %d:%02d.%02d", count + 1, m, s, ms / 10);
+
+        // Highlight best?
+        if (t == analysis.bestLap)
+          tft->setTextColor(TFT_GREEN, TFT_BLACK);
+        else
+          tft->setTextColor(TFT_WHITE, TFT_BLACK);
+
+        tft->drawString(buf, 30, y);
+        y += 20;
+        count++;
+      }
+      if (analysis.lapTimes.size() > 6) {
+        tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft->drawString("... more laps ...", 30, y);
+      }
+    }
+  } else {
+    // Placeholders for Sector/Graphs
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft->drawString("Analysis Module", SCREEN_WIDTH / 2, 100);
+    tft->drawString("Under Construction", SCREEN_WIDTH / 2, 130);
+  }
 
   // Back Triangle
   tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);

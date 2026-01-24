@@ -18,20 +18,23 @@ void SynchronizeScreen::onShow() {
 
   // Static Draw (Background & Header)
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                            SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
 
-  // Header using standard font
+  // Header (Premium Style)
+  int headY = 20;
+  tft->drawFastHLine(0, headY, SCREEN_WIDTH, COLOR_SECONDARY);
+
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  tft->setTextColor(TFT_WHITE, COLOR_BG);
   tft->setTextDatum(TC_DATUM);
-  tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, 35);
+  tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, headY + 8);
 
   // Back Arrow
-  tft->setTextSize(2);
+  tft->setTextSize(1); // Standard arrow size
   tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  tft->setTextColor(TFT_WHITE, COLOR_BG);
   tft->drawString("<", 10, 25);
 
   drawScreen(true);
@@ -50,57 +53,84 @@ void SynchronizeScreen::update() {
 void SynchronizeScreen::drawScreen(bool fullRedraw) {
   TFT_eSPI *tft = _ui->getTft();
 
+  // Colors
+  uint16_t L_COLOR_BG = TFT_BLACK;
+  uint16_t L_COLOR_CARD = 0x18E3; // Charcoal
+  uint16_t L_COLOR_BTN = 0x10A2;  // Slate
+  uint16_t L_COLOR_TEXT = TFT_WHITE;
+  uint16_t L_COLOR_LABEL = TFT_SILVER;
+
   // Clear dynamic area (below header)
-  // Header ends approx y=40. Start clearing at 50.
-  tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, COLOR_BG);
+  // Header ends approx y=40-45. Start clearing at 50.
+  if (fullRedraw) {
+    tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, L_COLOR_BG);
+  }
 
-  // Ensure font is set
+  // --- STATUS CARD ---
+  int cardW = 280; // Widen slightly
+  int cardH = 100; // Compact height
+  int cardX = (SCREEN_WIDTH - cardW) / 2;
+  int cardY = 60;
+
+  tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, L_COLOR_CARD);
+  tft->drawRoundRect(cardX, cardY, cardW, cardH, 8, TFT_DARKGREY);
+
+  // Status Text
   tft->setFreeFont(&Org_01);
-
-  // Status Area
-  tft->setTextSize(1);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextSize(2); // Large for status
   tft->setTextDatum(MC_DATUM);
 
-  // Main Status
+  uint16_t statusColor = L_COLOR_TEXT;
   if (_isSyncing) {
-    tft->setTextColor(TFT_YELLOW, COLOR_BG);
+    statusColor = TFT_ORANGE;
   } else if (_lastSyncSuccess) {
-    tft->setTextColor(TFT_GREEN, COLOR_BG);
-  } else if (_statusMessage.indexOf("FAILED") != -1) {
-    tft->setTextColor(TFT_RED, COLOR_BG);
+    statusColor =
+        (_statusMessage.indexOf("PARTIAL") != -1) ? TFT_YELLOW : TFT_GREEN;
+  } else if (_statusMessage.indexOf("FAILED") != -1 ||
+             _statusMessage.indexOf("ERROR") != -1) {
+    statusColor = TFT_RED;
   }
-  tft->drawString(_statusMessage, SCREEN_WIDTH / 2, 80);
 
-  // Details
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
-  tft->drawString(_detailMessage, SCREEN_WIDTH / 2, 110);
+  tft->setTextColor(statusColor, L_COLOR_CARD);
+  tft->drawString(_statusMessage, SCREEN_WIDTH / 2, cardY + 25);
 
-  // Sync Button
+  // Detail Text
+  tft->setTextSize(1);
+  tft->setTextColor(L_COLOR_LABEL, L_COLOR_CARD);
+  tft->drawString(_detailMessage, SCREEN_WIDTH / 2, cardY + 50);
+
+  // Last Sync Info (Inside Card)
+  tft->setTextColor(TFT_DARKGREY, L_COLOR_CARD);
+  tft->setTextSize(1);
+  String lastSync = "Last: " + syncManager.getLastSyncTime();
+  tft->drawString(lastSync, SCREEN_WIDTH / 2, cardY + 75);
+
+  // --- SYNC BUTTON ---
+  int btnW = 180;
+  int btnH = 45;
+  int btnX = (SCREEN_WIDTH - btnW) / 2;
+  int btnY = 170;
+
   if (!_isSyncing) {
-    int btnW = 200;
-    int btnH = 50;
-    int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = 160;
+    tft->fillRoundRect(btnX, btnY, btnW, btnH, 8, L_COLOR_BTN);
+    tft->drawRoundRect(btnX, btnY, btnW, btnH, 8, TFT_WHITE);
 
-    uint16_t btnColor = COLOR_PRIMARY;
-    tft->fillRect(btnX, btnY, btnW, btnH, btnColor);
-    tft->drawRect(btnX, btnY, btnW, btnH, TFT_WHITE);
-
-    tft->setTextColor(COLOR_BG, btnColor);
+    tft->setTextColor(TFT_WHITE, L_COLOR_BTN);
+    tft->setTextSize(1); // Standard size for button
     tft->setTextDatum(MC_DATUM);
-    tft->drawString("START SYNC", SCREEN_WIDTH / 2, btnY + btnH / 2);
+    tft->drawString("START SYNC", SCREEN_WIDTH / 2, btnY + btnH / 2 - 2);
   } else {
-    // Show spinner placeholder or "Please Wait"
-    tft->setTextColor(TFT_BROWN, COLOR_BG); // Orange-ish
-    tft->drawString("PLEASE WAIT...", SCREEN_WIDTH / 2, 180);
+    // Syncing Indication (Disabled Look)
+    tft->fillRoundRect(btnX, btnY, btnW, btnH, 8,
+                       L_COLOR_BG); // Clear background first
+    tft->drawRoundRect(btnX, btnY, btnW, btnH, 8, TFT_DARKGREY);
+    tft->setTextColor(TFT_DARKGREY, L_COLOR_BG);
+    tft->setTextSize(1);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString("SYNCING...", SCREEN_WIDTH / 2, btnY + btnH / 2 - 2);
   }
 
-  // Footer info
-  tft->setTextColor(TFT_DARKGREY, COLOR_BG);
-  tft->setTextDatum(BC_DATUM);
-  String lastSync = "Last Sync: " + syncManager.getLastSyncTime();
-  tft->drawString(lastSync, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 10);
+  // Footer info removed (Moved to Status Card)
 }
 
 void SynchronizeScreen::handleTouch(int x, int y) {
@@ -116,8 +146,9 @@ void SynchronizeScreen::handleTouch(int x, int y) {
     return;
   }
 
-  // Sync Button Area (approx)
-  if (!_isSyncing && y >= 160 && y <= 210) {
+  // Sync Button Area (Bottom Position)
+  // BtnY = 170, BtnH = 45 -> Touch Y: 160 to 220 approx
+  if (!_isSyncing && y >= 160 && y <= 220) {
     _isSyncing = true;
     _statusMessage = "CONNECTING...";
     _detailMessage = "Checking WiFi...";
