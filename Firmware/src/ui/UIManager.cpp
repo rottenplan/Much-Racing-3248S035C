@@ -298,7 +298,8 @@ void UIManager::switchScreen(ScreenType type) {
     break;
   case SCREEN_GNSS_LOG:
     _currentScreen = _gnssLogScreen;
-    _screenTitle = "GNSS LOG";
+    _screenTitle =
+        ""; // Empty to show Time, avoids overlap with "GPS LOG" header
     break;
   }
 

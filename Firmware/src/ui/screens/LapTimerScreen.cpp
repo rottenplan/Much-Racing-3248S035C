@@ -440,9 +440,10 @@ void LapTimerScreen::update() {
 
       // 3. Track Selection (Open Popup)
       int startY = 60;
-      int itemH = 30;
+      int itemH = 45;
+      int gap = 8;
       if (p.y > startY) {
-        int idx = (p.y - startY) / itemH;
+        int idx = (p.y - startY) / (itemH + gap);
         if (idx >= 0 && idx < _tracks.size()) {
           _selectedTrackIdx = idx;
           _state = STATE_TRACK_MENU;
@@ -528,14 +529,13 @@ void LapTimerScreen::update() {
     }
   } else if (_state == STATE_TRACK_DETAILS) {
     if (touched) {
-      // Back Button logic in Details screen
-      if (p.x < 60 && p.y < 60) {
-        if (millis() - _lastTouchTime < 200)
-          return;
-        _lastTouchTime = millis();
+      if (millis() - _lastTouchTime < 200)
+        return;
+      _lastTouchTime = millis();
 
+      // 1. Back Button (Top Left)
+      if (p.x < 60 && p.y < 60) {
         if (millis() - _lastBackTapTime < 500) {
-          // Back from details -> List (not Menu)
           _state = STATE_TRACK_LIST;
           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                   SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
@@ -548,27 +548,34 @@ void LapTimerScreen::update() {
         return;
       }
 
-      // Select button in details screen?
-      // Reuse existing logic or simplify since user moved options to Popup
-      // User said "Select & Edit: View...and reposition".
-      // So Details screen likely needs "Start/Finish" edit mode.
-      // For now, I leave the old Details screen logic but only reachable via
-      // "Select & Edit".
+      // 2. Select Button
+      // x = (W - 140)/2, y=190, w=140, h=35
+      int btnW = 140;
+      int btnX = (SCREEN_WIDTH - btnW) / 2;
+      int btnY = 190;
+      int btnH = 35;
 
-      // Let's allow the "left menu" in Details to still function or remove it?
-      // "Select" button there is redundant but harmless.
-      // I'll leave the existing `else if (_state == STATE_TRACK_DETAILS)` block
-      // structure but I need to make sure I didn't overwrite it with my
-      // replacement. Ah, I am replacing `STATE_TRACK_LIST` and
-      // `STATE_TRACK_DETAILS` input logic here.
+      if (p.x > btnX && p.x < btnX + btnW && p.y > btnY - 10 &&
+          p.y < btnY + btnH + 10) {
+        // SELECT ACTION
+        Track &t = _tracks[_selectedTrackIdx];
+        _currentTrackName = t.name;
+        _selectedConfigIdx = 0;
 
-      // Wait, `STATE_TRACK_DETAILS` logic below needs to be preserved or
-      // re-added. The snippet I'm replacing covers `STATE_TRACK_LIST` and
-      // `STATE_TRACK_DETAILS` (from previous edits).
+        // Load Track Path logic
+        if (t.pathFile.length() > 0) {
+          loadTrackPath(t.pathFile);
+        } else {
+          _recordedPoints.clear();
+        }
 
-      // I need to include the `STATE_TRACK_DETAILS` logic in my replacement
-      // content if I'm overwriting it. Yes, I will keep the simple Back logic
-      // for Details for now.
+        _state = STATE_SUMMARY;
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                _ui->getBackgroundColor());
+        drawSummary();
+        _ui->drawStatusBar();
+      }
     }
   } else if (_state == STATE_SUMMARY) {
 
@@ -939,44 +946,94 @@ void LapTimerScreen::drawSearching() {
 void LapTimerScreen::drawTrackList() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Header
-  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Clear Screen (Below StatusBar)
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
 
-  // Title "Nearby Tracks" (Left)
-  tft->setTextDatum(TL_DATUM);
+  // --- 1. HEADER ---
+  int headY = 20; // Y-coord for line
+  tft->drawFastHLine(0, headY, SCREEN_WIDTH, COLOR_SECONDARY);
+
+  // Title "Nearby Tracks" (Moved to Center for consistency)
+  tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
-  tft->drawString("Nearby Tracks", 10, 25);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK); // Global White Text
+  tft->drawString("SELECT TRACK", SCREEN_WIDTH / 2, headY + 8);
 
-  // "New Track" Button (Top Right)
-  // Box: x=200, y=22, w=100, h=25 (Approx)
-  int btnX = SCREEN_WIDTH - 110;
-  int btnY = 22;
-  int btnW = 100;
-  int btnH = 20;
-  tft->drawRoundRect(btnX, btnY, btnW, btnH, 5, TFT_WHITE);
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextSize(1);
-  tft->drawString("New Track", btnX + btnW / 2, btnY + btnH / 2 + 2);
-
-  // List
-  int startY = 60;
-  int itemH = 30;
-
+  // Back Button (<) Left
   tft->setTextDatum(TL_DATUM);
   tft->setTextSize(1);
+  tft->drawString("<", 10, 25);
+
+  // "New Track" Button (Top Right) -> "+" Icon style
+  int btnX = SCREEN_WIDTH - 40;
+  int btnY = 25;
+  // Draw Circle Button
+  // tft->fillCircle(btnX + 10, btnY + 10, 15, 0x10A2); // Slate Circle
+  // tft->drawCircle(btnX + 10, btnY + 10, 15, TFT_WHITE);
+  // tft->drawString("+", btnX + 5, btnY + 2);
+
+  // Or "NEW" Text Button
+  int newW = 50;
+  int newH = 20;
+  int newX = SCREEN_WIDTH - newW - 10;
+  tft->fillRoundRect(newX, 25, newW, newH, 4, 0x10A2);
+  tft->drawRoundRect(newX, 25, newW, newH, 4, TFT_WHITE);
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextSize(1);
+  tft->drawString("NEW", newX + newW / 2, 25 + newH / 2 + 1);
+
+  // --- 2. LIST ---
+  int startY = 60;
+  int itemH = 45; // Taller for card style
+  int itemW = SCREEN_WIDTH - 20;
+  int itemX = 10;
+  int gap = 8;
+
+  tft->setTextDatum(TL_DATUM);
 
   if (_tracks.empty()) {
-    tft->drawString("No tracks found.", 20, 80);
+    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString("No tracks found.", SCREEN_WIDTH / 2, 100);
+    tft->drawString("Enable GPS or Create New.", SCREEN_WIDTH / 2, 125);
     _ui->drawStatusBar();
     return;
   }
 
+  // Draw Items
   for (size_t i = 0; i < _tracks.size(); i++) {
-    int y = startY + (i * itemH);
-    tft->setTextColor(COLOR_TEXT, COLOR_BG);
-    tft->drawString(_tracks[i].name, 20, y);
+    int y = startY + (i * (itemH + gap));
+    if (y + itemH > SCREEN_HEIGHT)
+      break; // Pagination limit
+
+    // Card BG
+    tft->fillRoundRect(itemX, y, itemW, itemH, 6, 0x18E3); // Charcoal
+    tft->drawRoundRect(itemX, y, itemW, itemH, 6, TFT_DARKGREY);
+
+    // Track Icon (Left)
+    // tft->fillCircle(itemX + 20, y + itemH / 2, 10, TFT_BLACK);
+    // Draw Flag or Dot
+    tft->fillCircle(itemX + 20, y + itemH / 2, 4,
+                    _tracks[i].isCustom ? TFT_CYAN : TFT_GOLD);
+
+    // Name
+    tft->setTextColor(TFT_WHITE, 0x18E3);
+    tft->setTextFont(2); // Mid size
+    tft->setTextDatum(ML_DATUM);
+    tft->drawString(_tracks[i].name, itemX + 40, y + itemH / 2 - 5);
+
+    // Detail (Lat/Lon or Configs)
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextFont(1);
+    char buf[32];
+    sprintf(buf, "%d Configs", _tracks[i].configs.size());
+    tft->drawString(buf, itemX + 40, y + itemH / 2 + 10);
+
+    // Arrow Right
+    tft->setTextColor(TFT_DARKGREY, 0x18E3);
+    tft->drawString(">", itemX + itemW - 15, y + itemH / 2);
   }
 
   _ui->drawStatusBar();
@@ -1017,78 +1074,95 @@ void LapTimerScreen::drawTrackDetails() {
     return;
   Track &t = _tracks[_selectedTrackIdx];
 
-  // Header
-  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Title
+  tft->setTextDatum(TC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->drawString("TRACK DETAILS", SCREEN_WIDTH / 2, 28);
 
   // Back Arrow
   tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->setTextColor(COLOR_TEXT, COLOR_BG);
+  tft->setTextSize(1);
   tft->drawString("<", 10, 25);
 
-  // Menu Options (Left Side List)
-  const char *options[] = {"Select", "Select & Edit", "Invert",
-                           "Reinit best Lap", "Remove"};
-  int menuY = 60; // Moved up slightly
+  // --- LAYOUT ---
+  // Style: Big Card for Map (Top), Info Card (Bottom Left), Action Buttons
+  // (Bottom Right) Actually, standard layout: Map Card: Full width or large
+  // square? Let's do: Map (Left), Info (Right) -> then Buttons Bottom. Map:
+  // x=10, y=55, w=145, h=120 Info: x=165, y=55, w=145, h=120 Buttons: y=185
 
-  tft->setTextSize(1);
-  for (int i = 0; i < 5; i++) {
-    if (i == 0) { // Draw cursor box for 'Select'
-      tft->fillRect(5, menuY + (i * 25) - 2, 110, 20, TFT_WHITE);
-      tft->setTextColor(TFT_BLACK, TFT_WHITE);
-    } else {
-      tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    }
-    tft->drawString(options[i], 10, menuY + (i * 25));
-  }
+  int mapX = 10;
+  int mapY = 55;
+  int mapW = 145;
+  int mapH = 120;
 
-  // --- RIGHT PANEL INFO ---
-  int panelX = 130;
-  int panelY = 50;
+  int infoX = 165;
+  int infoY = 55;
+  int infoW = 145;
+  int infoH = 120;
 
-  // 1. Map (Left side of Info Panel)
-  // Draw a scaled Mock Map relative to panelX
-  int mapX = panelX;
-  int mapY = panelY + 10;
+  // 1. MAP CARD
+  tft->fillRoundRect(mapX, mapY, mapW, mapH, 8, 0x18E3); // Charcoal
+  tft->drawRoundRect(mapX, mapY, mapW, mapH, 8, TFT_DARKGREY);
 
-  tft->drawLine(mapX, mapY, mapX + 40, mapY + 10, TFT_WHITE);
-  tft->drawLine(mapX + 40, mapY + 10, mapX + 30, mapY + 50, TFT_WHITE);
-  tft->drawLine(mapX + 30, mapY + 50, mapX - 10, mapY + 40, TFT_WHITE);
-  tft->drawLine(mapX - 10, mapY + 40, mapX, mapY, TFT_WHITE);
-  // Add a "Start/Finish" dot
-  tft->fillCircle(mapX + 15, mapY + 5, 3, TFT_RED);
+  // Draw Map Placeholder or Actual if points exist
+  // We can reuse drawTrackMap from LapTimer but we need to pass bounds
+  // drawTrackMap(mapX, mapY, mapW, mapH); -> This function relies on
+  // _recordedPoints being loaded! In update(), when selecting "Select & Edit",
+  // we did NOT load points yet? CHECK update(): "Select & Edit" -> _state =
+  // STATE_TRACK_DETAILS. No loading points. We should load points roughly if
+  // available? Or just draw the simplistic mock. For now, simple mock or text
+  // "Map Preview".
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->setTextDatum(MC_DATUM);
+  tft->drawString("Map Preview", mapX + mapW / 2, mapY + mapH / 2);
 
-  // 2. Info Text (Right side of Info Panel)
-  int infoX = panelX + 55;
-  int infoY = panelY;
+  // 2. INFO CARD
+  tft->fillRoundRect(infoX, infoY, infoW, infoH, 8, 0x18E3);
+  tft->drawRoundRect(infoX, infoY, infoW, infoH, 8, TFT_DARKGREY);
 
-  // Track Name Box
-  tft->setTextSize(1);
-  int nameW = tft->textWidth(t.name) + 40; // Extra padding
-  tft->fillRect(infoX, infoY, nameW < 120 ? 120 : nameW, 18,
-                TFT_WHITE);                // White Box
-  tft->setTextColor(TFT_BLACK, TFT_WHITE); // Black Text
-  tft->drawString(t.name, infoX + 5, infoY + 3);
+  tft->setTextDatum(TL_DATUM);
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->drawString("NAME:", infoX + 10, infoY + 10);
 
-  // Location / Subtitle
-  tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  tft->drawString("Location: Earth", infoX, infoY + 25);
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->setTextFont(2);
+  // Wrap text if needed?
+  tft->drawString(t.name, infoX + 10, infoY + 25);
 
-  // Length
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextSize(2);
-  tft->drawString("555.1m", infoX, infoY + 40);
+  tft->setTextFont(1);
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->drawString("BEST LAP:", infoX + 10, infoY + 55);
 
-  // Best Lap Label
-  tft->setTextSize(1);
-  tft->setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  tft->drawString("Best LAP:", infoX, infoY + 65);
+  tft->setTextColor(TFT_GOLD, 0x18E3);
+  tft->setTextFont(2);
+  tft->drawString("01:10.5", infoX + 10, infoY + 70); // Placeholder
 
-  // Best Lap Time
-  tft->setTextSize(2);
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->drawString("01:10.501", infoX, infoY + 80);
+  tft->setTextFont(1);
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  char confBuf[32];
+  sprintf(confBuf, "Configs: %d", t.configs.size());
+  tft->drawString(confBuf, infoX + 10, infoY + 95);
+
+  // 3. ACTION BUTTONS
+  int btnY = 190;
+  int btnH = 35;
+  int btnW = 140;
+
+  // SELECT Button (Green/Slate) -> centered? Or split?
+  // Let's put SELECT center-right, BACK center-left?
+  // User asked for "Select & Edit". Maybe "EDIT" button?
+  // We'll implemented "SELECT" for now.
+
+  int selX = (SCREEN_WIDTH - btnW) / 2;
+  tft->fillRoundRect(selX, btnY, btnW, btnH, 6, 0x05E0); // Greenish
+  tft->drawRoundRect(selX, btnY, btnW, btnH, 6, TFT_WHITE);
+
+  tft->setTextColor(TFT_WHITE, 0x05E0);
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextFont(2);
+  tft->drawString("SELECT TRACK", selX + btnW / 2, btnY + btnH / 2 + 1);
 
   _ui->drawStatusBar();
 }

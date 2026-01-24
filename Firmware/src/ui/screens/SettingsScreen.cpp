@@ -96,8 +96,6 @@ void SettingsScreen::loadSettings() {
     // GPS Status Sub-menu REMOVED
     // _settings.push_back({"GPS STATUS", TYPE_ACTION});
     // _settings.push_back({"GNSS LOG", TYPE_ACTION}); // Moved to GPS Status
-    // Double Tap
-    _settings.push_back({"GNSS FINE TUNING", TYPE_ACTION});
 
     // Double Tap
     _settings.push_back({"GNSS FINE TUNING", TYPE_ACTION});

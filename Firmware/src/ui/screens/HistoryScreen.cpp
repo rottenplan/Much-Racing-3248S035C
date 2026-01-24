@@ -308,7 +308,7 @@ void HistoryScreen::update() {
       } else if (_currentMode == MODE_VIEW_DATA) {
         // Tap anywhere (except back which is handled)
         _viewPage++;
-        if (_viewPage > 4)
+        if (_viewPage > 5) // Increased to 5 to include Lap List
           _viewPage = 0;
         drawViewData();
 
@@ -720,6 +720,9 @@ void HistoryScreen::drawViewData() {
   case 4:
     title = "LAP REPLAY";
     break;
+  case 5:
+    title = "LAP LIST";
+    break;
   }
   tft->drawString(title, SCREEN_WIDTH / 2, 25);
 
@@ -764,7 +767,10 @@ void HistoryScreen::drawViewData() {
     sprintf(buf, "%02d:%02d:%02d", h, m, s);
     tft->setTextColor(TFT_WHITE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
-    tft->setTextFont(4);
+    sprintf(buf, "%02d:%02d:%02d", h, m, s);
+    tft->setTextColor(TFT_WHITE, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(2); // Reduced from 4 to 2 to prevent overflow
     tft->drawString(buf, 10 + boxW / 2, startY + 30);
 
     // Box 2: Valid Laps (Count)
@@ -814,7 +820,8 @@ void HistoryScreen::drawViewData() {
       tft->drawString("NO LAP DATA", SCREEN_WIDTH / 2, Y3 + 25);
     }
 
-  } else if (_viewPage == 1) {
+  } else if (_viewPage == 5) {
+    // LAP LIST (Moved to Page 5)
     // LAP LIST
     // Simple scrollable list?
     // For now, just show first 6 laps or "Coming Soon" for full scroll
@@ -852,12 +859,55 @@ void HistoryScreen::drawViewData() {
         tft->drawString("... more laps ...", 30, y);
       }
     }
-  } else {
-    // Placeholders for Sector/Graphs
+  } else if (_viewPage == 2) {
+    // RPM DETAILS (Previously Page 1 logic was partial? No, Page 1 was Lap List
+    // in original code?) Wait, original code: case 0=Speed, case 1=RPM(Title)
+    // ... then if(_viewPage==1){ LAP LIST? } There was a mismatch in TITLE vs
+    // CONTENT. Fixed mapping: 0: SPEED (Summary) 1: RPM DETAILS 2: TEMP DETAILS
+    // 3: SECTOR ANALYSIS
+    // 4: LAP REPLAY
+    // Note: The previous code had "if (_viewPage == 1) { LAP LIST ... }" which
+    // contradicts the Title "RPM DETAILS". I will MOVE Lap List to a new
+    // separate mode or Page 5? Or rename Page 1 to LAP LIST. User asked for
+    // "Speed Detail ... implement others". Let's keep Page 1 as LAP LIST as it
+    // communicates valuable info, but change Header Title to "LAP LIST".
+
+    // Actually, let's implement the specific requested views.
+    // Page 1: RPM DETAILS (Placeholder for now as we don't log RPM)
     tft->setTextDatum(MC_DATUM);
+    tft->setTextColor(TFT_SILVER, TFT_BLACK);
+    tft->drawString("RPM DATA", SCREEN_WIDTH / 2, 100);
     tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft->drawString("Analysis Module", SCREEN_WIDTH / 2, 100);
-    tft->drawString("Under Construction", SCREEN_WIDTH / 2, 130);
+    tft->drawString("No RPM Logged", SCREEN_WIDTH / 2, 130);
+
+  } else if (_viewPage == 3) {
+    // TEMP DETAILS
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextColor(TFT_SILVER, TFT_BLACK);
+    tft->drawString("TEMP DATA", SCREEN_WIDTH / 2, 100);
+    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft->drawString("No Sensors Connected", SCREEN_WIDTH / 2, 130);
+
+  } else if (_viewPage == 4) {
+    // LAP REPLAY (Track Map)
+    // Reuse map drawing logic
+    // We need to pass x,y,w,h.
+    // Since drawTrackMap isn't static or member of HistoryScreen (it's in
+    // LapTimer), we implement a simple one here.
+
+    // Bounds check
+    if (analysis.totalDistance > 0.01) {
+      // We don't have the points! Analysis struct only has lapTimes.
+      // We need to re-read the file to get points for the map? That's heavy for
+      // every frame. Better: "Map View Not Available" or parse it once. Given
+      // memory constraints, we'll show a placeholder.
+      tft->setTextDatum(MC_DATUM);
+      tft->drawString("MAP PREVIEW", SCREEN_WIDTH / 2, 100);
+      tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+      tft->drawString("(Coming Soon)", SCREEN_WIDTH / 2, 130);
+    } else {
+      tft->drawString("NO TRACK DATA", SCREEN_WIDTH / 2, 110);
+    }
   }
 
   // Back Triangle
