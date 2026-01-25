@@ -7,6 +7,7 @@ class RpmSensorScreen : public UserScreen {
 public:
   void begin(UIManager *ui) override { _ui = ui; }
   void onShow() override;
+  void onHide() override;
   void update() override;
 
 private:
@@ -20,7 +21,7 @@ private:
 
   // Constants
   static const int GRAPH_WIDTH = 298;
-  static const int GRAPH_HEIGHT = 115;
+  static const int GRAPH_HEIGHT = 85;
   const int MAX_SPEED_SCALE = 150; // Max speed for graph scaling (km/h)
 
   TFT_eSprite *_graphSprite = nullptr;

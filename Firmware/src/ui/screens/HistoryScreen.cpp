@@ -308,7 +308,7 @@ void HistoryScreen::update() {
       } else if (_currentMode == MODE_VIEW_DATA) {
         // Tap anywhere (except back which is handled)
         _viewPage++;
-        if (_viewPage > 5) // Increased to 5 to include Lap List
+        if (_viewPage > 4) // Cycle through 5 pages (0-4)
           _viewPage = 0;
         drawViewData();
 
@@ -605,11 +605,22 @@ void HistoryScreen::drawList(int scrollOffset) {
     // X Positions
     // ID: 5
     // Date: 40
-    // Time: 140
+    // Time/Result: 140
 
     tft->drawString(bufID, 5, y + 4, 2); // Font 2
     tft->drawString(dDisp, 45, y + 4, 2);
-    tft->drawString(tRaw, 155, y + 4, 2);
+
+    if (_selectedType == "DRAG") {
+      // Show Result Time (e.g. 4.50s)
+      float res = _historyList[i].bestLap / 1000.0;
+      String resStr = String(res, 2) + "s";
+      tft->setTextColor(TFT_ORANGE, TFT_BLACK);
+      tft->drawString(resStr, 155, y + 4, 2);
+    } else {
+      // Show Time of Day
+      tft->setTextColor(TFT_WHITE, TFT_BLACK);
+      tft->drawString(tRaw, 155, y + 4, 2);
+    }
 
     count++;
   }
@@ -704,25 +715,29 @@ void HistoryScreen::drawViewData() {
   tft->setTextSize(1);
 
   String title = "";
-  switch (_viewPage) {
-  case 0:
-    title = "SPEED DETAILS";
-    break;
-  case 1:
-    title = "RPM DETAILS";
-    break;
-  case 2:
-    title = "TEMP DETAILS";
-    break;
-  case 3:
-    title = "SECTOR ANALYSIS";
-    break;
-  case 4:
-    title = "LAP REPLAY";
-    break;
-  case 5:
-    title = "LAP LIST";
-    break;
+  // Check Type
+  bool isDrag = (_historyList[_lastTapIdx].type == "DRAG");
+
+  if (isDrag) {
+    title = "DRAG SUMMARY"; // Only 1 page for now?
+  } else {
+    switch (_viewPage) {
+    case 0:
+      title = "SESSION SUMMARY";
+      break;
+    case 1:
+      title = "LAP LIST";
+      break;
+    case 2:
+      title = "SECTOR ANALYSIS";
+      break;
+    case 3:
+      title = "LAP REPLAY";
+      break;
+    case 4:
+      title = "RPM & TEMP";
+      break;
+    }
   }
   tft->drawString(title, SCREEN_WIDTH / 2, 25);
 
@@ -744,6 +759,67 @@ void HistoryScreen::drawViewData() {
   }
 
   int startY = 50;
+
+  if (isDrag) {
+    // DRAG DISPLAY
+    // Use Grid 4 boxes for Splits
+    int boxW = (SCREEN_WIDTH - 25) / 2;
+    int boxH = 50;
+    int gap = 5;
+
+    // 0-60
+    tft->fillRoundRect(10, startY, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("0-60 KPH", 15, startY + 5);
+    tft->setTextColor(TFT_WHITE, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(4);
+    tft->drawString(analysis.time0to60 > 0
+                        ? String(analysis.time0to60 / 1000.0, 2) + "s"
+                        : "--",
+                    10 + boxW / 2, startY + 30);
+
+    // 0-100
+    tft->fillRoundRect(15 + boxW, startY, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("0-100 KPH", 20 + boxW, startY + 5);
+    tft->setTextColor(TFT_ORANGE, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString(analysis.time0to100 > 0
+                        ? String(analysis.time0to100 / 1000.0, 2) + "s"
+                        : "--",
+                    15 + boxW + boxW / 2, startY + 30);
+
+    int Y2 = startY + boxH + gap;
+
+    // 100-200
+    tft->fillRoundRect(10, Y2, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("100-200 KPH", 15, Y2 + 5);
+    tft->setTextColor(TFT_CYAN, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString(analysis.time100to200 > 0
+                        ? String(analysis.time100to200 / 1000.0, 2) + "s"
+                        : "--",
+                    10 + boxW / 2, Y2 + 30);
+
+    // 402m (1/4 Mile)
+    tft->fillRoundRect(15 + boxW, Y2, boxW, boxH, 5, 0x18E3);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TL_DATUM);
+    tft->drawString("402m (1/4)", 20 + boxW, Y2 + 5);
+    tft->setTextColor(TFT_GREEN, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString(analysis.time400m > 0
+                        ? String(analysis.time400m / 1000.0, 2) + "s"
+                        : "--",
+                    15 + boxW + boxW / 2, Y2 + 30);
+
+    return; // Only 1 Page for now
+  }
 
   if (_viewPage == 0) {
     // SUMMARY PAGE
@@ -780,6 +856,7 @@ void HistoryScreen::drawViewData() {
     tft->drawString("VALID LAPS", 20 + boxW, startY + 5);
     tft->setTextColor(TFT_SKYBLUE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(4);
     tft->drawString(String(analysis.validLaps), 15 + boxW + boxW / 2,
                     startY + 30);
 
@@ -820,11 +897,8 @@ void HistoryScreen::drawViewData() {
       tft->drawString("NO LAP DATA", SCREEN_WIDTH / 2, Y3 + 25);
     }
 
-  } else if (_viewPage == 5) {
-    // LAP LIST (Moved to Page 5)
+  } else if (_viewPage == 1) {
     // LAP LIST
-    // Simple scrollable list?
-    // For now, just show first 6 laps or "Coming Soon" for full scroll
     tft->setTextDatum(TL_DATUM);
     tft->setTextColor(TFT_SILVER, TFT_BLACK);
     tft->drawString("LAP TIMES:", 20, startY);
@@ -844,70 +918,94 @@ void HistoryScreen::drawViewData() {
         char buf[32];
         sprintf(buf, "%d.  %d:%02d.%02d", count + 1, m, s, ms / 10);
 
-        // Highlight best?
         if (t == analysis.bestLap)
           tft->setTextColor(TFT_GREEN, TFT_BLACK);
         else
           tft->setTextColor(TFT_WHITE, TFT_BLACK);
 
-        tft->drawString(buf, 30, y);
-        y += 20;
+        tft->drawString(buf, 30, y, 2);
+        y += 22;
         count++;
-      }
-      if (analysis.lapTimes.size() > 6) {
-        tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
-        tft->drawString("... more laps ...", 30, y);
       }
     }
   } else if (_viewPage == 2) {
-    // RPM DETAILS (Previously Page 1 logic was partial? No, Page 1 was Lap List
-    // in original code?) Wait, original code: case 0=Speed, case 1=RPM(Title)
-    // ... then if(_viewPage==1){ LAP LIST? } There was a mismatch in TITLE vs
-    // CONTENT. Fixed mapping: 0: SPEED (Summary) 1: RPM DETAILS 2: TEMP DETAILS
-    // 3: SECTOR ANALYSIS
-    // 4: LAP REPLAY
-    // Note: The previous code had "if (_viewPage == 1) { LAP LIST ... }" which
-    // contradicts the Title "RPM DETAILS". I will MOVE Lap List to a new
-    // separate mode or Page 5? Or rename Page 1 to LAP LIST. User asked for
-    // "Speed Detail ... implement others". Let's keep Page 1 as LAP LIST as it
-    // communicates valuable info, but change Header Title to "LAP LIST".
-
-    // Actually, let's implement the specific requested views.
-    // Page 1: RPM DETAILS (Placeholder for now as we don't log RPM)
-    tft->setTextDatum(MC_DATUM);
+    // SECTOR ANALYSIS
+    tft->setTextDatum(TL_DATUM);
     tft->setTextColor(TFT_SILVER, TFT_BLACK);
-    tft->drawString("RPM DATA", SCREEN_WIDTH / 2, 100);
-    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft->drawString("No RPM Logged", SCREEN_WIDTH / 2, 130);
+    tft->drawString("LAP  S1    S2    S3    TOTAL", 15, startY, 2);
+    tft->drawFastHLine(10, startY + 18, SCREEN_WIDTH - 20, TFT_DARKGREY);
 
-  } else if (_viewPage == 3) {
-    // TEMP DETAILS
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextColor(TFT_SILVER, TFT_BLACK);
-    tft->drawString("TEMP DATA", SCREEN_WIDTH / 2, 100);
-    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft->drawString("No Sensors Connected", SCREEN_WIDTH / 2, 130);
+    unsigned long bestS1 = 0, bestS2 = 0, bestS3 = 0;
+    for (unsigned long s : analysis.sector1)
+      if (bestS1 == 0 || s < bestS1)
+        bestS1 = s;
+    for (unsigned long s : analysis.sector2)
+      if (bestS2 == 0 || s < bestS2)
+        bestS2 = s;
+    for (unsigned long s : analysis.sector3)
+      if (bestS3 == 0 || s < bestS3)
+        bestS3 = s;
 
-  } else if (_viewPage == 4) {
-    // LAP REPLAY (Track Map)
-    // Reuse map drawing logic
-    // We need to pass x,y,w,h.
-    // Since drawTrackMap isn't static or member of HistoryScreen (it's in
-    // LapTimer), we implement a simple one here.
+    int y = startY + 25;
+    for (int i = 0; i < (int)analysis.lapTimes.size() && i < 5; i++) {
+      char buf[64];
+      unsigned long s1 =
+          (i < analysis.sector1.size()) ? analysis.sector1[i] : 0;
+      unsigned long s2 =
+          (i < analysis.sector2.size()) ? analysis.sector2[i] : 0;
+      unsigned long s3 =
+          (i < analysis.sector3.size()) ? analysis.sector3[i] : 0;
+      unsigned long tot = analysis.lapTimes[i];
 
-    // Bounds check
-    if (analysis.totalDistance > 0.01) {
-      // We don't have the points! Analysis struct only has lapTimes.
-      // We need to re-read the file to get points for the map? That's heavy for
-      // every frame. Better: "Map View Not Available" or parse it once. Given
-      // memory constraints, we'll show a placeholder.
-      tft->setTextDatum(MC_DATUM);
-      tft->drawString("MAP PREVIEW", SCREEN_WIDTH / 2, 100);
-      tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
-      tft->drawString("(Coming Soon)", SCREEN_WIDTH / 2, 130);
-    } else {
-      tft->drawString("NO TRACK DATA", SCREEN_WIDTH / 2, 110);
+      tft->setTextColor(TFT_WHITE, TFT_BLACK);
+      // Columnar display
+      sprintf(buf, "%d", i + 1);
+      tft->drawString(buf, 15, y, 2);
+
+      sprintf(buf, "%.1fs", s1 / 1000.0);
+      tft->setTextColor((s1 == bestS1 && s1 > 0) ? TFT_GREEN : TFT_WHITE,
+                        TFT_BLACK);
+      tft->drawString(buf, 55, y, 2);
+
+      sprintf(buf, "%.1fs", s2 / 1000.0);
+      tft->setTextColor((s2 == bestS2 && s2 > 0) ? TFT_GREEN : TFT_WHITE,
+                        TFT_BLACK);
+      tft->drawString(buf, 105, y, 2);
+
+      sprintf(buf, "%.1fs", s3 / 1000.0);
+      tft->setTextColor((s3 == bestS3 && s3 > 0) ? TFT_GREEN : TFT_WHITE,
+                        TFT_BLACK);
+      tft->drawString(buf, 155, y, 2);
+
+      sprintf(buf, "%d:%02d", (int)(tot / 60000), (int)((tot / 1000) % 60));
+      tft->setTextColor((tot == analysis.bestLap) ? TFT_GOLD : TFT_WHITE,
+                        TFT_BLACK);
+      tft->drawString(buf, 205, y, 2);
+
+      y += 20;
     }
+
+    // Theo Best
+    if (bestS1 > 0 && bestS2 > 0 && bestS3 > 0) {
+      unsigned long theo = bestS1 + bestS2 + bestS3;
+      char buf[32];
+      sprintf(buf, "THEO BEST: %d:%02d.%d", (int)(theo / 60000),
+              (int)((theo / 1000) % 60), (int)((theo % 1000) / 100));
+      tft->setTextColor(TFT_GOLD, TFT_BLACK);
+      tft->setTextDatum(BC_DATUM);
+      tft->drawString(buf, SCREEN_WIDTH / 2, 210, 2);
+    }
+  } else if (_viewPage == 3) {
+    // MAP PLACEHOLDER
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextColor(TFT_SILVER, TFT_BLACK);
+    tft->drawString("MAP VIEW", SCREEN_WIDTH / 2, 120, 4);
+    tft->drawString("(Not Available)", SCREEN_WIDTH / 2, 150, 2);
+  } else if (_viewPage == 4) {
+    // RPM/TEMP placeholder
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft->drawString("No RPM/Temp Logs", SCREEN_WIDTH / 2, 120, 2);
   }
 
   // Back Triangle

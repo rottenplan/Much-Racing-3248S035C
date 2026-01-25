@@ -25,6 +25,7 @@ extern WiFiManager wifiManager;
 // instruction #include "screens/AutoOffScreen.h"
 #include "screens/GnssLogScreen.h"
 #include "screens/RpmSensorScreen.h"
+#include "screens/WebServerScreen.h"
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _currentScreen = nullptr;
@@ -55,7 +56,9 @@ void UIManager::begin() {
   _speedometerScreen = new SpeedometerScreen();
   _gpsStatusScreen = new GpsStatusScreen();
   _synchronizeScreen = new SynchronizeScreen();
+  _synchronizeScreen = new SynchronizeScreen();
   _gnssLogScreen = new GnssLogScreen();
+  _webServerScreen = new WebServerScreen();
 
   // Mulai Layar
   _splashScreen->begin(this);
@@ -71,7 +74,9 @@ void UIManager::begin() {
   _speedometerScreen->begin(this);
   _gpsStatusScreen->begin(this);
   _synchronizeScreen->begin(this);
+  _synchronizeScreen->begin(this);
   _gnssLogScreen->begin(this);
+  _webServerScreen->begin(this);
 
   // Initialize Sleep Logic (Standardized with power_save)
   Preferences prefs;
@@ -219,7 +224,18 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
       p.y = 240;
 
     // Debug: Lacak koordinat sentuh
-    Serial.printf("Touch: Raw[%d,%d] -> Screen[%d,%d]\n", rawX, rawY, p.x, p.y);
+    // Serial.printf("Touch: Raw[%d,%d] -> Screen[%d,%d]\n", rawX, rawY, p.x,
+    // p.y);
+
+    // Global Debounce Logic (250ms)
+    unsigned long now = millis();
+    if (now - _lastTouchProcessedTime < 250) {
+      // Ignore this touch event
+      p.x = -1;
+      p.y = -1;
+      return p;
+    }
+    _lastTouchProcessedTime = now;
   }
   return p;
 }
@@ -235,7 +251,7 @@ void UIManager::switchScreen(ScreenType type) {
   gpsManager.setRawDataCallback(nullptr);
 
   if (_currentScreen) {
-    // Optional: _currentScreen->onHide(); if we had it
+    _currentScreen->onHide();
   }
   // Tambahkan penundaan 1 detik untuk transisi yang mulus (kecuali dari Splash)
   // Tidak ada penundaan untuk peralihan instan
@@ -292,14 +308,14 @@ void UIManager::switchScreen(ScreenType type) {
   case SCREEN_GPS_STATUS:
     _currentScreen = _gpsStatusScreen;
     break;
-  case SCREEN_SYNCHRONIZE:
-    _currentScreen = _synchronizeScreen;
-    _screenTitle = ""; // Let screen handle title or default
-    break;
   case SCREEN_GNSS_LOG:
     _currentScreen = _gnssLogScreen;
     _screenTitle =
         ""; // Empty to show Time, avoids overlap with "GPS LOG" header
+    break;
+  case SCREEN_WEB_SERVER:
+    _currentScreen = _webServerScreen;
+    _screenTitle = "OFFLINE SERVER";
     break;
   }
 

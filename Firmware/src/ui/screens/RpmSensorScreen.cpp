@@ -26,6 +26,7 @@
 extern GPSManager gpsManager;
 
 void RpmSensorScreen::onShow() {
+  gpsManager.setRpmEnabled(true); // Force Enable
   _currentRpm = 0;
   _maxRpm = 0;
   _currentLvl = 0;
@@ -53,25 +54,30 @@ void RpmSensorScreen::onShow() {
   // Create Sprite for Flicker-Free Graph
   if (_graphSprite == nullptr) {
     _graphSprite = new TFT_eSprite(_ui->getTft());
-    _graphSprite->createSprite(GRAPH_WIDTH, GRAPH_HEIGHT); // 280x125
+    _graphSprite->createSprite(GRAPH_WIDTH, GRAPH_HEIGHT); // 298x85
   }
 
   drawScreen();
+}
+
+void RpmSensorScreen::onHide() {
+  gpsManager.setRpmEnabled(false); // Disable Logic
+  if (_graphSprite != nullptr) {
+    _graphSprite->deleteSprite();
+    delete _graphSprite;
+    _graphSprite = nullptr;
+  }
+  // Manual Wipe to prevent ghosting
+  TFT_eSPI *tft = _ui->getTft();
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
 }
 
 void RpmSensorScreen::update() {
   // 1. Back Button
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1 && p.x < 60 && p.y < 60) {
-    static unsigned long lastBackTap = 0;
-    if (millis() - lastBackTap < 500) {
-      // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // Cleanup - NO,
-      // GLOBAL
-      _ui->switchScreen(SCREEN_MENU);
-      lastBackTap = 0;
-    } else {
-      lastBackTap = millis();
-    }
+    _ui->switchScreen(SCREEN_MENU); // Instant Switch (Single Tap)
     return;
   }
 
@@ -114,15 +120,23 @@ void RpmSensorScreen::drawScreen() {
   _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                             SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
 
-  // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
+  // --- STANDARD HEADER ---
+  int headerY = 20;
+  tft->drawFastHLine(0, headerY, SCREEN_WIDTH, _ui->getSecondaryColor());
+
+  // Title
+  tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
+  tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  tft->drawString("RPM SENSOR", SCREEN_WIDTH / 2, headerY + 8);
+
+  // Back Button (Blue Triangle) - Top Left (Standardized)
+  // Triangle pointing Left: (10, 35), (22, 29), (22, 41)
+  tft->fillTriangle(10, 35, 22, 29, 22, 41, TFT_BLUE);
 
   // --- INFO CARDS ---
-  int cardY = 30;
+  int cardY = 55; // Shifted down from 30
   int cardH = 60;
   int cardW = (SCREEN_WIDTH - 25) / 2;
 
@@ -150,7 +164,7 @@ void RpmSensorScreen::updateValues() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Card Calculations (Mirror drawScreen)
-  int cardY = 30;
+  int cardY = 55; // Shifted down
   int cardH = 60;
   int cardW = (SCREEN_WIDTH - 25) / 2;
 
@@ -197,9 +211,10 @@ void RpmSensorScreen::updateValues() {
 
 void RpmSensorScreen::drawGraphGrid() {
   TFT_eSPI *tft = _ui->getTft();
-  int gY = 100;          // Moved down slightly
-  int gH = GRAPH_HEIGHT; // 115
-  int gW = GRAPH_WIDTH;  // 280?
+  int gY = 125; // Shifted down from 100 -> 125
+  int gH = 85; // Reduced height (was 115, -25 shift = 90?, 215-125=90, save 5px
+               // margin -> 85)
+  int gW = GRAPH_WIDTH; // 280?
 
   // Draw Graph Container Frame
   tft->drawRoundRect(10, gY, SCREEN_WIDTH - 20, gH, 4, TFT_DARKGREY);
@@ -210,11 +225,7 @@ void RpmSensorScreen::drawGraphGrid() {
   tft->setTextColor(TFT_SILVER);
 
   // Left (RPM) - Inside frame? Or Outside? Sprite covers inside.
-  // Sprite is pushed to (11, 96)?
-  // Let's adjust sprite pos in drawGraphLine to match gY + 1
-  // Labels outside
-  // We can't really draw outside comfortably with 280 width (Screen 320). 20px
-  // margins.
+  // Sprite is pushed to (11, 96)? -> Now (11, 126)
 
   // Left Axis
   tft->setTextDatum(MR_DATUM);
@@ -258,39 +269,31 @@ void RpmSensorScreen::drawGraphLine() {
     int idx2 = (start + i + 1) % GRAPH_WIDTH;
 
     // RPM (Red)
-    int yR1 = sH - (int)((_graphHistory[idx1] / 100.0) * sH);
-    int yR2 = sH - (int)((_graphHistory[idx2] / 100.0) * sH);
+    int yR1 = (sH - 1) - (int)((_graphHistory[idx1] / 100.0) * (sH - 1));
+    int yR2 = (sH - 1) - (int)((_graphHistory[idx2] / 100.0) * (sH - 1));
 
     // Clamp
     if (yR1 < 0)
       yR1 = 0;
-    if (yR1 >= sH)
-      yR1 = sH - 1;
     if (yR2 < 0)
       yR2 = 0;
-    if (yR2 >= sH)
-      yR2 = sH - 1;
 
     _graphSprite->drawLine(i, yR1, i + 1, yR2, TFT_RED);
 
     // Speed (Cyan)
-    int yS1 = sH - (int)((_speedHistory[idx1] / 100.0) * sH);
-    int yS2 = sH - (int)((_speedHistory[idx2] / 100.0) * sH);
+    int yS1 = (sH - 1) - (int)((_speedHistory[idx1] / 100.0) * (sH - 1));
+    int yS2 = (sH - 1) - (int)((_speedHistory[idx2] / 100.0) * (sH - 1));
 
     if (yS1 < 0)
       yS1 = 0;
-    if (yS1 >= sH)
-      yS1 = sH - 1;
     if (yS2 < 0)
       yS2 = 0;
-    if (yS2 >= sH)
-      yS2 = sH - 1;
 
     _graphSprite->drawLine(i, yS1, i + 1, yS2, TFT_CYAN);
   }
 
   // 4. Push Sprite to Screen
-  // GraphY = 100. Border 10->SCREEN-10.
-  // Inner Rect Start = 11, 101.
-  _graphSprite->pushSprite(11, 101);
+  // GraphY = 125. Border 10->SCREEN-10.
+  // Inner Rect Start = 11, 126.
+  _graphSprite->pushSprite(11, 126);
 }

@@ -30,6 +30,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <div id="offline" class="offline-warning">No Internet - Map Tiles May Missing</div>
   <div style="background:#000; padding:5px; text-align:center; font-size:12px; color:#888;">
     Status: <span id="connection-status" style="color:yellow;">Connecting...</span>
+    <span style="margin-left:10px;"><a href="/sessions" style="color:#04DF00;text-decoration:none;border:1px solid #04DF00;padding:2px 5px;border-radius:4px;">Manage Sessions</a></span>
   </div>
   <div id="map"></div>
   <div id="stats">
@@ -173,6 +174,60 @@ const char UPDATE_HTML[] PROGMEM = R"rawliteral(
       };
       req.send(data);
     });
+  </script>
+</body>
+</html>
+)rawliteral";
+
+const char SESSIONS_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Manager</title>
+  <style>
+    body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 10px; }
+    h2 { color: #04DF00; }
+    ul { list-style: none; padding: 0; }
+    li { background: #222; margin: 10px auto; padding: 15px; border-radius: 8px; max-width: 400px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+    a.btn { background: #04DF00; color: #000; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 14px; }
+    .name { font-size: 16px; font-weight: bold; color: #fff; }
+    .size { font-size: 12px; color: #aaa; }
+    .empty { color: #555; margin-top: 50px; }
+  </style>
+</head>
+<body>
+  <h2>Session Files</h2>
+  <div id="list">
+    <p class="empty">Loading files...</p>
+  </div>
+  <p><a href="/" style="color:#888;">&larr; Back to Dashboard</a></p>
+
+  <script>
+    fetch('/api/sessions')
+      .then(res => res.json())
+      .then(files => {
+        const list = document.getElementById('list');
+        list.innerHTML = '';
+        if (files.length === 0) {
+          list.innerHTML = '<p class="empty">No sessions found on SD Card.</p>';
+          return;
+        }
+        files.forEach(f => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <div style="text-align:left;">
+              <div class="name">${f.name}</div>
+              <div class="size">${f.size}</div>
+            </div>
+            <a href="/download?file=${f.path}" class="btn">Download</a>
+          `;
+          list.appendChild(li);
+        });
+      })
+      .catch(e => {
+        document.getElementById('list').innerHTML = '<p class="empty" style="color:red;">Error loading list.</p>';
+      });
   </script>
 </body>
 </html>

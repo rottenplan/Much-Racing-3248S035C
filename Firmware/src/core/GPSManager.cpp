@@ -91,8 +91,8 @@ volatile unsigned long GPSManager::_lastPulseMicros = 0;
 
 void IRAM_ATTR GPSManager::onPulse() {
   unsigned long now = micros();
-  // Debounce: 2ms (2000us) -> Max 30.000 RPM (Reduces noise significantly)
-  if (now - _lastPulseMicros > 2000) {
+  // Debounce: 1ms (1000us) -> Max 60.000 RPM (Reduces noise significantly)
+  if (now - _lastPulseMicros > 1000) {
     _rpmPulses++;
     _lastPulseMicros = now;
   }
@@ -191,7 +191,8 @@ void GPSManager::update() {
 
         // NOISE FILTER: Ignore absurdly low RPM (Ghost readings)
         // Real engines don't run stable < 300 RPM.
-        if (rawRpm < 300) {
+        // Relaxing to 50 for testing availability
+        if (rawRpm < 50) {
           _currentRPM = 0;
         } else {
           _currentRPM = rawRpm;

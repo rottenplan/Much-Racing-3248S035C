@@ -21,13 +21,17 @@ enum ScreenType {
   SCREEN_SPEEDOMETER,
   SCREEN_GPS_STATUS,
   SCREEN_SYNCHRONIZE,
-  SCREEN_GNSS_LOG
+  SCREEN_GNSS_LOG,
+  SCREEN_WEB_SERVER
 };
+
+// ...
 
 class UserScreen {
 public:
   virtual void begin(UIManager *ui) = 0;
   virtual void onShow() = 0;
+  virtual void onHide() {}
   virtual void update() = 0;
 };
 
@@ -97,6 +101,7 @@ private:
   UserScreen *_gpsStatusScreen;
   UserScreen *_synchronizeScreen;
   UserScreen *_gnssLogScreen;
+  UserScreen *_webServerScreen;
 
   String _screenTitle; // Added title
 
@@ -118,6 +123,7 @@ private:
   // Wakeup
   unsigned long _lastTapTime;
   bool _wasTouched;
+  unsigned long _lastTouchProcessedTime; // Added for debounce
 };
 
 #endif

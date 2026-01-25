@@ -145,12 +145,10 @@ String SessionManager::loadHistoryIndex() {
     return "";
 
   String content = "";
+  content.reserve(indexFile.size());
   while (indexFile.available()) {
     content += (char)indexFile.read();
   }
-  indexFile.close();
-  indexFile.close();
-  indexFile.close();
   indexFile.close();
   return content;
 }
@@ -354,6 +352,21 @@ SessionManager::analyzeSession(String filename) {
         if (result.bestLap == 0 || t < result.bestLap)
           result.bestLap = t;
       }
+    } else if (line.startsWith("SECTOR,")) {
+      // SECTOR,Lap,Num,Time
+      int c1 = line.indexOf(',');
+      int c2 = line.indexOf(',', c1 + 1);
+      int c3 = line.indexOf(',', c2 + 1);
+      if (c3 > 0) {
+        int num = line.substring(c2 + 1, c3).toInt();
+        unsigned long t = line.substring(c3 + 1).toInt();
+        if (num == 1)
+          result.sector1.push_back(t);
+        else if (num == 2)
+          result.sector2.push_back(t);
+        else if (num == 3)
+          result.sector3.push_back(t);
+      }
     } else {
       // Data line
       if (!isdigit(line.charAt(0)) && line.charAt(0) != '-')
@@ -406,5 +419,216 @@ SessionManager::analyzeSession(String filename) {
       result.avgSpeed = result.totalDistance / hours;
   }
 
+  // --- Drag Analysis ---
+  // Re-read file or process captured logic?
+  // Since we processed it sequentially, we need to track drag starts.
+  // Assuming the file IS a drag run, it starts around 0 speed.
+  // We can re-scan or do it in the first pass.
+  // Let's simplified re-scan: Find 0-60, 0-100, etc.
+  // Constraint: GPS is 10Hz or 25Hz. Linear interpolation needed for accuracy.
+
+  result.time0to60 = 0;
+  result.time0to100 = 0;
+  result.time100to200 = 0;
+  result.time400m = 0;
+
+  f = SD.open(filename, FILE_READ);
+  if (!f)
+    return result;
+
+  unsigned long startTime = 0;
+  bool started = false;
+  double startLat = 0, startLon = 0;
+  unsigned long time100 = 0;
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0 || !isdigit(line.charAt(0)))
+      continue;
+
+    int p1 = line.indexOf(',');
+    int p2 = line.indexOf(',', p1 + 1);
+    int p3 = line.indexOf(',', p2 + 1);
+    int p4 = line.indexOf(',', p3 + 1);
+
+    if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0) {
+      unsigned long t = line.substring(0, p1).toInt();
+      double lat = line.substring(p1 + 1, p2).toDouble();
+      double lon = line.substring(p2 + 1, p3).toDouble();
+      float speed = line.substring(p3 + 1, p4).toFloat();
+
+      if (!started && speed > 1.0) {
+        started = true;
+        startTime = t;
+        startLat = lat;
+        startLon = lon;
+      }
+
+      if (started) {
+        unsigned long runTime = t - startTime;
+
+        // 0-60 km/h
+        if (result.time0to60 == 0 && speed >= 60.0) {
+          result.time0to60 = runTime;
+        }
+        // 0-100 km/h
+        if (result.time0to100 == 0 && speed >= 100.0) {
+          result.time0to100 = runTime;
+          time100 = t;
+        }
+        // 100-200 km/h
+        if (time100 > 0 && result.time100to200 == 0 && speed >= 200.0) {
+          result.time100to200 = t - time100;
+        }
+
+        // Distance (Cheap Calc) - Real implementation should accumulate
+        // strictly For simplicity, we assume straight line from start if drag?
+        // No, accumulate. We'll trust totalDistance Logic or re-calc distance
+        // from start. Let's use Haversine from START point for Drag Distance
+        float dLat = (lat - startLat) * DEG_TO_RAD;
+        float dLon = (lon - startLon) * DEG_TO_RAD;
+        float a = sin(dLat / 2) * sin(dLat / 2) +
+                  cos(startLat * DEG_TO_RAD) * cos(lat * DEG_TO_RAD) *
+                      sin(dLon / 2) * sin(dLon / 2);
+        float c = 2 * atan2(sqrt(a), sqrt(1 - a));
+        float distFromStart = 6371000 * c; // meters
+
+        if (result.time400m == 0 && distFromStart >= 402.336) { // 1/4 mile
+          result.time400m = runTime;
+        }
+      }
+    }
+  }
+  f.close();
   return result;
+}
+
+// --- Predictive Timing ---
+bool SessionManager::loadBestLapAsReference(String filename) {
+  referenceLap.clear();
+  File f = SD.open(filename, FILE_READ);
+  if (!f)
+    return false;
+
+  // Pass 1: Find Best Lap Index
+  int bestLapIdx = -1;
+  unsigned long bestTime = 0;
+  int currentLap = 0; // 0-indexed count
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.startsWith("LAP,")) {
+      // LAP,Count,Time
+      int lastComma = line.lastIndexOf(',');
+      if (lastComma > 0) {
+        unsigned long t = line.substring(lastComma + 1).toInt();
+        if (bestLapIdx == -1 || t < bestTime) {
+          bestTime = t;
+          bestLapIdx = currentLap;
+        }
+      }
+      currentLap++;
+    }
+  }
+
+  if (bestLapIdx == -1) {
+    f.close();
+    return false; // No laps found
+  }
+
+  // Pass 2: Extract Points for Best Lap
+  f.seek(0);
+  currentLap = 0;
+  bool collecting = (currentLap == bestLapIdx);
+
+  double prevLat = 0, prevLon = 0;
+  float totalDist = 0;
+  unsigned long lapStartTime = 0;
+  bool firstPoint = true;
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0)
+      continue;
+
+    if (line.startsWith("LAP,")) {
+      if (currentLap == bestLapIdx) {
+        break;
+      }
+      currentLap++;
+      collecting = (currentLap == bestLapIdx);
+      if (collecting) {
+        totalDist = 0;
+        firstPoint = true;
+        lapStartTime = 0;
+      }
+      continue;
+    }
+
+    if (collecting && isdigit(line.charAt(0))) {
+      int p1 = line.indexOf(',');
+      int p2 = line.indexOf(',', p1 + 1);
+      int p3 = line.indexOf(',', p2 + 1);
+      if (p1 > 0 && p2 > 0 && p3 > 0) {
+        unsigned long t = line.substring(0, p1).toInt();
+        double lat = line.substring(p1 + 1, p2).toDouble();
+        double lon = line.substring(p2 + 1, p3).toDouble();
+
+        if (firstPoint) {
+          lapStartTime = t;
+          prevLat = lat;
+          prevLon = lon;
+          totalDist = 0;
+          firstPoint = false;
+          referenceLap.push_back({0, 0});
+        } else {
+          float dLat = (lat - prevLat) * DEG_TO_RAD;
+          float dLon = (lon - prevLon) * DEG_TO_RAD;
+          float a = sin(dLat / 2) * sin(dLat / 2) +
+                    cos(prevLat * DEG_TO_RAD) * cos(lat * DEG_TO_RAD) *
+                        sin(dLon / 2) * sin(dLon / 2);
+          float c = 2 * atan2(sqrt(a), sqrt(1 - a));
+          float dist = 6371000 * c;
+
+          if (dist > 0.5) {
+            totalDist += dist;
+            unsigned long relTime = t - lapStartTime;
+            referenceLap.push_back({totalDist, (uint32_t)relTime});
+            prevLat = lat;
+            prevLon = lon;
+          }
+        }
+      }
+    }
+  }
+
+  f.close();
+  return !referenceLap.empty();
+}
+
+float SessionManager::getReferenceTime(float distance) {
+  if (referenceLap.empty())
+    return -1.0;
+
+  auto it = std::lower_bound(
+      referenceLap.begin(), referenceLap.end(), distance,
+      [](const ReferencePoint &a, float val) { return a.distance < val; });
+
+  if (it == referenceLap.begin())
+    return referenceLap[0].time;
+  if (it == referenceLap.end())
+    return referenceLap.back().time;
+
+  const ReferencePoint &p2 = *it;
+  const ReferencePoint &p1 = *(it - 1);
+
+  float distDelta = p2.distance - p1.distance;
+  if (distDelta < 0.1)
+    return p1.time;
+
+  float ratio = (distance - p1.distance) / distDelta;
+  return p1.time + (p2.time - p1.time) * ratio;
 }

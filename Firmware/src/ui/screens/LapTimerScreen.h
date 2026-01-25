@@ -2,6 +2,7 @@
 #define LAP_TIMER_SCREEN_H
 
 #include "../UIManager.h"
+#include "../components/KeyboardComponent.h"
 
 #include <Arduino.h>
 #include <vector>
@@ -37,6 +38,8 @@ enum LapTimerState {
   STATE_SUMMARY,
   STATE_RACING,
   STATE_RECORD_TRACK,
+  STATE_CREATE_TRACK,
+  STATE_RENAME_TRACK,
   STATE_NO_GPS
 };
 enum RaceMode { MODE_BEST, MODE_LAST, MODE_PREDICTIVE };
@@ -85,6 +88,8 @@ private:
   void drawSearching();         // New Searching Screen
   void drawRecordTrackStatic(); // Static part of Record UI
   void drawRecordTrack();       // Dynamic part of Record UI
+  void drawCreateTrack();       // Track Creator Wizard
+  void drawRenameTrack();       // Renaming UI
   void drawNoGPS();
 
   // Lap Data
@@ -111,6 +116,9 @@ private:
   void saveTrackToGPX(String filename); // New helper
 
   void checkFinishLine();
+  void saveNewTrack(String name, double sLat, double sLon, double fLat,
+                    double fLon);
+  void renameTrack(int index, String newName);
 
   // Race Screen Helpers
   unsigned long _maxRpmSession = 0;
@@ -128,6 +136,23 @@ private:
   RecordingState _lastRecordedStateRender = (RecordingState)-1;
   long _lastLastLapTimeRender = -1;
   long _lastBestLapTimeRender = -1;
+
+  // Predictive Timing
+  float _currentDelta = 0.0;
+  float _lastDeltaRender = -999.0;
+  double _currentLapDist = 0.0;
+  int _lastSector = 0; // 0=None, 1=S1, 2=S2
+  unsigned long _sectorStartTime = 0;
+
+  // Track Creator State
+  int _createStep; // 0=Start, 1=Finish, 2=Save
+  double _createStartLat, _createStartLon;
+  double _createFinishLat, _createFinishLon;
+
+  // Renaming State
+  KeyboardComponent _keyboard;
+  String _renamingName;
+  bool _keyboardShift = true;
 };
 
 #endif

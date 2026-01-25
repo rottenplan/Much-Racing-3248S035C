@@ -30,7 +30,17 @@ void WiFiManager::begin() {
   // OTA Update Routes
   _server.on("/update", HTTP_GET,
              std::bind(&WiFiManager::handleUpdateGet, this));
+
+  // Session Manager Routes
+  _server.on("/sessions", HTTP_GET,
+             std::bind(&WiFiManager::handleSessionsPage, this));
+  _server.on("/api/sessions", HTTP_GET,
+             std::bind(&WiFiManager::handleApiSessions, this));
+  _server.on("/download", HTTP_GET,
+             std::bind(&WiFiManager::handleDownload, this));
+
   _server.on(
+
       "/update", HTTP_POST,
       [this]() { _server.sendHeader("Connection", "close"); },
       [this]() { handleUpdateUpload(); });
@@ -129,14 +139,86 @@ void WiFiManager::handleUpdateUpload() {
       _server.send(200, "text/plain", "Update Success! Rebooting...");
       delay(1000);
       ESP.restart();
-    } else {
-      Update.printError(Serial);
-      _server.send(500, "text/plain", "Update Failed");
     }
   }
 }
 
+void WiFiManager::handleSessionsPage() {
+  _server.send(200, "text/html", SESSIONS_HTML);
+}
+
+void WiFiManager::handleApiSessions() {
+  JsonDocument doc;
+  JsonArray array = doc.to<JsonArray>();
+
+  File root = SD.open("/sessions"); // Assuming sessions are here
+  if (!root || !root.isDirectory()) {
+    // Fallback to root if folder missing
+    root = SD.open("/");
+  }
+
+  if (root) {
+    File file = root.openNextFile();
+    while (file) {
+      String fileName = String(file.name());
+      // Filter .csv or .gpx
+      if (!file.isDirectory() &&
+          (fileName.endsWith(".csv") || fileName.endsWith(".gpx"))) {
+        JsonObject obj = array.add<JsonObject>();
+
+        // Clean filename if it contains full path (depending on SD lib version)
+        int lastSlash = fileName.lastIndexOf('/');
+        String cleanName =
+            (lastSlash >= 0) ? fileName.substring(lastSlash + 1) : fileName;
+
+        obj["name"] = cleanName;
+
+        // Size Formatting
+        float kb = file.size() / 1024.0;
+        if (kb > 1024)
+          obj["size"] = String(kb / 1024.0, 2) + " MB";
+        else
+          obj["size"] = String(kb, 1) + " KB";
+
+        // Full Path for download
+        String fullPath = String(root.path()) + "/" + cleanName;
+        if (String(root.path()) == "/")
+          fullPath = "/" + cleanName;
+        obj["path"] = fullPath;
+      }
+      file = root.openNextFile();
+    }
+  }
+
+  String output;
+  serializeJson(doc, output);
+  _server.send(200, "application/json", output);
+}
+
+void WiFiManager::handleDownload() {
+  if (!_server.hasArg("file")) {
+    _server.send(400, "text/plain", "Bad Request");
+    return;
+  }
+
+  String path = _server.arg("file");
+  // Basic security: No parent dir traversing
+  if (path.indexOf("..") != -1) {
+    _server.send(403, "text/plain", "Forbidden");
+    return;
+  }
+
+  if (SD.exists(path)) {
+    File file = SD.open(path, FILE_READ);
+    _server.streamFile(file, "application/octet-stream");
+    file.close();
+  } else {
+    _server.send(404, "text/plain", "File Not Found");
+  }
+}
+
 bool WiFiManager::connect(const char *ssid, const char *pass) {
+
   _ssid = ssid;
   _pass = pass;
 

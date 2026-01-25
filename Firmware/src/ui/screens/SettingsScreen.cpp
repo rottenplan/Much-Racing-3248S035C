@@ -115,10 +115,8 @@ void SettingsScreen::loadSettings() {
   } else if (_currentMode == MODE_WIFI_MENU) {
     _prefs.begin("laptimer", false);
 
-    // WiFi Hotspot Toggle
-    SettingItem hotspot = {"WIFI HOTSPOT", TYPE_TOGGLE, "wifi_hotspot"};
-    hotspot.checkState = wifiManager.isEnabled();
-    _settings.push_back(hotspot);
+    // Offline Server (Replaces Toggle)
+    _settings.push_back({"OFFLINE SERVER", TYPE_ACTION});
 
     // WiFi Setup (Client Mode)
     _settings.push_back({"WIFI SETUP", TYPE_ACTION});
@@ -786,11 +784,10 @@ void SettingsScreen::handleTouch(int idx) {
       // Clear only content area
       _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-      _ui->drawStatusBar(true);
-      drawList(0, true);
-      return;
-    } else if (item.name == "MANUAL CLOCK ADJUST") {
       _ui->switchScreen(SCREEN_TIME_SETTINGS);
+      return;
+    } else if (item.name == "OFFLINE SERVER") {
+      _ui->switchScreen(SCREEN_WEB_SERVER);
       return;
     } else if (item.name == "ENGINE HOURS") {
       _currentMode = MODE_ENGINE;

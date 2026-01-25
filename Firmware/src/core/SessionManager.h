@@ -47,9 +47,25 @@ public:
     int validLaps;
     std::vector<unsigned long> lapTimes;
     unsigned long bestLap;
+    // Drag Metrics
+    unsigned long time0to60;
+    unsigned long time0to100;
+    unsigned long time100to200;
+    unsigned long time400m;
+    std::vector<unsigned long> sector1;
+    std::vector<unsigned long> sector2;
+    std::vector<unsigned long> sector3;
   };
 
   SessionAnalysis analyzeSession(String filename);
+
+  struct ReferencePoint {
+    float distance; // Meters from start of LAP
+    uint32_t time;  // ms from start of LAP
+  };
+  std::vector<ReferencePoint> referenceLap;
+  bool loadBestLapAsReference(String filename); // Loads best lap from session
+  float getReferenceTime(float distance);       // Interp logic
 
 private:
   bool _logging;

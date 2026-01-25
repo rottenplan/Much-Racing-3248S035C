@@ -55,6 +55,11 @@ private:
   void handleUpdateGet();
   void handleUpdatePost();
   void handleUpdateUpload();
+
+  // Session Manager
+  void handleSessionsPage();
+  void handleApiSessions();
+  void handleDownload();
 };
 
 #endif

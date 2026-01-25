@@ -8,6 +8,7 @@ class GnssLogScreen : public UserScreen {
 public:
   void begin(UIManager *ui) override { _ui = ui; }
   void onShow() override;
+  void onHide() override;
   void update() override;
 
 private:

@@ -33,6 +33,13 @@ void GpsStatusScreen::onShow() {
   // Back Button (Blue Triangle) - Bottom Left
   tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 
+  // Log Button (Orange Label) - Bottom Right
+  tft->fillRoundRect(260, 210, 50, 20, 4, TFT_ORANGE);
+  tft->setTextColor(TFT_BLACK, TFT_ORANGE);
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextFont(1);
+  tft->drawString("LOG", 285, 221);
+
   drawStatus();
 }
 
@@ -53,7 +60,13 @@ void GpsStatusScreen::update() {
       return;
     }
 
-    // Check for Double Tap on body
+    // Check for "LOG" Button Area (Bottom Right)
+    if (p.x > 260 && p.y > 200) {
+      _ui->switchScreen(SCREEN_GNSS_LOG);
+      return;
+    }
+
+    // Check for Double Tap on body (Keep as backup)
     unsigned long now = millis();
     if (now - _lastTapTime < 500) {
       // Double Tap!

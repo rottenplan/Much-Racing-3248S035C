@@ -65,6 +65,12 @@ void GnssLogScreen::onShow() {
   });
 }
 
+void GnssLogScreen::onHide() {
+  gpsManager.setRawDataCallback(nullptr);
+  _lines.clear();
+  _buffer = "";
+}
+
 void GnssLogScreen::drawCheckboxes() {
   TFT_eSPI *tft = _ui->getTft();
 
