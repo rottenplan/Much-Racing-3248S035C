@@ -8,24 +8,32 @@ void SplashScreen::onShow() {
   // tft->setRotation(1); // Already set in main.cpp
   // Screen already cleared in main.cpp before backlight turns on
 
-  // Gambar Bitmap (320x240)
-  tft->drawBitmap(0, 0, image_BOLONG_bits, 320, 240, 0xFFFF); // Putih
+  // Gambar Bitmap (320x240) - Centered
+  int bmpX = (SCREEN_WIDTH - 320) / 2;
+  int bmpY = (SCREEN_HEIGHT - 240) / 2;
+  tft->drawBitmap(bmpX, bmpY, image_BOLONG_bits, 320, 240, 0xFFFF); // Putih
 
   // Gambar Teks "ENGINE STARTING" menggunakan Org_01
   tft->setTextColor(0xFFFF);
   tft->setTextSize(FONT_SIZE_SPLASH_TEXT);
   tft->setFreeFont(&Org_01);
-  tft->drawString("ENGINE STARTING", 115, 214);
+  // Center text horizontally, and position vertically relative to image or
+  // screen
+  tft->setTextDatum(TC_DATUM); // Ensure text is centered
+  tft->drawString("ENGINE STARTING", SCREEN_WIDTH / 2, bmpY + 214);
 
   // Inisialisasi Kemajuan
   _progress = 0;
   // Gambar batang kosong awal atau hanya mulai dari 0
-  tft->fillRect(38, 198, _progress, 11, 0xFFFF);
+  int barX = bmpX + 38;
+  int barY = bmpY + 198;
+  tft->fillRect(barX, barY, _progress, 11, 0xFFFF);
 
   _lastUpdate = millis();
 }
 
 void SplashScreen::update() {
+  TFT_eSPI *tft = _ui->getTft();
   // Logika Animasi
   // Lebar target adalah ~246 berdasarkan kode pengguna
   if (_progress < 246) {
@@ -34,8 +42,11 @@ void SplashScreen::update() {
     if (millis() - _lastUpdate > 10) {
       _progress += 2; // Penambahan lebih cepat
 
-      TFT_eSPI *tft = _ui->getTft();
-      tft->fillRect(38, 198, _progress, 11, 0xFFFF);
+      int bmpX = (SCREEN_WIDTH - 320) / 2;
+      int bmpY = (SCREEN_HEIGHT - 240) / 2;
+      int barX = bmpX + 38;
+      int barY = bmpY + 198;
+      tft->fillRect(barX, barY, _progress, 11, 0xFFFF);
 
       _lastUpdate = millis();
     }

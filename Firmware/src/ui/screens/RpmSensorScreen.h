@@ -20,7 +20,7 @@ private:
   void updateValues();
 
   // Constants
-  static const int GRAPH_WIDTH = 298;
+  static const int GRAPH_WIDTH = 458; // Fits inside 460px frame (480-20)
   static const int GRAPH_HEIGHT = 85;
   const int MAX_SPEED_SCALE = 150; // Max speed for graph scaling (km/h)
 

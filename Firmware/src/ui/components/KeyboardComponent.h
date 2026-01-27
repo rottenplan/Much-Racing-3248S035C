@@ -18,9 +18,9 @@ public:
   KeyResult handleTouch(int x, int y, int startY);
 
 private:
-  static const int KEY_W = 28;
-  static const int KEY_H = 25;
-  static const int GAP = 5;
+  static const int KEY_W = 44; // 44*10 + 9*4 = 476px (Fits in 480)
+  static const int KEY_H = 40; // Taller for easier touch
+  static const int GAP = 4;
 };
 
 #endif

@@ -192,7 +192,7 @@ void HistoryScreen::update() {
         int startY = 80;
         int btnH = 40;
         int gap = 20;
-        int btnW = 240;
+        int btnW = 360; // Widened
         int x = (SCREEN_WIDTH - btnW) / 2;
 
         // Button 0
@@ -417,7 +417,7 @@ void HistoryScreen::drawMenu() {
   int startY = 60;
   int btnHeight = 45;
   int gap = 15;
-  int btnWidth = 240;
+  int btnWidth = 360; // Widened
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   const char *items[] = {"TRACK HISTORY", "DRAG HISTORY"};
@@ -602,24 +602,24 @@ void HistoryScreen::drawList(int scrollOffset) {
     char bufID[16];
     sprintf(bufID, "%03d", idVal);
 
-    // X Positions
-    // ID: 5
-    // Date: 40
-    // Time/Result: 140
+    // X Positions for 480px width
+    // ID: 20
+    // Date: 100
+    // Time/Result: 320
 
-    tft->drawString(bufID, 5, y + 4, 2); // Font 2
-    tft->drawString(dDisp, 45, y + 4, 2);
+    tft->drawString(bufID, 20, y + 4, 2); // Font 2
+    tft->drawString(dDisp, 100, y + 4, 2);
 
     if (_selectedType == "DRAG") {
       // Show Result Time (e.g. 4.50s)
       float res = _historyList[i].bestLap / 1000.0;
       String resStr = String(res, 2) + "s";
       tft->setTextColor(TFT_ORANGE, TFT_BLACK);
-      tft->drawString(resStr, 155, y + 4, 2);
+      tft->drawString(resStr, 320, y + 4, 2);
     } else {
       // Show Time of Day
       tft->setTextColor(TFT_WHITE, TFT_BLACK);
-      tft->drawString(tRaw, 155, y + 4, 2);
+      tft->drawString(tRaw, 320, y + 4, 2);
     }
 
     count++;

@@ -58,6 +58,7 @@ void SetupScreen::update() {
 
   // Handle touch
   if (tp.x >= 0 && tp.y >= 0) {
+
     if (millis() - _lastTouchTime < 200)
       return;
     _lastTouchTime = millis();
@@ -95,20 +96,25 @@ void SetupScreen::drawWelcome() {
   tft->setTextDatum(MC_DATUM);
 
   // Title
+  // Title
   tft->setTextSize(1);
   tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-  tft->drawString("WELCOME TO", SCREEN_WIDTH / 2, 75);
+  tft->drawString("WELCOME TO", SCREEN_WIDTH / 2,
+                  SCREEN_HEIGHT * 0.25); // ~80 on 320h
 
   tft->setTextSize(2);
   tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
-  tft->drawString("MUCH RACING", SCREEN_WIDTH / 2, 90);
+  tft->drawString("MUCH RACING", SCREEN_WIDTH / 2,
+                  SCREEN_HEIGHT * 0.35); // ~112 on 320h6
 
   tft->setTextSize(1);
   tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-  tft->drawString("LET'S GET STARTED", SCREEN_WIDTH / 2, 130);
+  tft->drawString("LET'S GET STARTED", SCREEN_WIDTH / 2,
+                  SCREEN_HEIGHT * 0.50); // ~160 on 320h
 
   // Continue button
-  drawButton("TAP TO BEGIN", SCREEN_WIDTH / 2 - 80, 180, 160, 40, false);
+  drawButton("TAP TO BEGIN", SCREEN_WIDTH / 2 - 80, SCREEN_HEIGHT * 0.70, 160,
+             40, false); // ~224 on 320h
 }
 
 void SetupScreen::drawComplete() {
@@ -121,8 +127,8 @@ void SetupScreen::drawComplete() {
   tft->setTextDatum(MC_DATUM);
 
   // Success message
-  tft->drawString("SETUP", SCREEN_WIDTH / 2, 80);
-  tft->drawString("COMPLETE!", SCREEN_WIDTH / 2, 110);
+  tft->drawString("SETUP", SCREEN_WIDTH / 2, SCREEN_HEIGHT * 0.25);
+  tft->drawString("COMPLETE!", SCREEN_WIDTH / 2, SCREEN_HEIGHT * 0.35);
 
   tft->setTextSize(1);
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
@@ -133,7 +139,9 @@ void SetupScreen::drawComplete() {
   }
 
   // Continue button
-  drawButton("START RACING", SCREEN_WIDTH / 2 - 80, 180, 160, 40, false);
+  // Continue button
+  drawButton("START RACING", SCREEN_WIDTH / 2 - 80, SCREEN_HEIGHT * 0.70, 160,
+             40, false);
 }
 
 // Updated Account Setup (Compact Layout)
@@ -327,8 +335,13 @@ void SetupScreen::drawWiFiSetup(bool fullRedraw) {
 
 void SetupScreen::handleWelcomeTouch(int x, int y) {
   // Check if "TAP TO BEGIN" button was pressed
-  if (y >= 180 && y <= 220 && x >= SCREEN_WIDTH / 2 - 80 &&
-      x <= SCREEN_WIDTH / 2 + 80) {
+  // Button drawn at: SCREEN_WIDTH / 2 - 80, SCREEN_HEIGHT * 0.70, 160, 40
+  int btnX = SCREEN_WIDTH / 2 - 80;
+  int btnY = SCREEN_HEIGHT * 0.70;
+  int btnW = 160;
+  int btnH = 40;
+
+  if (x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH) {
     nextStep();
   }
 }
@@ -479,7 +492,8 @@ void SetupScreen::handleWiFiTouch(int x, int y) {
 }
 
 void SetupScreen::handleCompleteTouch(int x, int y) {
-  if (y >= 180 && y <= 220 && x >= SCREEN_WIDTH / 2 - 80 &&
+  int btnY = SCREEN_HEIGHT * 0.70;
+  if (y >= btnY && y <= btnY + 40 && x >= SCREEN_WIDTH / 2 - 80 &&
       x <= SCREEN_WIDTH / 2 + 80) {
     saveSetupComplete();
     _ui->switchScreen(SCREEN_MENU);
@@ -555,8 +569,9 @@ void SetupScreen::handleAccountTouch(int x, int y) {
 void SetupScreen::nextStep() {
   switch (_currentStep) {
   case STEP_WELCOME:
-    _currentStep = STEP_ACCOUNT;
-    drawAccountSetup();
+    // Was Account, now WiFi
+    _currentStep = STEP_WIFI_SCAN;
+    drawWiFiScan();
     break;
   case STEP_ACCOUNT:
     // Save Account
@@ -568,16 +583,17 @@ void SetupScreen::nextStep() {
         prefs.putString("password", _password);
       prefs.end();
     }
-    // Go to Scan
-    _currentStep = STEP_WIFI_SCAN;
-    drawWiFiScan();
+    // Was Scan, now Complete
+    _currentStep = STEP_COMPLETE;
+    drawComplete();
     break;
   case STEP_WIFI_SCAN:
     // Handled in touch, but logic flow: Scan -> Wifi Setup
     break;
   case STEP_WIFI:
-    _currentStep = STEP_COMPLETE;
-    drawComplete();
+    // Was Complete, now Account
+    _currentStep = STEP_ACCOUNT;
+    drawAccountSetup();
     break;
   default:
     break;

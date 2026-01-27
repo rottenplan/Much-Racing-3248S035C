@@ -36,10 +36,14 @@ void GnssLogScreen::onShow() {
   drawCheckboxes();
 
   // --- 3. LOG CARD ---
-  // Y=95, H=110 (Restored Height)
-  // Width Shrunk: W=240 (Centered: X=40)
-  tft->fillRoundRect(40, 95, 240, 110, 8, 0x18E3);
-  tft->drawRoundRect(40, 95, 240, 110, 8, TFT_DARKGREY);
+  // Dynamic Width
+  int boxX = 40;
+  int boxW = SCREEN_WIDTH - 80; // 400px on 480w
+  int boxY = 95;
+  int boxH = SCREEN_HEIGHT - 95 - 15; // Bottom margin 15
+
+  tft->fillRoundRect(boxX, boxY, boxW, boxH, 8, 0x18E3);
+  tft->drawRoundRect(boxX, boxY, boxW, boxH, 8, TFT_DARKGREY);
 
   // Register Callback
   gpsManager.setRawDataCallback([this](uint8_t c) {
@@ -48,9 +52,10 @@ void GnssLogScreen::onShow() {
 
     if (c == '\n' || c == '\r') {
       if (_buffer.length() > 0) {
-        // Truncate to fit new box width (240px -> ~32 chars)
-        if (_buffer.length() > 32) {
-          _buffer = _buffer.substring(0, 32);
+        // Truncate to fit new box width (Approx 1 char = 8px? 400px = 50 chars)
+        int maxChars = (SCREEN_WIDTH - 100) / 8;
+        if (_buffer.length() > maxChars) {
+          _buffer = _buffer.substring(0, maxChars);
         }
         _lines.push_back(_buffer);
         if (_lines.size() > 8) // Max 8 lines for H=110
@@ -59,7 +64,7 @@ void GnssLogScreen::onShow() {
         _needsRedraw = true; // Trigger redraw
       }
     } else {
-      if (_buffer.length() < 50)
+      if (_buffer.length() < 60)
         _buffer += (char)c; // Prevent infinite growth
     }
   });
@@ -103,11 +108,17 @@ void GnssLogScreen::drawCheckboxes() {
   bool checkSBAS = (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
   bool checkGAL = (m == 0 || m == 2 || m == 3);
 
-  // Spacing: 10, 90, 170, 250
-  drawCheckItem(20, "GNSS", checkGPS);
-  drawCheckItem(100, "UBLOX", checkGLO);
-  drawCheckItem(180, "SBAS", checkSBAS);
-  drawCheckItem(260, "GAL", checkGAL);
+  // Dynamic Centering
+  // Items: GNSS(64), UBLOX(72), SBAS(64), GAL(50) ~ Total 300?
+  // Spacing: 80px per slot?
+  // 4 items * 80 = 320px
+  int totalW = 320;
+  int startX = (SCREEN_WIDTH - totalW) / 2;
+
+  drawCheckItem(startX + 0, "GNSS", checkGPS);
+  drawCheckItem(startX + 80, "UBLOX", checkGLO);
+  drawCheckItem(startX + 160, "SBAS", checkSBAS);
+  drawCheckItem(startX + 240, "GAL", checkGAL);
 }
 
 void GnssLogScreen::update() {
@@ -138,20 +149,24 @@ void GnssLogScreen::update() {
   if (p.y < 90) { // Expanded touch area from 60 to 90
     // Checkbox Area
     int tapX = p.x;
-    // 10, 90, 170, 250. Width ~60?
+
+    // Dynamic Centering Matching drawCheckboxes
+    int totalW = 320;
+    int startX = (SCREEN_WIDTH - totalW) / 2;
+    // 80px per slot starting at startX
 
     uint8_t m = gpsManager.getGnssMode();
     bool glo = (m == 0 || m == 1 || m == 2 || m == 7);
     bool sbas = (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
     bool gal = (m == 0 || m == 2 || m == 3);
 
-    if (tapX > 10 && tapX < 80) { // GNSS Area
-                                  // GNSS always on
-    } else if (tapX > 90 && tapX < 160) {
+    if (tapX > startX && tapX < startX + 70) { // GNSS Area
+                                               // GNSS always on
+    } else if (tapX > startX + 80 && tapX < startX + 150) {
       glo = !glo;
-    } else if (tapX > 170 && tapX < 240) {
+    } else if (tapX > startX + 160 && tapX < startX + 230) {
       sbas = !sbas;
-    } else if (tapX > 250 && tapX < 320) {
+    } else if (tapX > startX + 240 && tapX < startX + 310) {
       gal = !gal;
     }
 

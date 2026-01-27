@@ -17,7 +17,7 @@ private:
   int _currentPage = 0;
   int _touchStartY;
 
-  static const int ITEMS_PER_PAGE = 4;
+  static const int ITEMS_PER_PAGE = 5;
   unsigned long _lastTouchTime = 0;
 
   int _lastSelectedIndex;

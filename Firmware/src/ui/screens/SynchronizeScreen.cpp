@@ -67,7 +67,7 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   }
 
   // --- STATUS CARD ---
-  int cardW = 280; // Widen slightly
+  int cardW = 400; // Widen for 480px screen (was 280)
   int cardH = 100; // Compact height
   int cardX = (SCREEN_WIDTH - cardW) / 2;
   int cardY = 60;

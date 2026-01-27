@@ -131,7 +131,7 @@ void DragMeterScreen::update() {
       if (_state == STATE_MENU) {
         int startY = 55;
         int btnHeight = 35;
-        int btnWidth = 240;
+        int btnWidth = 360; // Widened for 3.5"
         int gap = 8;
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -169,7 +169,7 @@ void DragMeterScreen::update() {
         // Drag Mode Menu Logic (Similar to Main Menu)
         int startY = 55;
         int btnHeight = 35;
-        int btnWidth = 240;
+        int btnWidth = 360; // Widened for 3.5"
         int gap = 8;
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -950,7 +950,7 @@ void DragMeterScreen::drawMenu() {
 
   int startY = 55;
   int btnHeight = 35;
-  int btnWidth = 240;
+  int btnWidth = 360; // Widened for 3.5"
   int gap = 8;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -984,7 +984,7 @@ void DragMeterScreen::drawDragModeMenu() {
 
   int startY = 55;
   int btnHeight = 35;
-  int btnWidth = 240;
+  int btnWidth = 360; // Widened
   int gap = 8;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -1018,7 +1018,7 @@ void DragMeterScreen::drawPredictiveMenu() {
 
   int startY = 55;
   int btnHeight = 35;
-  int btnWidth = 240;
+  int btnWidth = 360; // Widened
   int gap = 8;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 

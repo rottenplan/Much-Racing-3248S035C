@@ -32,13 +32,13 @@ void sdProgressCallback(int percent, String status) {
   static_tft->setFreeFont(&Org_01);
 
   // Clear text area (approx y=100-120)
-  static_tft->fillRect(0, 100, 320, 30, COLOR_BG);
-  static_tft->drawString(status, 320 / 2, 110);
+  static_tft->fillRect(0, 100, SCREEN_WIDTH, 30, COLOR_BG);
+  static_tft->drawString(status, SCREEN_WIDTH / 2, 110);
 
   // Draw Bar
-  int barW = 200;
+  int barW = SCREEN_WIDTH * 0.6; // Dynamic width
   int barH = 10;
-  int barX = (320 - barW) / 2;
+  int barX = (SCREEN_WIDTH - barW) / 2;
   int barY = 140;
 
   // Outline
@@ -600,8 +600,8 @@ void SettingsScreen::update() {
     return;
   }
 
-  // Scroll Down Button (Bottom-Right, y > 210, x > 290)
-  if (p.x > 290 && p.y > 210) {
+  // Scroll Down Button (Bottom-Right, y > 210, near right edge)
+  if (p.x > SCREEN_WIDTH - 60 && p.y > 210) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
@@ -618,8 +618,8 @@ void SettingsScreen::update() {
     return;
   }
 
-  // Scroll Up Button (Bottom-Right, y > 210, x 260-290)
-  if (p.x > 260 && p.x <= 290 && p.y > 210) {
+  // Scroll Up Button (Bottom-Right, left of Down button)
+  if (p.x > SCREEN_WIDTH - 110 && p.x <= SCREEN_WIDTH - 60 && p.y > 210) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
@@ -1430,14 +1430,24 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
     tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
 
     // Scroll Buttons (Right)
-    // Up Arrow (Left of the pair)
+    int btnY = 225; // Center Y of triangle
+    int btnSize = 10;
+    // Down Arrow (Far Right)
+    int downX = SCREEN_WIDTH - 30;
+
+    // Up Arrow (Left of Down)
+    int upX = SCREEN_WIDTH - 70;
+
+    // Up Arrow
     if (scrollOffset > 0) {
-      tft->fillTriangle(270, 233, 290, 233, 280, 217, COLOR_ACCENT);
+      tft->fillTriangle(upX, btnY + btnSize, upX + 20, btnY + btnSize, upX + 10,
+                        btnY - btnSize, COLOR_ACCENT);
     }
 
-    // Down Arrow (Far Right)
+    // Down Arrow
     if (scrollOffset + visibleItems < _settings.size()) {
-      tft->fillTriangle(300, 217, 320, 217, 310, 233, COLOR_ACCENT);
+      tft->fillTriangle(downX, btnY - btnSize, downX + 20, btnY - btnSize,
+                        downX + 10, btnY + btnSize, COLOR_ACCENT);
     }
   }
 }

@@ -56,7 +56,6 @@ void UIManager::begin() {
   _speedometerScreen = new SpeedometerScreen();
   _gpsStatusScreen = new GpsStatusScreen();
   _synchronizeScreen = new SynchronizeScreen();
-  _synchronizeScreen = new SynchronizeScreen();
   _gnssLogScreen = new GnssLogScreen();
   _webServerScreen = new WebServerScreen();
 
@@ -73,7 +72,6 @@ void UIManager::begin() {
   _rpmSensorScreen->begin(this);
   _speedometerScreen->begin(this);
   _gpsStatusScreen->begin(this);
-  _synchronizeScreen->begin(this);
   _synchronizeScreen->begin(this);
   _gnssLogScreen->begin(this);
   _webServerScreen->begin(this);
@@ -216,12 +214,12 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     // Batasi
     if (p.x < 0)
       p.x = 0;
-    if (p.x > 320)
-      p.x = 320;
+    if (p.x > SCREEN_WIDTH)
+      p.x = SCREEN_WIDTH;
     if (p.y < 0)
       p.y = 0;
-    if (p.y > 240)
-      p.y = 240;
+    if (p.y > SCREEN_HEIGHT)
+      p.y = SCREEN_HEIGHT;
 
     // Debug: Lacak koordinat sentuh
     // Serial.printf("Touch: Raw[%d,%d] -> Screen[%d,%d]\n", rawX, rawY, p.x,
@@ -312,6 +310,10 @@ void UIManager::switchScreen(ScreenType type) {
     _currentScreen = _gnssLogScreen;
     _screenTitle =
         ""; // Empty to show Time, avoids overlap with "GPS LOG" header
+    break;
+  case SCREEN_SYNCHRONIZE:
+    _currentScreen = _synchronizeScreen;
+    _screenTitle = "SYNCHRONIZE";
     break;
   case SCREEN_WEB_SERVER:
     _currentScreen = _webServerScreen;

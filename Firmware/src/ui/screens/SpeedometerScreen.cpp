@@ -126,8 +126,18 @@ void SpeedometerScreen::drawDashboard(bool force) {
       _ui->getBackgroundColor(); // Text inside Box (Same as Main BG)
 
   // --- PENGATURAN POSISI (OFFSET) ---
-  int offTop = 15; // Geser Atas (Dikurangi dari 33 agar naik)
+  // --- PENGATURAN POSISI (OFFSET) ---
+  int offTop = 15 + ((SCREEN_HEIGHT - 240) / 2); // Center vertically
   int offBot = 10; // Geser Bawah (Dikurangi dari 28)
+
+  int cx = SCREEN_WIDTH / 2;
+  int boxTotalW = 280;
+  int startX = (SCREEN_WIDTH - boxTotalW) / 2;
+
+  // Dynamic X:
+  int x1 = startX;
+  int x2 = startX + 80 + 10;
+  int x3 = startX + 80 + 10 + 100 + 10;
 
   if (force) {
     // Clear only content area
@@ -143,9 +153,10 @@ void SpeedometerScreen::drawDashboard(bool force) {
 
     // Layout: Left(20, width 80) - Gap(10) - Center(110, width 100) - Gap(10) -
     // Right(220, width 80)
-    tft->fillRect(20, boxY, 80, boxH, colTheme);   // Hijau
-    tft->fillRect(110, boxY, 100, boxH, colBoxBg); // Putih (Contrast)
-    tft->fillRect(220, boxY, 80, boxH, colRed);    // Merah
+
+    tft->fillRect(x1, boxY, 80, boxH, colTheme);  // Hijau
+    tft->fillRect(x2, boxY, 100, boxH, colBoxBg); // Putih (Contrast)
+    tft->fillRect(x3, boxY, 80, boxH, colRed);    // Merah
 
     // --- TEXT INDIKATOR ---
     char buf[10];
@@ -159,32 +170,33 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextColor(colBoxText,
                       colTheme); // Text=BGColor (Black in Dark), BG=Green
     sprintf(buf, "%d", _maxRPM);
-    tft->drawString(buf, 60, yTextMid); // Center of 20+80=100 -> 60
+    tft->drawString(buf, x1 + 40, yTextMid); // Center of Box 1
 
     // Box 2 (White/Tengah): Max Speed
     tft->setTextColor(colBoxText, colBoxBg); // Text=BGColor, BG=Contrast
     sprintf(buf, "%.0f", _maxSpeed);
-    tft->drawString(buf, 160, yTextMid); // Center of 110+100=210 -> 160
+    tft->drawString(buf, x2 + 50, yTextMid); // Center of Box 2
 
     // Box 3 (Red/Kanan): GPS Signal
     tft->setTextColor(colBoxText, colRed); // Text=BGColor, BG=Red
     sprintf(buf, "%d", _lastSats);
-    tft->drawString(buf, 260, yTextMid); // Center of 220+80=300 -> 260
+    tft->drawString(buf, x3 + 40, yTextMid); // Center of Box 3
 
     tft->setTextDatum(TL_DATUM); // Reset
 
     // --- 1. HEADER BAR (SPEED) ---
-    tft->fillRect(2, 39 + offTop, 320, 19, colBoxBg);
+    tft->fillRect(2, 39 + offTop, SCREEN_WIDTH - 4, 19, colBoxBg);
 
     // Tulisan "SPEED" - DI CENTERKAN
     tft->setTextColor(colBoxText, colBoxBg);
     tft->setTextSize(2);
     tft->setTextDatum(MC_DATUM);
-    tft->drawString("SPEED", 160, 39 + offTop + 10);
+    tft->drawString("SPEED", cx, 39 + offTop + 10);
 
     // Requested Titles "RPM" (Left) and "MAX" (Right)
-    tft->drawString("RPM", 60, 39 + offTop + 10);
-    tft->drawString("MAX", 260, 39 + offTop + 10);
+    // Use x1 and x3 centers
+    tft->drawString("RPM", x1 + 40, 39 + offTop + 10);
+    tft->drawString("MAX", x3 + 40, 39 + offTop + 10);
 
     tft->setTextDatum(TL_DATUM);
 
@@ -197,24 +209,24 @@ void SpeedometerScreen::drawDashboard(bool force) {
 
     char speedBuf[10];
     sprintf(speedBuf, "%.0f", _lastSpeed);
-    tft->drawString(speedBuf, 160, yCenterSpeed);
+    tft->drawString(speedBuf, cx, yCenterSpeed);
     tft->setTextDatum(TL_DATUM);
 
     // Satuan "Km/H" (Naik dikit ke 115)
     tft->setTextSize(1);
-    tft->drawCentreString("Km/H", 160, 115 + offTop, 1);
+    tft->drawCentreString("Km/H", cx, 115 + offTop, 1);
 
     // --- 3. DATA TRIP ---
     // Geser naik lagi ke 122 (User request: "0000 naikan lagi")
     tft->setTextColor(colTheme, _ui->getBackgroundColor());
     tft->setTextSize(1);
-    tft->drawCentreString("LONG TRIP", 160, 122 + offTop, 1);
+    tft->drawCentreString("LONG TRIP", cx, 122 + offTop, 1);
 
     // Angka Trip (Geser naik ke 142)
     tft->setTextSize(3);
     char tripBuf[10];
     sprintf(tripBuf, "%04.0f", _lastTrip);
-    tft->drawCentreString(tripBuf, 160, 142 + offTop, 1);
+    tft->drawCentreString(tripBuf, cx, 142 + offTop, 1);
 
     // --- 5. SKALA & GARIS ---
     int yScaleVal = 176 + offBot;
@@ -247,27 +259,42 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->drawLine(259, yLine, 259, yLine - 3, c);
 
     // --- 6. BAR RPM ---
-    int yRPM = 185 + offBot;
-    tft->drawRect(35, yRPM, 254, 17, colWhite);
+    int yRPM = 185 + offBot + offTop - 15; // Re-adjust based on offTop shift?
+    // Wait, everything above shifted by offTop.
+    // yRPM was 185 + offBot (fixed). offTop is dynamic now.
+    // We should probably shift this too to maintain relative layout?
+    // Let's rely on offTop logic implicitly if we want to move WHOLE dashboard.
+    // Actually, offTop was for "Top Part". This is bottom part.
+    // If we want to Center Vertically, we should add offTop offset to
+    // EVERYTHING. Original code: yRPM = 185 + offBot. (Independent of offTop).
+    // Let's add the ((H-240)/2) offset here too.
+    int vShift = (SCREEN_HEIGHT - 240) / 2;
+    yRPM = 185 + offBot + vShift;
+
+    // Scale Bar to Screen Width? Or Keep 254?
+    // Let's keep 254 centered.
+    int barW = 254;
+    int barX = (SCREEN_WIDTH - barW) / 2;
+
+    tft->drawRect(barX, yRPM, barW, 17, colWhite);
 
     // ANGKA LIVE RPM (Y=205 Absolute, Rendered around 215?)
     // Note: offBot=10. Y=205.
-    // If we want it at 215 Absolute: 205+10 = 215. This is correct.
     tft->setTextSize(2);
     tft->setTextColor(colWhite, _ui->getBackgroundColor());
     char rpmBuf[10];
     int dispRpm = (_lastRPM < 0) ? 0 : _lastRPM;
     sprintf(rpmBuf, "%d", dispRpm);
-    tft->drawCentreString(rpmBuf, 160, 205 + offBot, 1);
+    tft->drawCentreString(rpmBuf, cx, 205 + offBot + vShift, 1);
 
     // Isi Bar RPM
-    int maxRpmWidth = 252;
+    int maxRpmWidth = barW - 2;
     int curRpmWidth =
         map(constrain(_lastRPM, 0, 8000), 0, 8000, 0, maxRpmWidth);
 
-    tft->fillRect(36, yRPM + 1, curRpmWidth, 15, colTheme);
-    tft->fillRect(36 + curRpmWidth, yRPM + 1, maxRpmWidth - curRpmWidth, 15,
-                  COLOR_BG);
+    tft->fillRect(barX + 1, yRPM + 1, curRpmWidth, 15, colTheme);
+    tft->fillRect(barX + 1 + curRpmWidth, yRPM + 1, maxRpmWidth - curRpmWidth,
+                  15, COLOR_BG);
   }
 
   // --- UPDATE DINAMIS ---
@@ -288,21 +315,21 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextColor(colBoxText, colTheme);
     tft->setTextPadding(70); // Width 80 -> Padding 70 safe
     sprintf(buf, "%d", _maxRPM);
-    tft->drawString(buf, 60, yTextMid);
+    tft->drawString(buf, x1 + 40, yTextMid);
     tft->setTextPadding(0);
 
     // Box 2: Max Speed
     tft->setTextColor(colBoxText, colBoxBg);
     tft->setTextPadding(90); // Width 100 -> Padding 90 safe
     sprintf(buf, "%.0f", _maxSpeed);
-    tft->drawString(buf, 160, yTextMid);
+    tft->drawString(buf, x2 + 50, yTextMid);
     tft->setTextPadding(0);
 
     // Box 3: GPS Satellites
     tft->setTextColor(colBoxText, colRed);
     tft->setTextPadding(70); // Width 80 -> Padding 70 safe
     sprintf(buf, "%d", _lastSats);
-    tft->drawString(buf, 260, yTextMid);
+    tft->drawString(buf, x3 + 40, yTextMid);
     tft->setTextPadding(0);
 
     tft->setTextDatum(TL_DATUM);
@@ -315,7 +342,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     int yCenterSpeed = 86 + offTop;
     char speedBuf[10];
     sprintf(speedBuf, "%.0f", _lastSpeed);
-    tft->drawString(speedBuf, 160, yCenterSpeed);
+    tft->drawString(speedBuf, cx, yCenterSpeed);
     tft->setTextPadding(0);
     tft->setTextDatum(TL_DATUM);
 
@@ -325,19 +352,23 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextPadding(120); // PADDING
     char tripBuf[10];
     sprintf(tripBuf, "%04.0f", _lastTrip);
-    tft->drawCentreString(tripBuf, 160, 142 + offTop, 1);
+    tft->drawCentreString(tripBuf, cx, 142 + offTop, 1);
     tft->setTextPadding(0);
 
     // 4. Update Bar RPM & ANGKA RPM LIVE
-    int maxRpmWidth = 252;
+    int vShift = (SCREEN_HEIGHT - 240) / 2;
+    int yRPM = 185 + offBot + vShift;
+    int barW = 254;
+    int maxRpmWidth = barW - 2;
+    int barX = (SCREEN_WIDTH - barW) / 2;
+
     int curRpmWidth =
         map(constrain(_lastRPM, 0, 8000), 0, 8000, 0, maxRpmWidth);
-    int yRPM = 185 + offBot;
 
     // Update Bar
-    tft->fillRect(36, yRPM + 1, curRpmWidth, 15, colTheme);
-    tft->fillRect(36 + curRpmWidth, yRPM + 1, maxRpmWidth - curRpmWidth, 15,
-                  COLOR_BG);
+    tft->fillRect(barX + 1, yRPM + 1, curRpmWidth, 15, colTheme);
+    tft->fillRect(barX + 1 + curRpmWidth, yRPM + 1, maxRpmWidth - curRpmWidth,
+                  15, COLOR_BG);
 
     // Update Angka RPM
     tft->setTextSize(2);
@@ -346,7 +377,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     char rpmBuf[10];
     int dispRpm = (_lastRPM < 0) ? 0 : _lastRPM;
     sprintf(rpmBuf, "%d", dispRpm);
-    tft->drawCentreString(rpmBuf, 160, 205 + offBot, 1);
+    tft->drawCentreString(rpmBuf, cx, 205 + offBot + vShift, 1);
     tft->setTextPadding(0);
   }
 }

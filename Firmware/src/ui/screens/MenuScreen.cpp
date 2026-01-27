@@ -99,8 +99,8 @@ void MenuScreen::update() {
       // 1. Check Navigation Arrow (Bottom Center)
       int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
 
-      // Toggle Button Area (Y > 210)
-      if (p.y > 210) {
+      // Toggle Button Area (Bottom 40px)
+      if (p.y > SCREEN_HEIGHT - 40) {
         if (millis() - lastPageSwitch > 150) {
           if (_currentPage < maxPage) {
             _currentPage++; // Go Down/Next
@@ -245,13 +245,15 @@ void MenuScreen::drawMenu(bool force) {
 
     int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
 
+    int yInd = SCREEN_HEIGHT - 10;
     if (maxPage > 0) {
       if (_currentPage < maxPage) {
-        tft->fillTriangle(SCREEN_WIDTH / 2 - 10, 230, SCREEN_WIDTH / 2 + 10,
-                          230, SCREEN_WIDTH / 2, 238, COLOR_ACCENT);
+        tft->fillTriangle(SCREEN_WIDTH / 2 - 10, yInd - 8,
+                          SCREEN_WIDTH / 2 + 10, yInd - 8, SCREEN_WIDTH / 2,
+                          yInd, COLOR_ACCENT);
       } else if (_currentPage > 0) {
-        tft->fillTriangle(SCREEN_WIDTH / 2 - 10, 238, SCREEN_WIDTH / 2 + 10,
-                          238, SCREEN_WIDTH / 2, 230, COLOR_ACCENT);
+        tft->fillTriangle(SCREEN_WIDTH / 2 - 10, yInd, SCREEN_WIDTH / 2 + 10,
+                          yInd, SCREEN_WIDTH / 2, yInd - 8, COLOR_ACCENT);
       }
     }
   }

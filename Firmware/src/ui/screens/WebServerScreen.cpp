@@ -23,13 +23,13 @@ void WebServerScreen::drawStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Header
-  tft->drawFastHLine(0, 20, 320,
-                     _ui->getSecondaryColor()); // Using 320 const for width
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH,
+                     _ui->getSecondaryColor()); // Dynamic width
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->drawString("OFFLINE SERVER", 160, 25);
+  tft->drawString("OFFLINE SERVER", SCREEN_WIDTH / 2, 25);
 
   // Back
   tft->setTextDatum(TL_DATUM);
@@ -40,16 +40,16 @@ void WebServerScreen::drawStatic() {
   tft->setTextDatum(MC_DATUM);
   tft->setTextColor(TFT_SILVER, TFT_BLACK);
   tft->setTextFont(1);
-  tft->drawString("Connect via Phone/Laptop to:", 160, 60);
+  tft->drawString("Connect via Phone/Laptop to:", SCREEN_WIDTH / 2, 60);
 }
 
 void WebServerScreen::drawStatus() {
   TFT_eSPI *tft = _ui->getTft();
 
   int boxY = 80;
-  int boxW = 280;
+  int boxW = 400; // Wider for 480px
   int boxH = 120;
-  int boxX = (320 - boxW) / 2;
+  int boxX = (SCREEN_WIDTH - boxW) / 2;
 
   tft->fillRoundRect(boxX, boxY, boxW, boxH, 8, 0x18E3); // Charcoal
   tft->drawRoundRect(boxX, boxY, boxW, boxH, 8, TFT_DARKGREY);
@@ -85,7 +85,7 @@ void WebServerScreen::drawStatus() {
   tft->setTextDatum(MC_DATUM);
   tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft->setTextFont(1);
-  tft->drawString("Open IP in Browser to download data", 160, 220);
+  tft->drawString("Open IP in Browser to download data", SCREEN_WIDTH / 2, 220);
 
   _ui->drawStatusBar();
 }

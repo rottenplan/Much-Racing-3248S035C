@@ -21,8 +21,8 @@
 #define TOUCH_INT 21
 #define TOUCH_RST 25
 // Native Resolution (Portrait)
-#define TOUCH_WIDTH 240
-#define TOUCH_HEIGHT 320
+#define TOUCH_WIDTH 320
+#define TOUCH_HEIGHT 480
 
 // Touch Calibration / Mapping
 // Common for Landscape on this board: Swap XY=true, Invert Y=true
@@ -59,8 +59,8 @@
 // SYSTEM CONSTANTS
 // ==========================================
 // Landscape Mode
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 480
+#define SCREEN_HEIGHT 320
 #define STATUS_BAR_HEIGHT 20 // Fixed height for status bar
 
 #define SERIAL_DEBUG_BAUD 115200

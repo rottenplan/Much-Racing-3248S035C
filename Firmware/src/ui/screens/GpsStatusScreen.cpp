@@ -34,11 +34,14 @@ void GpsStatusScreen::onShow() {
   tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
 
   // Log Button (Orange Label) - Bottom Right
-  tft->fillRoundRect(260, 210, 50, 20, 4, TFT_ORANGE);
+  int logBtnW = 50;
+  int logBtnX = SCREEN_WIDTH - logBtnW - 10; // Right aligned with padding
+  int logBtnY = 210;
+  tft->fillRoundRect(logBtnX, logBtnY, logBtnW, 20, 4, TFT_ORANGE);
   tft->setTextColor(TFT_BLACK, TFT_ORANGE);
   tft->setTextDatum(MC_DATUM);
   tft->setTextFont(1);
-  tft->drawString("LOG", 285, 221);
+  tft->drawString("LOG", logBtnX + (logBtnW / 2), logBtnY + 11);
 
   drawStatus();
 }
@@ -61,7 +64,9 @@ void GpsStatusScreen::update() {
     }
 
     // Check for "LOG" Button Area (Bottom Right)
-    if (p.x > 260 && p.y > 200) {
+    int logBtnW = 50;
+    int logBtnX = SCREEN_WIDTH - logBtnW - 10;
+    if (p.x > logBtnX && p.y > 200) {
       _ui->switchScreen(SCREEN_GNSS_LOG);
       return;
     }
@@ -102,11 +107,19 @@ void GpsStatusScreen::drawStatus() {
   static unsigned long lastUpdate = 0;
   bool forceRedraw = (_lastSats == -1);
 
+  // Dynamic Layout Calculation
+  int gap = 10;
+  // Radar is typically square-ish. Let's say 130x135.
+  int radarW = 130;
+  int radarH = 135;
+  // Remaining width for Info Card
+  int infoCardW = SCREEN_WIDTH - radarW - (gap * 3);
+
   if (forceRedraw || millis() - lastUpdate > 1000) {
     lastUpdate = millis();
-    int cardX = 10;
+    int cardX = gap;
     int cardY = TOP_OFFSET + 10;
-    int cardW = 160;
+    int cardW = infoCardW;
     int cardH = 135;
 
     // Draw Card Background (only if needed or clean update)
@@ -195,28 +208,31 @@ void GpsStatusScreen::drawStatus() {
     if (forceRedraw) {
       tft->drawString("STATUS", cardX + 10, cardY + 5);
       // Labels moved UP
-      tft->drawString("SATS", cardX + 30, cardY + 18);
-      tft->drawString("Hz", cardX + 80, cardY + 18);
-      tft->drawString("HDOP", cardX + 130, cardY + 18);
+      // Distribute labels evenly
+      int sectionW = cardW / 4; // 3 items + status
+      tft->drawString("SATS", cardX + sectionW * 0 + 20, cardY + 18);
+      tft->drawString("Hz", cardX + sectionW * 1 + 20, cardY + 18);
+      tft->drawString("HDOP", cardX + sectionW * 2 + 20, cardY + 18);
     }
 
-    // Sat Count (Values moved DOWN)
+    // Distribute values evenly
+    int sectionW = cardW / 4;
     int valY = cardY + 42;
 
     tft->setTextColor(TFT_GREEN, 0x10A2);
     tft->setTextFont(4);
     tft->setTextDatum(MC_DATUM);
-    tft->drawString(String(sats), cardX + 30, valY);
+    tft->drawString(String(sats), cardX + sectionW * 0 + 35, valY);
 
     // Hz
     tft->setTextColor(TFT_CYAN, 0x10A2);
     tft->setTextFont(4);
-    tft->drawString(String(hz), cardX + 80, valY);
+    tft->drawString(String(hz), cardX + sectionW * 1 + 30, valY);
 
     // HDOP
     tft->setTextColor(TFT_YELLOW, 0x10A2);
     tft->setTextFont(4);
-    tft->drawString(String(hdop, 1), cardX + 130, valY);
+    tft->drawString(String(hdop, 1), cardX + sectionW * 2 + 35, valY);
 
     // Fix Quality
     String fixStr = gpsManager.isFixed() ? "3D FIX" : "NO FIX";
@@ -231,10 +247,10 @@ void GpsStatusScreen::drawStatus() {
   }
 
   // --- 3. RADAR (Right Side) ---
-  int radarX = 180;
+  int radarX = SCREEN_WIDTH - radarW - gap; // Aligned Right
   int radarY = TOP_OFFSET + 10;
-  int radarW = 130;
-  int radarH = 135;
+  // radarW defined above
+  // radarH defined above
   int cX = radarX + radarW / 2;
   int cY = radarY + radarH / 2;
   int r = 55;
