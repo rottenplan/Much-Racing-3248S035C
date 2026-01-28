@@ -6,6 +6,7 @@
 #include <SD.h>
 #include <SPI.h> // Ensure SPI is included
 #include <TinyGPS++.h>
+#include <functional>
 
 class GPSManager {
 public:
@@ -133,6 +134,7 @@ private:
   // RPM Logic
   static volatile unsigned long _rpmPulses;
   static volatile unsigned long _lastPulseMicros;
+  static volatile unsigned long _pulseInterval;
   unsigned long _lastRpmCalcTime = 0;
 
 public:

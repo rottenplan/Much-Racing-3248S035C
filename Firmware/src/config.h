@@ -43,7 +43,7 @@
 // #define PIN_RGB_BLUE 17  // Disabled: Used for GPS_RX
 // #define PIN_LIGHT_SENSOR 34
 // #define PIN_SPEAKER 26
-#define PIN_RPM_INPUT 34 // Moved to 34 to free up 35 for Battery
+#define PIN_RPM_INPUT 35 // RPM Input moved to 35
 
 // GPS / UART
 // Standard Serial Pins (Conflict with USB Debugging!)
@@ -51,7 +51,7 @@
 #define PIN_GPS_TX 1
 #define GPS_BAUD 115200 // Increased from 9600 for faster GPS lock
 // #define PIN_LIGHT_SENSOR 34 // Removed: Used for Battery
-#define PIN_BATTERY 34
+#define PIN_BATTERY 34 // Battery Input moved to 34
 #define BATTERY_VOLTAGE_MAX 4.2
 #define BATTERY_VOLTAGE_MIN 3.0 // Lowered to 3.0V to capture lower range
 

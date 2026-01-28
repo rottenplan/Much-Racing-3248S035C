@@ -24,7 +24,10 @@ extern WiFiManager wifiManager;
 #include "screens/TimeSettingScreen.h" // Removed duplicate as per
 // instruction #include "screens/AutoOffScreen.h"
 #include "screens/GnssLogScreen.h"
+#include "screens/RacingDashboardScreen.h"
 #include "screens/RpmSensorScreen.h"
+#include "screens/SessionSummaryScreen.h"
+#include "screens/TrackRecorderScreen.h"
 #include "screens/WebServerScreen.h"
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
@@ -53,11 +56,14 @@ void UIManager::begin() {
   _timeSettingScreen = new TimeSettingScreen();
   // _autoOffScreen = new AutoOffScreen();
   _rpmSensorScreen = new RpmSensorScreen();
-  _speedometerScreen = new SpeedometerScreen();
+  _speedometerScreen = new SpeedometerScreen(_tft); // Pass _tft to constructor
   _gpsStatusScreen = new GpsStatusScreen();
   _synchronizeScreen = new SynchronizeScreen();
   _gnssLogScreen = new GnssLogScreen();
   _webServerScreen = new WebServerScreen();
+  _trackRecorderScreen = new TrackRecorderScreen();
+  _sessionSummaryScreen = new SessionSummaryScreen();
+  _racingDashboardScreen = new RacingDashboardScreen();
 
   // Mulai Layar
   _splashScreen->begin(this);
@@ -75,6 +81,9 @@ void UIManager::begin() {
   _synchronizeScreen->begin(this);
   _gnssLogScreen->begin(this);
   _webServerScreen->begin(this);
+  _trackRecorderScreen->begin(this);
+  _sessionSummaryScreen->begin(this);
+  _racingDashboardScreen->begin(this);
 
   // Initialize Sleep Logic (Standardized with power_save)
   Preferences prefs;
@@ -317,7 +326,19 @@ void UIManager::switchScreen(ScreenType type) {
     break;
   case SCREEN_WEB_SERVER:
     _currentScreen = _webServerScreen;
-    _screenTitle = "OFFLINE SERVER";
+    _screenTitle = "LOCAL SERVER";
+    break;
+  case SCREEN_TRACK_RECORDER:
+    _currentScreen = _trackRecorderScreen;
+    _screenTitle = "RECORD TRACK";
+    break;
+  case SCREEN_SESSION_SUMMARY:
+    _currentScreen = _sessionSummaryScreen;
+    _screenTitle = "SUMMARY";
+    break;
+  case SCREEN_RACING_DASHBOARD:
+    _currentScreen = _racingDashboardScreen;
+    _screenTitle = "RACING";
     break;
   }
 
@@ -550,6 +571,9 @@ void UIManager::drawStatusBar(bool force) {
     }
     _lastLogging = isLogging;
   }
+
+  // Draw separator line below status bar
+  _tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
 }
 
 // --- Auto Off Logic ---
@@ -614,6 +638,35 @@ void UIManager::showToast(String message, int duration) {
 
 void UIManager::drawCarbonBackground(int x, int y, int w, int h) {
   _tft->fillRect(x, y, w, h, getBackgroundColor());
+}
+
+// Standard Back Button at Bottom Left with Bar
+void UIManager::drawBackButton() {
+  int barH = 30; // Height of bottom bar
+  int barY = SCREEN_HEIGHT - barH;
+
+  // 1. Draw Bottom Bar Background (Full Width)
+  // Use Secondary Color or Specific Bar Color?
+  // Let's match Top Bar style (Background color + Line)
+  _tft->fillRect(0, barY, SCREEN_WIDTH, barH, getBackgroundColor());
+
+  // 3. Draw Back Triangle
+  int centerY = barY + (barH / 2);
+  int tipX = 15;
+  int width = 12;
+  int backX = tipX + width;
+  int halfH = 8;
+
+  _tft->fillTriangle(tipX, centerY, backX, centerY - halfH, backX,
+                     centerY + halfH, COLOR_ACCENT);
+}
+
+bool UIManager::isBackButtonTouched(TouchPoint p) {
+  if (p.x == -1)
+    return false;
+  // Generous touch area at bottom left
+  // x < 80, y > SCREEN_HEIGHT - 80
+  return (p.x < 80 && p.y > SCREEN_HEIGHT - 80);
 }
 
 // --- Theme Support ---

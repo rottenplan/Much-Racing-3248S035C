@@ -1,9 +1,17 @@
 #include "GnssLogScreen.h"
 #include "../../core/GPSManager.h"
 #include "../fonts/Org_01.h"
+#include <Arduino.h>
+#include <TFT_eSPI.h>
 
 extern GPSManager gpsManager;
 extern TFT_eSPI tft; // Or access via _ui->getTft()
+
+// Constants for Layout
+#define CHECK_Y_START 50
+#define CHECK_H 40
+#define LOG_BOX_Y 110
+#define LOG_BOX_BOTTOM 215
 
 void GnssLogScreen::onShow() {
   // Clear full screen
@@ -26,24 +34,16 @@ void GnssLogScreen::onShow() {
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2); // Match Session Summary
-  tft->drawString("GPS LOG", SCREEN_WIDTH / 2, 28);
+  tft->setTextSize(2);
+  tft->drawString("GNSS LOGGER", SCREEN_WIDTH / 2, 28);
 
   // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  _ui->drawBackButton();
 
-  // --- 2. CHECKBOXES (Top area) ---
+  // Draw Initial UI Elements
   drawCheckboxes();
-
-  // --- 3. LOG CARD ---
-  // Dynamic Width
-  int boxX = 40;
-  int boxW = SCREEN_WIDTH - 80; // 400px on 480w
-  int boxY = 95;
-  int boxH = SCREEN_HEIGHT - 95 - 15; // Bottom margin 15
-
-  tft->fillRoundRect(boxX, boxY, boxW, boxH, 8, 0x18E3);
-  tft->drawRoundRect(boxX, boxY, boxW, boxH, 8, TFT_DARKGREY);
+  drawControls();
+  drawLogBoxArea();
 
   // Register Callback
   gpsManager.setRawDataCallback([this](uint8_t c) {
@@ -52,20 +52,20 @@ void GnssLogScreen::onShow() {
 
     if (c == '\n' || c == '\r') {
       if (_buffer.length() > 0) {
-        // Truncate to fit new box width (Approx 1 char = 8px? 400px = 50 chars)
-        int maxChars = (SCREEN_WIDTH - 100) / 8;
+        // Truncate to fit
+        int maxChars = (SCREEN_WIDTH - 60) / 8;
         if (_buffer.length() > maxChars) {
           _buffer = _buffer.substring(0, maxChars);
         }
         _lines.push_back(_buffer);
-        if (_lines.size() > 8) // Max 8 lines for H=110
+        if (_lines.size() > 8) // Max lines
           _lines.erase(_lines.begin());
         _buffer = "";
-        _needsRedraw = true; // Trigger redraw
+        _needsRedraw = true;
       }
     } else {
       if (_buffer.length() < 60)
-        _buffer += (char)c; // Prevent infinite growth
+        _buffer += (char)c;
     }
   });
 }
@@ -83,142 +83,191 @@ void GnssLogScreen::drawCheckboxes() {
   tft->setFreeFont(NULL);
   tft->setTextFont(1);
   tft->setTextSize(1);
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(TFT_SILVER, TFT_BLACK); // Silver on Black
-
-  int yTop = 55; // Lowered to fit under new header
-
-  // Helper to draw a "checkbox" style item
-  auto drawCheckItem = [&](int x, String label, bool checked) {
-    // Checkbox square (Larger 16x16)
-    tft->drawRect(x, yTop, 16, 16, TFT_DARKGREY);
-
-    if (checked) {
-      tft->fillRect(x + 3, yTop + 3, 10, 10, TFT_GREEN); // Green check
-    } else {
-      tft->fillRect(x + 3, yTop + 3, 10, 10, TFT_BLACK); // Uncheck
-    }
-    tft->drawString(label, x + 20, yTop + 1); // Adjusted text pos
-  };
+  tft->setTextDatum(MC_DATUM);
 
   uint8_t m = gpsManager.getGnssMode();
-  // Mapping logic
   bool checkGPS = true; // Always on
   bool checkGLO = (m == 0 || m == 1 || m == 2 || m == 7);
   bool checkSBAS = (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
   bool checkGAL = (m == 0 || m == 2 || m == 3);
 
-  // Dynamic Centering
-  // Items: GNSS(64), UBLOX(72), SBAS(64), GAL(50) ~ Total 300?
-  // Spacing: 80px per slot?
-  // 4 items * 80 = 320px
-  int totalW = 320;
+  // 4 Buttons evenly spaced
+  // W=100, Gap=10 -> 4*100 + 3*10 = 430. Fits in 480.
+  int btnW = 100;
+  int gap = 10;
+  int totalW = (btnW * 4) + (gap * 3);
   int startX = (SCREEN_WIDTH - totalW) / 2;
+  int y = CHECK_Y_START;
 
-  drawCheckItem(startX + 0, "GNSS", checkGPS);
-  drawCheckItem(startX + 80, "UBLOX", checkGLO);
-  drawCheckItem(startX + 160, "SBAS", checkSBAS);
-  drawCheckItem(startX + 240, "GAL", checkGAL);
+  auto drawBtn = [&](int idx, String label, bool active) {
+    int x = startX + (idx * (btnW + gap));
+    uint16_t color = active ? TFT_GREEN : 0x39E7; // Green or Dark Grey
+    uint16_t txtColor = active ? TFT_BLACK : TFT_WHITE;
+
+    // Fill
+    tft->fillRoundRect(x, y, btnW, CHECK_H, 4, color);
+    if (!active)
+      tft->drawRoundRect(x, y, btnW, CHECK_H, 4, TFT_SILVER);
+
+    tft->setTextColor(txtColor, color);
+    tft->drawString(label, x + btnW / 2, y + CHECK_H / 2);
+  };
+
+  drawBtn(0, "GPS", checkGPS);
+  drawBtn(1, "GLO", checkGLO);
+  drawBtn(2, "SBAS", checkSBAS);
+  drawBtn(3, "GAL", checkGAL);
+}
+
+void GnssLogScreen::drawControls() {
+  TFT_eSPI *tft = _ui->getTft();
+
+  // Resume/Pause Button (Right side, below checks)
+  // Clear Button (Left side, below checks) - OR use Bottom Right like Status
+  // Screen?
+
+  // Let's put specific control buttons:
+  // [ PAUSE/RESUME ]  [ CLEAR ]
+  // at bottom right?
+
+  // Back button is bottom left.
+  // Let's place RESUME/PAUSE at Bottom Right.
+
+  int btnW = 80;
+  int btnH = 30;
+  int x = SCREEN_WIDTH - btnW - 10;
+  int y = SCREEN_HEIGHT - 35; // Bottom area
+
+  uint16_t color = _paused ? TFT_GREEN : TFT_ORANGE;
+  String label = _paused ? "RESUME" : "PAUSE";
+
+  tft->fillRoundRect(x, y, btnW, btnH, 4, color);
+  tft->setTextColor(TFT_BLACK, color);
+  tft->setTextDatum(MC_DATUM);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(2);
+  tft->drawString(label, x + btnW / 2, y + btnH / 2);
+
+  // Clear Button - Left of Reuse/Pause?
+  // Or maybe just center bottom?
+  // Let's put CLEAR at Center Bottom
+  int clrW = 60;
+  int clrX = SCREEN_WIDTH / 2 - clrW / 2;
+  int clrY = SCREEN_HEIGHT - 35;
+
+  tft->fillRoundRect(clrX, clrY, clrW, btnH, 4, TFT_RED);
+  tft->setTextColor(TFT_WHITE, TFT_RED);
+  tft->drawString("CLR", clrX + clrW / 2, clrY + btnH / 2);
+}
+
+void GnssLogScreen::drawLogBoxArea() {
+  TFT_eSPI *tft = _ui->getTft();
+  int boxX = 20;
+  int boxW = SCREEN_WIDTH - 40;
+  int boxH = LOG_BOX_BOTTOM - LOG_BOX_Y; // 215 - 110 = 105
+
+  tft->drawRect(boxX, LOG_BOX_Y, boxW, boxH, TFT_DARKGREY);
 }
 
 void GnssLogScreen::update() {
-  // Touch Handling
   UIManager::TouchPoint p = _ui->getTouchPoint();
+
   if (p.x != -1) {
-    if (p.y > 200 && p.x < 60) {
-      // Back (Triangle area)
-      static unsigned long lastBackTap = 0;
-      if (millis() - lastBackTap < 500) {
-        gpsManager.setRawDataCallback(nullptr); // Disable callback
+    if (_ui->isBackButtonTouched(p)) {
+      static unsigned long lastBack = 0;
+      if (millis() - lastBack < 500) {
+        gpsManager.setRawDataCallback(nullptr);
         _ui->switchScreen(SCREEN_GPS_STATUS);
-        lastBackTap = 0;
+        lastBack = 0;
       } else {
-        lastBackTap = millis();
+        lastBack = millis();
       }
       return;
     }
 
-    // Toggle Pause (Tap on log area or Toggle Button?)
-    // Area: Y 95 - 205
-    if (p.x > 40 && p.x < 280 && p.y > 90 && p.y < 210) {
-      _paused = !_paused;
-      _needsRedraw = true;
+    // CHECKBOXES
+    if (p.y >= CHECK_Y_START && p.y <= CHECK_Y_START + CHECK_H) {
+      // Calculate index
+      int btnW = 100;
+      int gap = 10;
+      int totalW = (btnW * 4) + (gap * 3);
+      int startX = (SCREEN_WIDTH - totalW) / 2;
+
+      if (p.x >= startX && p.x <= startX + totalW) {
+        int idx = (p.x - startX) / (btnW + gap);
+        if (idx >= 0 && idx <= 3) {
+          uint8_t m = gpsManager.getGnssMode();
+          bool glo = (m == 0 || m == 1 || m == 2 || m == 7);
+          bool sbas =
+              (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
+          bool gal = (m == 0 || m == 2 || m == 3);
+
+          // Toggle logic
+          if (idx == 1)
+            glo = !glo;
+          if (idx == 2)
+            sbas = !sbas;
+          if (idx == 3)
+            gal = !gal;
+          // Idx 0 (GPS) ignored as it's always on
+
+          // Resolve Mode
+          uint8_t newMode = 1;
+
+          if (glo && gal && sbas)
+            newMode = 0;
+          else if (glo && !gal && sbas)
+            newMode = 1;
+          else if (glo && gal && !sbas)
+            newMode = 2;
+          else if (!glo && gal && sbas)
+            newMode = 3;
+          else if (!glo && !gal && sbas)
+            newMode = 4;
+          else if (!glo && !gal && !sbas)
+            newMode = 5;
+          else if (glo && !gal && !sbas)
+            newMode = 7;
+
+          if (newMode != m) {
+            gpsManager.setGnssMode(newMode);
+            drawCheckboxes();
+            delay(100); // Debounce visual
+          }
+        }
+      }
+    }
+
+    // CONTROL BUTTONS (Bottom Area)
+    if (p.y > SCREEN_HEIGHT - 40) {
+      // PAUSE/RESUME (Right)
+      if (p.x > SCREEN_WIDTH - 100) {
+        _paused = !_paused;
+        drawControls();
+        delay(200);
+      }
+      // CLEAR (Center)
+      else if (p.x > SCREEN_WIDTH / 2 - 40 && p.x < SCREEN_WIDTH / 2 + 40) {
+        _lines.clear();
+        _buffer = "";
+        _needsRedraw = true;
+        delay(200);
+      }
     }
   }
 
-  if (p.y < 90) { // Expanded touch area from 60 to 90
-    // Checkbox Area
-    int tapX = p.x;
-
-    // Dynamic Centering Matching drawCheckboxes
-    int totalW = 320;
-    int startX = (SCREEN_WIDTH - totalW) / 2;
-    // 80px per slot starting at startX
-
-    uint8_t m = gpsManager.getGnssMode();
-    bool glo = (m == 0 || m == 1 || m == 2 || m == 7);
-    bool sbas = (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
-    bool gal = (m == 0 || m == 2 || m == 3);
-
-    if (tapX > startX && tapX < startX + 70) { // GNSS Area
-                                               // GNSS always on
-    } else if (tapX > startX + 80 && tapX < startX + 150) {
-      glo = !glo;
-    } else if (tapX > startX + 160 && tapX < startX + 230) {
-      sbas = !sbas;
-    } else if (tapX > startX + 240 && tapX < startX + 310) {
-      gal = !gal;
-    }
-
-    // Resolve new mode
-    uint8_t newMode = 1; // Default fallback
-
-    if (glo && gal && sbas)
-      newMode = 0; // All
-    else if (glo && !gal && sbas)
-      newMode = 1; // GPS+GLO+SBAS
-    else if (glo && gal && !sbas)
-      newMode = 2; // GPS+GAL+GLO
-    else if (!glo && gal && sbas)
-      newMode = 3; // GPS+GAL+SBAS
-    else if (!glo && !gal && sbas)
-      newMode = 4; // GPS+SBAS
-    else if (!glo && !gal && !sbas)
-      newMode = 5; // GPS Only
-    else if (glo && !gal && !sbas)
-      newMode = 7; // GPS+GLO
-
-    if (newMode != m) {
-      gpsManager.setGnssMode(newMode);
-      // _ui->switchScreen(SCREEN_GNSS_LOG); // Reload to redraw checks <--
-      // REMOVED
-      drawCheckboxes(); // Update only checkboxes
-      return;
-    }
-  }
-
-  // Status Indicator
+  // CONNECTION STATUS UPDATES
   bool connected = (millis() - _lastDataTime < 1000) && (_lastDataTime != 0);
   if (connected != _lastStatusConnected) {
     _lastStatusConnected = connected;
-    _needsRedraw = true;
-
-    // Update status immediately
+    // Just indicator dot? Or text?
+    // Let's use a small dot next to header
     TFT_eSPI *tft = _ui->getTft();
-    tft->setTextSize(1);
-    tft->setTextDatum(TR_DATUM);
-    // Draw status at top right, aligned with checks Y=35
-    if (connected) {
-      tft->setTextColor(TFT_GREEN, TFT_BLACK);
-      tft->drawString("GPS: CONNECTED  ", 310, 35);
-    } else {
-      tft->setTextColor(TFT_RED, TFT_BLACK);
-      tft->drawString("GPS: NO DATA    ", 310, 35);
-    }
+    tft->fillCircle(SCREEN_WIDTH - 20, 28, 5, connected ? TFT_GREEN : TFT_RED);
   }
 
   static unsigned long lastDrawTime = 0;
-  if (_needsRedraw && (millis() - lastDrawTime > 300)) { // Throttle to ~3 FPS
+  if (_needsRedraw && (millis() - lastDrawTime > 100)) {
     drawLines();
     _needsRedraw = false;
     lastDrawTime = millis();
@@ -228,23 +277,26 @@ void GnssLogScreen::update() {
 void GnssLogScreen::drawLines() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Revert to Standard Font
+  // Define Log Area
+  int boxX = 20;
+  int boxW = SCREEN_WIDTH - 40;
+  int boxH = LOG_BOX_BOTTOM - LOG_BOX_Y;
+
+  // Clear inside
+  tft->fillRect(boxX + 1, LOG_BOX_Y + 1, boxW - 2, boxH - 2,
+                TFT_BLACK); // Black background for log
+
   tft->setTextFont(1);
   tft->setTextSize(1);
   tft->setFreeFont(NULL);
-
-  // Green text for logs
-  tft->setTextColor(TFT_GREEN, 0x18E3);
+  tft->setTextColor(TFT_GREEN, TFT_BLACK);
   tft->setTextDatum(TL_DATUM);
-  tft->setTextPadding(220); // Width reduced to avoid overwriting right border
 
-  // Margin 10px from X=40 -> X=50. Y=105.
-  int innerX = 50;
-  int innerY = 105;
+  int x = boxX + 5;
+  int y = LOG_BOX_Y + 5;
 
-  int y = innerY;
   for (const auto &line : _lines) {
-    tft->drawString(line, innerX, y);
-    y += 10; // Standard spacing
+    tft->drawString(line, x, y);
+    y += 12; // Spacing
   }
 }

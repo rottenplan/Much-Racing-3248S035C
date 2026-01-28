@@ -88,13 +88,16 @@ void GPSManager::begin() {
 // Static Member Initialization
 volatile unsigned long GPSManager::_rpmPulses = 0;
 volatile unsigned long GPSManager::_lastPulseMicros = 0;
+volatile unsigned long GPSManager::_pulseInterval = 0;
 
 void IRAM_ATTR GPSManager::onPulse() {
   unsigned long now = micros();
-  // Debounce: 1ms (1000us) -> Max 60.000 RPM (Reduces noise significantly)
-  if (now - _lastPulseMicros > 1000) {
-    _rpmPulses++;
+  // Debounce: 2ms (2000us) -> Max 30.000 RPM (Reduces noise significantly)
+  unsigned long interval = now - _lastPulseMicros;
+  if (interval > 2000) {
     _lastPulseMicros = now;
+    _pulseInterval = interval;
+    _rpmPulses++; // Still keep track of total pulses if needed
   }
 }
 
@@ -173,32 +176,31 @@ void GPSManager::update() {
     _lastRateCheck = millis();
   }
 
-  // --- RPM CALCULATION ---
+  // --- RPM CALCULATION (PERIOD METHOD) ---
   if (_rpmEnabled) {
-    if (millis() - _lastRpmCalcTime > 100) { // 10Hz Update
-      noInterrupts();
-      unsigned long pulses = _rpmPulses;
-      _rpmPulses = 0;
-      interrupts();
-
-      unsigned long dt = millis() - _lastRpmCalcTime;
+    if (millis() - _lastRpmCalcTime > 50) { // 20Hz Update for smoothness
       _lastRpmCalcTime = millis();
 
-      if (dt > 0) {
-        // Use cached _currentPPR
-        unsigned long rawRpm =
-            (unsigned long)((pulses * 60000.0) / (dt * _currentPPR));
+      unsigned long lastP = _lastPulseMicros;
+      unsigned long interval = _pulseInterval;
+      unsigned long nowMicros = micros();
 
-        // NOISE FILTER: Ignore absurdly low RPM (Ghost readings)
-        // Real engines don't run stable < 300 RPM.
-        // Relaxing to 50 for testing availability
-        if (rawRpm < 50) {
-          _currentRPM = 0;
-        } else {
-          _currentRPM = rawRpm;
-        }
-      } else {
+      // Timeout: 0.5s without pulse -> Engine Off/Stall (<120 RPM 4T)
+      if (nowMicros - lastP > 500000) {
         _currentRPM = 0;
+      } else if (interval > 0) {
+        // Calculate RPM: (60 sec * 1000 ms * 1000 us) / (interval * PPR)
+        // 60,000,000 / (interval * PPR)
+        float ppr = (_currentPPR > 0.1) ? _currentPPR : 1.0;
+        float instRPM = 60000000.0 / (float)(interval * ppr);
+
+        if (instRPM > 20000)
+          instRPM = 0; // Sanity check (Noise)
+
+        // Smoothing (EMA)
+        // _currentRPM = 0.7 * _currentRPM + 0.3 * instRPM;
+        // Or simpler integer smoothing
+        _currentRPM = (_currentRPM * 7 + (int)instRPM * 3) / 10;
       }
     }
   } else {

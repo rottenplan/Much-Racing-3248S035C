@@ -89,8 +89,8 @@ void DragMeterScreen::update() {
     if (millis() - lastDragTouch > 200) {
       lastDragTouch = millis();
 
-      // 1. Tombol Kembali (Top Left)
-      if (p.x < 60 && p.y < 60) {
+      // 1. Tombol Kembali
+      if (_ui->isBackButtonTouched(p)) {
         static unsigned long lastBackTap = 0;
         if (millis() - lastBackTap < 500) {
           lastBackTap = 0;
@@ -131,7 +131,7 @@ void DragMeterScreen::update() {
       if (_state == STATE_MENU) {
         int startY = 55;
         int btnHeight = 35;
-        int btnWidth = 360; // Widened for 3.5"
+        int btnWidth = 400; // Widened for 480w
         int gap = 8;
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -478,8 +478,8 @@ void DragMeterScreen::updateDisciplines() {
   // LOG DATA
   if (_runState == RUN_RUNNING && sessionManager.isLogging()) {
     // Time,Lat,Lon,Speed,Sats,Alt,Heading
-    String data = String(millis()) + "," + String(currentLat, 6) + "," +
-                  String(currentLon, 6) + "," + String(speed, 2) + "," +
+    String data = String(millis()) + "," + String(currentLat, 7) + "," +
+                  String(currentLon, 7) + "," + String(speed, 2) + "," +
                   String(gpsManager.getSatellites()) + "," +
                   String(currentAlt, 2) + "," +
                   String(gpsManager.getHeading(), 2);
@@ -671,7 +671,7 @@ void DragMeterScreen::drawDashboardStatic() {
   tft->setTextDatum(TL_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   if (_state == STATE_MENU) {
     _ui->setTitle("DRAG METER");
@@ -712,8 +712,8 @@ void DragMeterScreen::drawDashboardStatic() {
     }
 
     // Vertical Line splitting List and Highlight
-    tft->drawFastVLine(SCREEN_WIDTH / 2, 110, SCREEN_HEIGHT - 110 - 20,
-                       _ui->getTextColor()); // -20 for footer
+    tft->drawFastVLine(240, 110, SCREEN_HEIGHT - 110 - 20,
+                       _ui->getTextColor()); // Centered at 240 for 480w
 
     // List Area (Left)
     // Labels updated in Dynamic or Static? Labels are static.
@@ -823,10 +823,11 @@ void DragMeterScreen::drawSummary() {
   }
 
   // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextSize(2); // Org_01 size 2
-  tft->drawString("<", 10, 25);
+  // tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
+  // tft->setTextDatum(TL_DATUM);
+  // tft->setTextSize(2);
+  // tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
 
@@ -940,11 +941,7 @@ void DragMeterScreen::drawMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
 
@@ -974,11 +971,7 @@ void DragMeterScreen::drawDragModeMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
 
@@ -1008,11 +1001,7 @@ void DragMeterScreen::drawPredictiveMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
   // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
 

@@ -76,7 +76,7 @@ void RpmSensorScreen::onHide() {
 void RpmSensorScreen::update() {
   // 1. Back Button
   UIManager::TouchPoint p = _ui->getTouchPoint();
-  if (p.x != -1 && p.x < 60 && p.y < 60) {
+  if (_ui->isBackButtonTouched(p)) {
     _ui->switchScreen(SCREEN_MENU); // Instant Switch (Single Tap)
     return;
   }
@@ -131,9 +131,8 @@ void RpmSensorScreen::drawScreen() {
   tft->setTextSize(2);
   tft->drawString("RPM SENSOR", SCREEN_WIDTH / 2, headerY + 8);
 
-  // Back Button (Blue Triangle) - Top Left (Standardized)
-  // Triangle pointing Left: (10, 35), (22, 29), (22, 41)
-  tft->fillTriangle(10, 35, 22, 29, 22, 41, TFT_BLUE);
+  // Back Button (Blue Triangle) - Bottom Left (Standardized)
+  _ui->drawBackButton();
 
   // --- INFO CARDS ---
   int cardY = 55; // Shifted down from 30

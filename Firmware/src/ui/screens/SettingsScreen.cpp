@@ -443,13 +443,12 @@ void SettingsScreen::saveSetting(int idx) {
 
     if (item.key == "rpm_enabled") {
       extern GPSManager gpsManager;
-      gpsManager.setRpmEnabled(
-          !item.checkState); // Invert? No, item.checkState is the CURRENT state
-                             // *before* toggle?
-      // Wait, let's look at logic below: item.checkState = !item.checkState;
-      // The logic in handleTouch (line 601) toggles it BEFORE calling
-      // saveSetting. So item.checkState is the NEW desired state.
+      // gpsManager.setRpmEnabled handles Pin setup AND saving to Preferences
       gpsManager.setRpmEnabled(item.checkState);
+
+      // Avoid double-save race condition
+      _prefs.end();
+      return;
     }
 
     if (item.key == "wifi_hotspot") {
@@ -503,7 +502,8 @@ void SettingsScreen::update() {
     return;
 
   // FIX: Handle Top-Left Back Button for SD Test (Premium Layout)
-  if (_currentMode == MODE_SD_TEST && p.x < 60 && p.y < 60) {
+  // FIX: Handle Top-Left Back Button for SD Test (Premium Layout)
+  if (_currentMode == MODE_SD_TEST && _ui->isBackButtonTouched(p)) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
@@ -519,8 +519,8 @@ void SettingsScreen::update() {
     return;
   }
 
-  // Tombol Kembali (Bottom-Left corner, y > 210)
-  if (p.x < 80 && p.y > 210) {
+  // Tombol Kembali (Bottom-Left corner)
+  if (_ui->isBackButtonTouched(p)) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
@@ -608,7 +608,7 @@ void SettingsScreen::update() {
 
     int listY = 30;
     int itemH = 20;
-    int maxY = 210;
+    int maxY = SCREEN_HEIGHT - 40;
     int visibleItems = (maxY - listY) / itemH;
 
     if (_scrollOffset + visibleItems < _settings.size()) {
@@ -1013,9 +1013,9 @@ void SettingsScreen::drawAbout() {
   _ui->drawStatusBar(true);
 
   // Card Background
-  int cardX = 20;
+  int cardW = UI_CARD_W;
+  int cardX = (SCREEN_WIDTH - cardW) / 2;
   int cardY = 50;
-  int cardW = SCREEN_WIDTH - 40;
   int cardH = 160;
 
   tft->fillRoundRect(cardX, cardY, cardW, cardH, 10, 0x18E3); // Charcoal
@@ -1050,14 +1050,11 @@ void SettingsScreen::drawAbout() {
 void SettingsScreen::drawHeader(String title, uint16_t backColor) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Draw horizontal line at bottom gap (above the arrow area, like status bar
-  // line) tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Draw horizontal line at bottom gap (check if we need it)
+  // tft->drawFastHLine(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, COLOR_SECONDARY);
 
-  // Back Button at bottom-left - Blue filled triangle pointing LEFT
-  // Same size as MenuScreen arrows: 20px wide, 8px tall
-  // Points: left tip at (5, 225), right-top at (25, 221), right-bottom at (25,
-  // 229)
-  tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
+  // Back Button at bottom-left
+  _ui->drawBackButton();
 }
 
 void SettingsScreen::drawGPSStatus(bool force) {
@@ -1072,22 +1069,25 @@ void SettingsScreen::drawGPSStatus(bool force) {
     tft->setTextDatum(TL_DATUM);
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
-    tft->drawString("<", 10, 25);
+    // tft->drawString("<", 10, 25); // OLD
+    _ui->drawBackButton();
 
     // Static layout elements
     int yStats = 45; // Shifted up from 62 to prevent overlap
     int hStatsHeader = 18;
-    tft->fillRect(10, yStats, 160, hStatsHeader, _ui->getTextColor());
+    int statsW = 220; // Widened
+    tft->fillRect(10, yStats, statsW, hStatsHeader, _ui->getTextColor());
     tft->setTextColor(_ui->getBackgroundColor(), _ui->getTextColor());
     tft->setTextSize(1);
     tft->drawString("GPS STATUS", 15, yStats + 9);
 
     // List Rect
     int listH = 6 * 15 + 8; // 6 items * 15px + pad
-    tft->drawRect(10, yStats + hStatsHeader, 160, listH, _ui->getTextColor());
+    tft->drawRect(10, yStats + hStatsHeader, statsW, listH,
+                  _ui->getTextColor());
 
     // Radar
-    int cX = 245, cY = 120, r = 55;
+    int cX = 350, cY = 120, r = 55; // Shifted cX from 245 to 350 for 480w
 
     // Radar
     tft->drawCircle(cX, cY, r * 0.66, COLOR_SECONDARY);
@@ -1143,12 +1143,13 @@ void SettingsScreen::drawGPSStatus(bool force) {
       if (force) {
         tft->drawString(label, 15, y + (hItem / 2));
         tft->drawString(":", 60, y + (hItem / 2));
-        tft->drawFastHLine(10, y + hItem, 160, COLOR_SECONDARY);
+        int statsW = 220;
+        tft->drawFastHLine(10, y + hItem, statsW, COLOR_SECONDARY);
       }
 
       // Clear and draw value
-      tft->fillRect(75, y, 90, hItem - 1, _ui->getBackgroundColor());
-      tft->drawString(val, 75, y + (hItem / 2));
+      tft->fillRect(85, y, 130, hItem - 1, _ui->getBackgroundColor());
+      tft->drawString(val, 85, y + (hItem / 2));
     }
   };
 
@@ -1222,7 +1223,7 @@ void SettingsScreen::drawSDTest() {
 
   tft->setTextDatum(TL_DATUM);
   tft->setTextSize(1);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   int y = 60;
 
@@ -1337,10 +1338,10 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
     tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
   }
 
-  // List (starts at y=30, with gap after status bar)
+  // List
   int listY = 30;
   int itemH = 20;
-  int maxY = 210; // Bottom limit for list
+  int maxY = SCREEN_HEIGHT - 40; // Dynamic footer
 
   // Clear list area to prevent ghosts when scrolling
   if (force) {
@@ -1424,13 +1425,13 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
   // Draw bottom elements AFTER list
   if (force) {
     // Clear bottom area
-    tft->fillRect(0, 210, SCREEN_WIDTH, 30, COLOR_BG);
+    tft->fillRect(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, COLOR_BG);
 
     // Back Button (Left)
-    tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
+    _ui->drawBackButton();
 
     // Scroll Buttons (Right)
-    int btnY = 225; // Center Y of triangle
+    int btnY = SCREEN_HEIGHT - 25; // Center Y
     int btnSize = 10;
     // Down Arrow (Far Right)
     int downX = SCREEN_WIDTH - 30;

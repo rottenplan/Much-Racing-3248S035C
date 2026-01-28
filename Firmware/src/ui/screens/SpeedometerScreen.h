@@ -6,8 +6,10 @@
 
 class SpeedometerScreen : public UserScreen {
 public:
+  SpeedometerScreen(TFT_eSPI *tft); // Add Constructor
   void begin(UIManager *ui) override { _ui = ui; }
   void onShow() override;
+  void onHide() override; // Add onHide
   void update() override;
 
 private:

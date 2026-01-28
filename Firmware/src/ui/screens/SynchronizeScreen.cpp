@@ -35,7 +35,7 @@ void SynchronizeScreen::onShow() {
   tft->setTextSize(1); // Standard arrow size
   tft->setTextDatum(TL_DATUM);
   tft->setTextColor(TFT_WHITE, COLOR_BG);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   drawScreen(true);
 }
@@ -67,8 +67,8 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   }
 
   // --- STATUS CARD ---
-  int cardW = 400; // Widen for 480px screen (was 280)
-  int cardH = 100; // Compact height
+  int cardW = UI_CARD_W; // Widen for 480px screen
+  int cardH = 100;       // Compact height
   int cardX = (SCREEN_WIDTH - cardW) / 2;
   int cardY = 60;
 
@@ -106,7 +106,7 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   tft->drawString(lastSync, SCREEN_WIDTH / 2, cardY + 75);
 
   // --- SYNC BUTTON ---
-  int btnW = 180;
+  int btnW = UI_BTN_W;
   int btnH = 45;
   int btnX = (SCREEN_WIDTH - btnW) / 2;
   int btnY = 170;
@@ -135,7 +135,7 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
 
 void SynchronizeScreen::handleTouch(int x, int y) {
   // Back button area
-  if (x < 50 && y < 50) {
+  if (_ui->isBackButtonTouched(UIManager::TouchPoint(x, y))) {
     static unsigned long lastBackTap = 0;
     if (millis() - lastBackTap < 500) {
       _ui->switchScreen(SCREEN_MENU);
@@ -147,8 +147,9 @@ void SynchronizeScreen::handleTouch(int x, int y) {
   }
 
   // Sync Button Area (Bottom Position)
-  // BtnY = 170, BtnH = 45 -> Touch Y: 160 to 220 approx
-  if (!_isSyncing && y >= 160 && y <= 220) {
+  int btnX = (SCREEN_WIDTH - UI_BTN_W) / 2;
+  if (!_isSyncing && y >= 160 && y <= 220 && x >= btnX &&
+      x <= btnX + UI_BTN_W) {
     _isSyncing = true;
     _statusMessage = "CONNECTING...";
     _detailMessage = "Checking WiFi...";

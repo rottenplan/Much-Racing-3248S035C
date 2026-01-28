@@ -22,6 +22,8 @@ private:
 
   void drawLines();
   void drawCheckboxes();
+  void drawControls();
+  void drawLogBoxArea();
 };
 
 #endif

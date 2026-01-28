@@ -51,8 +51,8 @@ void TimeSettingScreen::update() {
     if (millis() - lastTouch > 200) {
       lastTouch = millis();
 
-      // 1. Back Button (Top Left)
-      if (p.x < 60 && p.y < 60) {
+      // 1. Back Button
+      if (_ui->isBackButtonTouched(p)) {
         static unsigned long lastBackTap = 0;
         if (millis() - lastBackTap < 500) {
           _ui->switchScreen(SCREEN_SETTINGS);
@@ -156,7 +156,7 @@ void TimeSettingScreen::drawScreen() {
   tft->setTextDatum(TL_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   // Title
   tft->setTextColor(COLOR_TEXT, COLOR_BG);

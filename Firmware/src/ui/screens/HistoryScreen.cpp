@@ -36,7 +36,7 @@ void HistoryScreen::onShow() {
   tft->drawString("HISTORY", SCREEN_WIDTH / 2, 28);
 
   // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  _ui->drawBackButton();
 
   drawMenu();
 }
@@ -148,7 +148,8 @@ void HistoryScreen::update() {
       // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log
       // style
       // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log style
-      if (tx < 60 && ty > 180) {
+      // Global Back Button (Bottom Left)
+      if (_ui->isBackButtonTouched(UIManager::TouchPoint(tx, ty))) {
         // Single Tap Logic
         if (_currentMode == MODE_MENU) {
           _ui->switchScreen(SCREEN_MENU);
@@ -428,6 +429,7 @@ void HistoryScreen::drawMenu() {
     tft->drawRect(x, y, btnWidth, btnHeight, TFT_DARKGREY);
     tft->drawString(items[i], SCREEN_WIDTH / 2, y + (btnHeight / 2));
   }
+  _ui->drawBackButton();
 }
 
 void HistoryScreen::drawGroups(int scrollOffset) {
@@ -483,6 +485,7 @@ void HistoryScreen::drawGroups(int scrollOffset) {
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->drawString("No Groups Found", SCREEN_WIDTH / 2, 120);
   }
+  _ui->drawBackButton();
 }
 
 void HistoryScreen::drawList(int scrollOffset) {
@@ -605,8 +608,8 @@ void HistoryScreen::drawList(int scrollOffset) {
     // X Positions for 480px width
     // ID: 20
     // Date: 100
-    // Time/Result: 320
-
+    // Time/Result: 400 (Adjusted for 480w)
+    int col3X = 400;
     tft->drawString(bufID, 20, y + 4, 2); // Font 2
     tft->drawString(dDisp, 100, y + 4, 2);
 
@@ -615,11 +618,11 @@ void HistoryScreen::drawList(int scrollOffset) {
       float res = _historyList[i].bestLap / 1000.0;
       String resStr = String(res, 2) + "s";
       tft->setTextColor(TFT_ORANGE, TFT_BLACK);
-      tft->drawString(resStr, 320, y + 4, 2);
+      tft->drawString(resStr, col3X, y + 4, 2);
     } else {
       // Show Time of Day
       tft->setTextColor(TFT_WHITE, TFT_BLACK);
-      tft->drawString(tRaw, 320, y + 4, 2);
+      tft->drawString(tRaw, col3X, y + 4, 2);
     }
 
     count++;
@@ -632,7 +635,8 @@ void HistoryScreen::drawList(int scrollOffset) {
   }
 
   // Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  // Back Triangle
+  _ui->drawBackButton();
 }
 
 void HistoryScreen::scanGroups() {
@@ -698,7 +702,8 @@ void HistoryScreen::drawOptions() {
   }
 
   // Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  // Back Triangle
+  _ui->drawBackButton();
 }
 
 void HistoryScreen::drawViewData() {

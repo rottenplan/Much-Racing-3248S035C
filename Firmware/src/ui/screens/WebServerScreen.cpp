@@ -34,7 +34,7 @@ void WebServerScreen::drawStatic() {
   // Back
   tft->setTextDatum(TL_DATUM);
   tft->setTextSize(1);
-  tft->drawString("<", 10, 25);
+  _ui->drawBackButton();
 
   // Instructions
   tft->setTextDatum(MC_DATUM);
@@ -99,7 +99,7 @@ void WebServerScreen::update() {
     _lastTouchTime = millis();
 
     // Back Button
-    if (p.x < 60 && p.y < 60) {
+    if (_ui->isBackButtonTouched(p)) {
       _ui->switchScreen(SCREEN_SETTINGS); // Return to Settings
       return;
     }

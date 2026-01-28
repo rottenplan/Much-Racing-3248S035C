@@ -2,6 +2,7 @@
 #define UI_MANAGER_H
 
 #include "../config.h"
+#include "screens/TrackData.h"
 #include <TFT_eSPI.h>
 
 // Forward declaration
@@ -22,10 +23,17 @@ enum ScreenType {
   SCREEN_GPS_STATUS,
   SCREEN_SYNCHRONIZE,
   SCREEN_GNSS_LOG,
-  SCREEN_WEB_SERVER
+  SCREEN_WEB_SERVER,
+  SCREEN_TRACK_RECORDER,
+  SCREEN_SESSION_SUMMARY,
+  SCREEN_RACING_DASHBOARD
 };
 
-// ...
+// Global Layout Constants for 480x320
+#define UI_CARD_W (SCREEN_WIDTH - 40)
+#define UI_BTN_W 240
+#define UI_POPUP_W 320
+#define UI_MARGIN 20
 
 class UserScreen {
 public:
@@ -35,19 +43,21 @@ public:
   virtual void update() = 0;
 };
 
-// Include the Touch class declaration (using forward decl if possible to avoid
-// circular dep)
 #include "TAMC_GT911.h"
-
-// ... existing code ...
 
 class UIManager {
 public:
+  struct TouchPoint {
+    int x;
+    int y;
+    TouchPoint(int _x = -1, int _y = -1) : x(_x), y(_y) {}
+  };
+
   UIManager(TFT_eSPI *tft);
   void begin();
   void update();
   void switchScreen(ScreenType type);
-  void drawStatusBar(bool force = false); // Added force parameter
+  void drawStatusBar(bool force = false);
   void setTitle(String title) { _screenTitle = title; }
   void setAutoOff(unsigned long ms);
   void setBrightness(int level);
@@ -55,36 +65,37 @@ public:
   void checkSleep();
   void updateInteraction();
 
-  // UI Helper
   void showToast(String message, int duration = 2000);
   void drawCarbonBackground(int x, int y, int w, int h);
+  void drawBackButton();
+  bool isBackButtonTouched(TouchPoint p);
 
-  // Touch Handling
   void setTouch(TAMC_GT911 *touch) { _touch = touch; }
   TAMC_GT911 *getTouch() { return _touch; }
-
-  struct TouchPoint {
-    int x;
-    int y;
-  };
   TouchPoint getTouchPoint();
-
   TFT_eSPI *getTft() { return _tft; }
 
-  // Theme Support
   void setDarkMode(bool enable);
   bool isDarkMode() { return _isDarkMode; }
   uint16_t getBackgroundColor();
   uint16_t getTextColor();
   uint16_t getSecondaryColor();
 
+  // Session Data Sharing
+  void setLastSession(ActiveSessionData data) { _lastSession = data; }
+  ActiveSessionData &getLastSession() { return _lastSession; }
+  void setSelectedTrack(Track t) { _selectedTrack = t; }
+  Track &getSelectedTrack() { return _selectedTrack; }
+
 private:
   TFT_eSPI *_tft;
-  TAMC_GT911 *_touch; // Added touch pointer
+  TAMC_GT911 *_touch;
   UserScreen *_currentScreen;
   ScreenType _currentType;
   bool _isDarkMode;
-  // ... existing code ...
+
+  ActiveSessionData _lastSession;
+  Track _selectedTrack;
 
   // Screens
   UserScreen *_splashScreen;
@@ -95,15 +106,17 @@ private:
   UserScreen *_historyScreen;
   UserScreen *_settingsScreen;
   UserScreen *_timeSettingScreen;
-  // UserScreen *_autoOffScreen;
   UserScreen *_rpmSensorScreen;
   UserScreen *_speedometerScreen;
   UserScreen *_gpsStatusScreen;
   UserScreen *_synchronizeScreen;
   UserScreen *_gnssLogScreen;
   UserScreen *_webServerScreen;
+  UserScreen *_trackRecorderScreen;
+  UserScreen *_sessionSummaryScreen;
+  UserScreen *_racingDashboardScreen;
 
-  String _screenTitle; // Added title
+  String _screenTitle;
 
   // Status Bar State Trackers
   String _lastTimeStr;
@@ -112,18 +125,18 @@ private:
   int _lastSignalStrength;
   int _lastBat;
   bool _lastLogging;
-  int _lastWifiStatus; // -1 = unknown, 0 = disconnected, 1 = connected
+  int _lastWifiStatus;
 
   // Sleep / Auto-Off
   unsigned long _lastInteractionTime;
   unsigned long _autoOffMs;
   bool _isScreenOff;
-  int _currentBrightness; // To restore after sleep
+  int _currentBrightness;
 
   // Wakeup
   unsigned long _lastTapTime;
   bool _wasTouched;
-  unsigned long _lastTouchProcessedTime; // Added for debounce
+  unsigned long _lastTouchProcessedTime;
 };
 
 #endif

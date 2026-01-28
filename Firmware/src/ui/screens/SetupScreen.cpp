@@ -113,8 +113,8 @@ void SetupScreen::drawWelcome() {
                   SCREEN_HEIGHT * 0.50); // ~160 on 320h
 
   // Continue button
-  drawButton("TAP TO BEGIN", SCREEN_WIDTH / 2 - 80, SCREEN_HEIGHT * 0.70, 160,
-             40, false); // ~224 on 320h
+  drawButton("TAP TO BEGIN", (SCREEN_WIDTH - UI_BTN_W) / 2,
+             SCREEN_HEIGHT * 0.70, UI_BTN_W, 40, false); // ~224 on 320h
 }
 
 void SetupScreen::drawComplete() {
@@ -140,8 +140,8 @@ void SetupScreen::drawComplete() {
 
   // Continue button
   // Continue button
-  drawButton("START RACING", SCREEN_WIDTH / 2 - 80, SCREEN_HEIGHT * 0.70, 160,
-             40, false);
+  drawButton("START RACING", (SCREEN_WIDTH - UI_BTN_W) / 2,
+             SCREEN_HEIGHT * 0.70, UI_BTN_W, 40, false);
 }
 
 // Updated Account Setup (Compact Layout)
@@ -335,10 +335,9 @@ void SetupScreen::drawWiFiSetup(bool fullRedraw) {
 
 void SetupScreen::handleWelcomeTouch(int x, int y) {
   // Check if "TAP TO BEGIN" button was pressed
-  // Button drawn at: SCREEN_WIDTH / 2 - 80, SCREEN_HEIGHT * 0.70, 160, 40
-  int btnX = SCREEN_WIDTH / 2 - 80;
+  int btnW = UI_BTN_W;
+  int btnX = (SCREEN_WIDTH - btnW) / 2;
   int btnY = SCREEN_HEIGHT * 0.70;
-  int btnW = 160;
   int btnH = 40;
 
   if (x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH) {
@@ -493,8 +492,9 @@ void SetupScreen::handleWiFiTouch(int x, int y) {
 
 void SetupScreen::handleCompleteTouch(int x, int y) {
   int btnY = SCREEN_HEIGHT * 0.70;
-  if (y >= btnY && y <= btnY + 40 && x >= SCREEN_WIDTH / 2 - 80 &&
-      x <= SCREEN_WIDTH / 2 + 80) {
+  int btnW = UI_BTN_W;
+  int btnX = (SCREEN_WIDTH - btnW) / 2;
+  if (y >= btnY && y <= btnY + 40 && x >= btnX && x <= btnX + btnW) {
     saveSetupComplete();
     _ui->switchScreen(SCREEN_MENU);
   }
