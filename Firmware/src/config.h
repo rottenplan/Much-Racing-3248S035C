@@ -46,10 +46,10 @@
 #define PIN_RPM_INPUT 35 // RPM Input moved to 35
 
 // GPS / UART
-// Standard Serial Pins (Conflict with USB Debugging!)
-#define PIN_GPS_RX 3
-#define PIN_GPS_TX 1
-#define GPS_BAUD 115200 // Increased from 9600 for faster GPS lock
+// Set for Connector P1 (4-pin white) - SWAPPED AGAIN
+#define PIN_GPS_RX 22
+#define PIN_GPS_TX 21
+#define GPS_BAUD 115200
 // #define PIN_LIGHT_SENSOR 34 // Removed: Used for Battery
 #define PIN_BATTERY 34 // Battery Input moved to 34
 #define BATTERY_VOLTAGE_MAX 4.2

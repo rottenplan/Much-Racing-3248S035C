@@ -24,8 +24,8 @@ SyncManager syncManager;
 // SPIClass touchSpi = SPIClass(HSPI); // Tidak diperlukan untuk I2C
 
 void setup() {
-  // Serial.begin(115200); // Disabled to allow GPS on Pins 1 & 3
-  // Serial.println("Starting RaceBox Clone...");
+  Serial.begin(115200);
+  Serial.println("Starting RaceBox Clone...");
 
   // Inisialisasi Pin
   // Force Backlight OFF immediately to prevent startup glitches

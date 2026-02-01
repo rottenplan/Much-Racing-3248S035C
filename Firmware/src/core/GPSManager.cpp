@@ -13,14 +13,11 @@ void GPSManager::begin() {
   _txPin = prefs.getInt("gps_tx_pin", PIN_GPS_TX);
   _baudRate = prefs.getInt("gps_baud", GPS_BAUD);
 
-  // Load Other Config
   _totalDistance = prefs.getDouble("total_trip", 0.0);
   _currentGnssMode = prefs.getInt("gnss_mode", 1);
   _currentDynModel = prefs.getInt("gnss_model", 3);
   _currentSBAS = prefs.getInt("gnss_sbas", 0);
-  _currentSBAS = prefs.getInt("gnss_sbas", 0);
   _projectionEnabled = prefs.getBool("gnss_proj", true);
-  _utcOffset = prefs.getInt("utc_offset", 0);
   _utcOffset = prefs.getInt("utc_offset", 0);
   _rpmEnabled = prefs.getBool("rpm_enabled", true); // Default: Enabled
 
@@ -56,6 +53,11 @@ void GPSManager::begin() {
     disableUnnecessarySentences();
 
     setGnssMode(_currentGnssMode);
+
+    // Force NMEA RMC enable just in case
+    const uint8_t enableRmc[] = {0xB5, 0x62, 0x06, 0x01, 0x03, 0x00,
+                                 0xF0, 0x04, 0x01, 0xFF, 0x18};
+    sendUBX(enableRmc, sizeof(enableRmc));
     setDynamicModel(_currentDynModel);
     setSBASConfig(_currentSBAS);
   }
@@ -424,6 +426,7 @@ double GPSManager::distanceBetween(double lat1, double long1, double lat2,
 
 void GPSManager::sendUBX(const uint8_t *cmd, int len) {
   if (_gpsSerial) {
+    Serial.printf("Sending UBX command (len: %d)\n", len);
     _gpsSerial->write(cmd, len);
   }
 }
@@ -476,6 +479,7 @@ void GPSManager::setGnssMode(uint8_t mode) {
     // For 9600 baud, force 1Hz to be safe.
     targetRate = 1;
   }
+  Serial.printf("Setting GPS Frequency Limit to %d Hz...\n", targetRate);
   setFrequencyLimit(targetRate);
   _currentGnssMode = mode;
 

@@ -262,13 +262,13 @@ void SettingsScreen::loadSettings() {
 
     // 6. GNSS RX PIN
     SettingItem rxPin = {"GNSS RX PIN", TYPE_VALUE, "gps_rx_pin"};
-    // Options: 17, 16, 1, 3
-    rxPin.options = {"17 (Def)", "16", "1 (TX0)", "3 (RX0)"};
+    // Options: 21, 22, 1, 3
+    rxPin.options = {"21", "22 (P1-RX)", "1 (TX0)", "3 (RX0)"};
 
     extern GPSManager gpsManager;
     int curRx = gpsManager.getRxPin();
-    rxPin.currentOptionIdx = 0; // Default 17
-    int validRxCheck[] = {17, 16, 1, 3};
+    rxPin.currentOptionIdx = 1; // Default 22 (P1)
+    int validRxCheck[] = {21, 22, 1, 3};
     for (int i = 0; i < 4; i++) {
       if (validRxCheck[i] == curRx) {
         rxPin.currentOptionIdx = i;
@@ -279,10 +279,11 @@ void SettingsScreen::loadSettings() {
 
     // 7. GNSS TX PIN
     SettingItem txPin = {"GNSS TX PIN", TYPE_VALUE, "gps_tx_pin"};
-    txPin.options = {"17 (Def)", "16", "1 (TX0)", "3 (RX0)"};
+    // Options: 21, 22, 1, 3
+    txPin.options = {"21 (P1-TX)", "22", "1 (TX0)", "3 (RX0)"};
     int curTx = gpsManager.getTxPin();
-    txPin.currentOptionIdx = 0; // Default 17
-    int validTxCheck[] = {17, 16, 1, 3};
+    txPin.currentOptionIdx = 0; // Default 21
+    int validTxCheck[] = {21, 22, 1, 3};
     for (int i = 0; i < 4; i++) {
       if (validTxCheck[i] == curTx) {
         txPin.currentOptionIdx = i;
@@ -410,8 +411,8 @@ void SettingsScreen::saveSetting(int idx) {
 
     if (item.key == "gps_rx_pin" || item.key == "gps_tx_pin") {
       // Map index to pin value
-      int validRxCheck[] = {17, 16, 1, 3};
-      int validTxCheck[] = {17, 16, 1, 3};
+      int validRxCheck[] = {21, 22, 1, 3};
+      int validTxCheck[] = {21, 22, 1, 3};
 
       // Get fresh pin values from other settings if just changing one
       int newRx = gpsManager.getRxPin();
